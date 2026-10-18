@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from .unit import STAGES,confined,digest,encoded,fingerprint,inventory
 from .store import read_json,immutable,load_state,save_state,new_attempt,write_receipt,record_event,acquire_lease,release_lease,lease_path
-from .adapters.base import probe_cli,build_command,child_environment,parse_event
+from .adapters.base import probe_cli,build_command,child_environment,parse_event,exact_write_rules
 from .transport import observe
 
 RESPONSE_SCHEMA={'type':'object','properties':{'stage':{'type':'string'},'summary':{'type':'string'},'assumptions':{'type':'array','items':{'type':'string'}},'references':{'type':'array','items':{'type':'string'}},'changes':{'type':'array','items':{'type':'string'}}},'required':['stage','summary','assumptions','references','changes'],'additionalProperties':False}
@@ -71,7 +71,7 @@ def answer_valid(answer,stage):
     if not answer['references']:raise ValueError('source references required')
 
 
-def execute_stage(run,stage,command=None,resume_id=None,attention_after_s=300):
+def execute_stage(run,stage,command=None,resume_id=None,attention_after_s=300,approved_writes=()):
     token=acquire_lease(run,{'pid':os.getpid(),'stage':stage})
     child_finished=False;observing=False;a=None
     try:
@@ -89,6 +89,8 @@ def execute_stage(run,stage,command=None,resume_id=None,attention_after_s=300):
         else:start_expected=expected
         if inventory(work)!=start_expected:raise ValueError('unexpected workspace changes')
         engine=p['unit']['engines'][stage]['engine'];model=p['unit']['engines'][stage].get('model')
+        if approved_writes and (stage!='implement' or engine!='claude' or command is not None):raise ValueError('exact native write grant is only for a Claude implementation invocation')
+        grants=exact_write_rules(work,approved_writes,p['unit']['outputs'])
         info=None
         if command is None:
             info=probe_cli(engine)
@@ -100,8 +102,11 @@ def execute_stage(run,stage,command=None,resume_id=None,attention_after_s=300):
         immutable(a/'response-schema.json',schema)
         if info:immutable(a/'cli.json',info)
         packet=request_packet(run,stage,p,parent)
+        packet['explicit_native_write_grants']=grants
         immutable(a/'request.json',packet)
         if command is None:command=build_command(engine,stage,a,model,resume_id)
+        for grant in grants:command+=['--allowedTools',grant]
+        immutable(a/'command.json',{'argv':command,'cwd':str(work)})
         s['status']='running';s['current']={'attempt_id':a.name,'stage':stage};save_state(run,s)
         record_event(run,dict(type='stage-started',attempt=a.name,stage=stage))
         observing=True

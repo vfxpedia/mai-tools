@@ -2,7 +2,7 @@
 > Author: MAI maintainers · 2026-10-18
 > Basis: Approved implementation plan · mai-tools #1 · mai-os #49
 > Summary: Versioned units, immutable process evidence, conservative leases and fixed-test verification
-> Status: Draft alpha. Independent review, native integration and platform measurements pending
+> Status: Draft alpha. Windows native integration and WSL offline measured; independent review and CI pending
 
 # Design
 
@@ -18,16 +18,20 @@ The verifier runs fixed unittest argv and a fixed negative control. It rejects z
 
 | Gate | Evidence | Current result |
 |---|---|---|
-| G1 Real input | Local version/auth probes and owned fixture | Probes measured; real model experiment pending |
-| G2 Known answers | Seven offline test files, process fixtures, fixed affine oracle | Core tests measured on Windows; mutation audit pending |
+| G1 Real input | Local subscription CLI probes and owned affine fixture | Windows Codex 0.162.1 and Claude 2.1.302: full stages, 4 mathematical tests, declared negative control and exact-ID failed-stage continuation passed |
+| G2 Known answers | Seven offline test files, process fixtures, fixed affine oracle | Windows and WSL core measured; explicit mutation probes in progress |
 | G3 Independent review | One whole-branch reviewer and regression findings | Pending |
-| G4 Systems | Shared runner on Windows/Linux/macOS | Local Windows measured; CI and WSL pending |
-| G5 Hygiene | Repository hygiene gate and archive inventory | Pending |
+| G4 Systems | Shared runner on Windows/Linux/macOS | Windows and WSL offline core measured; hosted CI pending. WSL native Codex unavailable, Claude subscription not confirmed; no credential copy or native call there |
+| G5 Hygiene | Repository hygiene gate and archive inventory | Staged source hygiene: zero findings. Wheel contains package and metadata only; source archive final check pending |
 | G6 English first | README, DESIGN, provenance | Written |
-| G7 User layer | Fresh-shell CLI and isolated package install | CLI help/prepare/status measured; install pending |
+| G7 User layer | Fresh-shell CLI and isolated package install | Install-free CLI and isolated venv console entry measured; native `resume` passed both engine fixtures |
 | G8 Limits stated | This table and README | Missing measurements explicitly pending |
 
 Not measured: scientific equivalence to any paper, GPU experiments, unattended long-duration quotas, native macOS login, independent Ubuntu desktop login, adversarial same-user filesystem modification. Existing other MAI tools and Mods are not recertified by mai-code's tests.
+
+Native experiment budget was 4 Codex calls and 5 Claude calls including failed attempts. Codex's prose change manifest was correctly rejected; a strict file-path enum and corrected stage-baseline comparison allowed an exact-ID continuation without changing the generated module. Claude's initial Write denial was preserved. After the owner explicitly approved only the synthetic output file, a native exact-path grant was tested. Its first Windows spelling failed; the documented drive normalization fixed it. No broad tool allow, bypass mode or global permission edit was used. Original failed attempts, prompts, streams and native histories remain retained.
+
+Existing Mods attribution was checked separately: Claude fixture IDs appeared in shared sessions/units; Codex exec fixture IDs did not. This does not prove all native lifecycle hooks fired, and no gauge installation/configuration was changed to hide that gap. The reusable executor remains usable independently of the unfinished compact-boundary or hook integration work.
 
 ## Accepted boundaries
 

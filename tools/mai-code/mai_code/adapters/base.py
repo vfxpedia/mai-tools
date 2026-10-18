@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from . import codex,claude
 from ..store import read_json
+from ..unit import confined
 
 PARENT_ENV={'CODEX_THREAD_ID','CODEX_TURN_ID','CLAUDECODE','CLAUDE_CODE_SESSION_ID','ORCA_TERMINAL_HANDLE','ORCA_AGENT_SESSION_ID'}
 CONFLICTS={'codex':{'OPENAI_API_KEY','CODEX_API_KEY','OPENAI_BASE_URL','CODEX_BASE_URL'},'claude':{'ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','ANTHROPIC_BASE_URL','CLAUDE_CODE_USE_BEDROCK','CLAUDE_CODE_USE_VERTEX','CLAUDE_CODE_USE_FOUNDRY'}}
@@ -76,3 +77,20 @@ def build_command(engine,stage,attempt,model=None,resume_id=None):
 def parse_event(engine,record):
     if not isinstance(record,dict):raise ValueError('native event must be an object')
     return (codex if engine=='codex' else claude).parse(record)
+
+
+def exact_write_rules(work,paths,outputs):
+    rules=[]
+    for rel in paths:
+        if rel not in outputs[2:] or re.search(r'[*?\[\]{}()!\r\n]',rel):raise ValueError('explicit write grant must name an exact declared implementation output')
+        target=confined(Path(work),rel)
+        rules.append(native_edit_rule(target))
+    return rules
+
+
+def native_edit_rule(target):
+    text=target.as_posix()
+    if target.drive:
+        if not re.fullmatch('[a-zA-Z]:',target.drive):raise ValueError('network write grants unsupported')
+        text='/'+target.drive[0].lower()+text[2:]
+    return 'Edit(/'+text+')'

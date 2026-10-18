@@ -69,4 +69,16 @@ class AdapterTests(unittest.TestCase):
         self.assertIn('--json-schema',args)
         self.assertEqual(json.loads(args[args.index('--json-schema')+1]),{'type':'object'})
 
+    def test_exact_write_grants_are_explicit_and_confined(self):
+        rules=self.a.exact_write_rules(self.path,['affine.py'],['analysis.json','plan.json','affine.py'])
+        target=(self.path/'affine.py').as_posix()
+        if sys.platform=='win32':target='/'+target[0].lower()+target[2:]
+        self.assertEqual(rules,['Edit(/'+target+')'])
+        for rel in ('../escape','affine*.py','analysis.json'):
+            with self.subTest(rel=rel),self.assertRaises(ValueError):self.a.exact_write_rules(self.path,[rel],['analysis.json','plan.json','affine.py'])
+
+    def test_windows_permission_drive_normalization(self):
+        from pathlib import PureWindowsPath
+        self.assertEqual(self.a.native_edit_rule(PureWindowsPath('C:/owned/affine.py')),'Edit(//c/owned/affine.py)')
+
 if __name__=='__main__':unittest.main()

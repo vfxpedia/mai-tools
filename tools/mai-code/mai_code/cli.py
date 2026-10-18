@@ -19,7 +19,9 @@ def main(argv=None):
     prepare=sub.add_parser('prepare');prepare.add_argument('unit_file',type=Path);prepare.add_argument('--data-root',type=Path,default=Path.home()/'.mai'/'mai-code')
     for operation in ('status','run','resume','verify'):
         op=sub.add_parser(operation);op.add_argument('run',type=Path)
-        if operation in ('run','resume'):op.add_argument('--through',choices=[*STAGES,'verify'],default='verify')
+        if operation in ('run','resume'):
+            op.add_argument('--through',choices=[*STAGES,'verify'],default='verify')
+            op.add_argument('--allow-write',action='append',default=[],metavar='EXACT_OUTPUT',help='Explicit per-invocation native Claude file permission; only declared implementation outputs, no wildcards or global writes')
         if operation=='verify':op.add_argument('--existing',action='store_true')
     args=p.parse_args(argv)
     try:
@@ -46,7 +48,7 @@ def main(argv=None):
                 a=run/'attempts'/state['current']['attempt_id'];receipt=read_json(a/'receipt.json')
                 decision=resume_decision(run,{'active':False,'session_id':receipt.get('native_session_id')})
                 if decision['decision']!='continue_exact_session':raise ValueError(decision['reason'])
-                result=execute_stage(run,decision['stage'],resume_id=decision['session_id'])
+                result=execute_stage(run,decision['stage'],resume_id=decision['session_id'],approved_writes=args.allow_write)
                 if result['status']!='passed':print(json.dumps(result));return 2
         end=(*STAGES,'verify').index(args.through)
         while True:
@@ -57,7 +59,7 @@ def main(argv=None):
             if (*STAGES,'verify').index(stage)>end:print(json.dumps({'status':'boundary-complete','through':args.through,'next':stage,'run':str(run)}));return 0
             if stage=='verify':
                 u=read_json(run/'packet.json')['unit'];result=verify_unit(run,u['test_argv'],u['negative_control_argv']);print(json.dumps(result));return 0 if result['unit_passed'] else 1
-            result=execute_stage(run,stage)
+            result=execute_stage(run,stage,approved_writes=args.allow_write if stage=='implement' else ())
             if result['status']!='passed':print(json.dumps({'status':'needs-attention','stage':stage,'diagnostic':result.get('diagnostic'),'run':str(run)}));return 2
     except (ValueError,OSError,KeyError) as e:
         # Never include subprocess/environment exception representations or credentials.

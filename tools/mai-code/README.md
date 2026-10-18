@@ -2,7 +2,7 @@
 > Author: MAI maintainers · 2026-10-18
 > Basis: mai-tools #1 · mai-os #49 · official local CLI contracts
 > Summary: Analyze paper extracts and implement bounded modules with existing CLI login and retained evidence
-> Status: Draft alpha 0.1.0a1. Offline core measured on Windows; native and cross-system results pending below
+> Status: Draft alpha 0.1.0a1. Windows native Codex/Claude fixture and exact-ID resume measured; release review and CI pending
 
 # mai-code
 
@@ -52,6 +52,8 @@ mai-code verify <reported-run-path> --existing
 Exit codes: 0 requested operation succeeded, 1 deterministic verification failed, 2 invalid/refused/incomplete operation. A prepared or analysis-only unit is **not** a passed implementation. A standalone verifier can pass its tests without marking incomplete stages as unit-passed.
 
 For an ordinary stopped boundary use `mai-code run` or `mai-code resume`. A failed closed attempt can use `resume` only with its exact recorded native UUID, unchanged inputs/workspace and known process exit. No global `--last`, `--continue`, engine switch or automatic retry. A missing receipt or unknown lease requires human reconciliation; the tool never deletes a stale lease by guessing a PID is dead. Do not remove a lease while a child could still run. Preserve the original run and create a newly approved unit for changed inputs or acceptance criteria.
+
+If Claude's native permission layer refuses an implementation write, the owner can explicitly grant only a declared file for that invocation: `mai-code resume <run-path> --allow-write module.py`. Repeat the flag for individually approved outputs. No wildcard, traversal, input, analysis/plan output or undeclared path is accepted. This creates a native `Edit(exact-path)` rule, which Claude uses for Write too, not a global setting or bypass mode. On Windows the rule's drive is normalized as `/c/...`, per the official permission contract. Existing deny/ask rules can still refuse it. Never substitute a shell write for a native refusal.
 
 When a call exceeds its attention threshold, `attempts/<id>/lifecycle.jsonl` records the live PID and attention event while both streams continue draining. This is **not cancellation or completion**. `status` reports the current attempt. Native permissions can refuse a write, especially in non-interactive mode. Do not disable permissions/hooks to turn a refusal into success.
 

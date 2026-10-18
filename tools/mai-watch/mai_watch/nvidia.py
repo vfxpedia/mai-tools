@@ -6,6 +6,7 @@ NVML through pynvml is a later source (M3): it is not installed on the reference
 """
 import csv
 import io
+import math
 import subprocess
 
 GPU_QUERY = 'index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw'
@@ -23,6 +24,8 @@ def num(field):
     try:
         v = float(s)
     except ValueError:
+        return None
+    if not math.isfinite(v):          # NaN or inf from a damaged row is not a reading (review R8)
         return None
     return int(v) if v == int(v) else v
 

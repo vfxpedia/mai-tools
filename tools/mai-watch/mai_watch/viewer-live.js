@@ -95,6 +95,8 @@
     return isFinite(s) ? 'resets in ' + ago(Math.max(0, s)) : 'reset time unknown';
   }
 
+  function sinceIso(iso) { var t = Date.parse(iso || ''); return isFinite(t) ? Math.max(0, (Date.now() - t) / 1000) : null; }
+
   function table(head, rows, cls) {
     var t = el('table', undefined, cls || ''), tr = el('tr');
     head.forEach(function (h) { tr.appendChild(el('th', h)); });
@@ -121,6 +123,7 @@
     var rows = (slow.paths || []).map(function (p) {
       var free = el('span', p.free_gib === null || p.free_gib === undefined ? 'unknown' : p.free_gib.toFixed(p.free_gib < 100 ? 1 : 0) + ' GiB free', 'strong');
       var st = p.state === 'ok' ? 'answers in ' + p.answer_ms + ' ms' : p.state + (p.error ? ': ' + p.error : '') + (p.waiting_s ? ' (waiting ' + p.waiting_s + ' s)' : '');
+      if (p.checked_at) st += ', checked ' + ago(sinceIso(p.checked_at)) + ' ago';
       var used = el('span', undefined, 'meter-cell');
       used.appendChild(bar(p.used_pct, p.state !== 'ok' ? 'off' : p.used_pct >= 95 ? 'hot' : ''));
       used.appendChild(el('span', p.used_pct === null || p.used_pct === undefined ? 'unknown' : p.used_pct.toFixed(1) + '% used'));
@@ -128,6 +131,7 @@
       return row;
     });
     box.appendChild(table(['folder', 'free', 'used', 'size', 'state'], rows, 'compact'));
+    if (slow.paths_dropped && slow.paths_dropped.length) box.appendChild(el('p', slow.paths_dropped.length + ' more folders not watched (limit 64)', 'warn live-problems'));
     return box;
   }
 
@@ -160,7 +164,7 @@
         var c = el('span', undefined, 'meter-cell');
         if (!w) { c.appendChild(el('span', 'not recorded')); return c; }
         c.appendChild(bar(w.pct, w.pct !== null && w.pct >= 90 ? 'hot' : ''));
-        c.appendChild(el('span', (w.pct === null ? 'unknown' : w.pct + '%') + ', ' + untilText(w.reset) + ', read ' + ago(w.read_age_s) + ' ago' + (w.note ? ' (' + w.note + ')' : '')));
+        c.appendChild(el('span', (w.pct === null ? 'unknown' : w.pct + '%') + ', ' + untilText(w.reset) + ', read ' + ago(sinceIso(w.read_at)) + ' ago' + (w.note ? ' (' + w.note + ')' : '')));
         return c;
       }
       return [r.engine + ' (' + r.account + ')', cell(r.five_hour), cell(r.seven_day)];
@@ -168,15 +172,19 @@
     if (u.limits === null) box.appendChild(el('p', u.limits_problem || 'limits unknown', 'mono'));
     else box.appendChild(table(['account', '5-hour window', '7-day window'], lim, 'compact'));
     var all = u.sessions || [];
-    var busy = all.filter(function (r) { return r.turns_today > 0 || r.last_active_s < 3600; });
+    var busy = all.filter(function (r) { return (r.turns_today || 0) > 0 || r.last_active_s < 3600; });
     var quiet = all.filter(function (r) { return busy.indexOf(r) < 0; });
+    // a sum over fewer turns than were made says so: it is a known part, not the total
+    function cover(known, all) { return all && known < all ? ' (' + known + ' of ' + all + ' turns known)' : ''; }
     function sesRows(list) { return list.map(function (r) {
       return [r.name || r.id.slice(0, 8), r.engine || 'unknown', r.context_pct === null || r.context_pct === undefined ? 'unknown' : r.context_pct + '%',
-        String(r.turns_today), r.cost_usd_today === null ? 'unknown' : '$' + r.cost_usd_today.toFixed(2),
-        r.tokens_today === null ? 'unknown' : (r.tokens_today / 1e6).toFixed(1) + ' M', ago(r.last_active_s) + ' ago', r.doing || ''];
+        r.turns_today === null ? 'no record today' : String(r.turns_today),
+        r.cost_usd_today === null ? 'unknown' : '$' + r.cost_usd_today.toFixed(2) + cover(r.cost_turns, r.turns_today),
+        r.tokens_today === null ? 'unknown' : (r.tokens_today / 1e6).toFixed(1) + ' M' + cover(r.token_turns, r.turns_today), ago(r.last_active_s) + ' ago', r.doing || ''];
     }); }
     var head = ['session', 'engine', 'context', 'turns today', 'cost today (API price estimate)', 'tokens today', 'last active', 'doing'];
     box.appendChild(table(head, sesRows(busy), 'compact'));
+    if (u.read_at) box.appendChild(el('p', 'usage read ' + ago(sinceIso(u.read_at)) + ' ago' + (u.problems && u.problems.length ? '; ' + u.problems.join('; ') : ''), 'mono'));
     if (quiet.length) {
       var det = el('details'); det.appendChild(el('summary', quiet.length + ' quiet sessions (no turn today and idle for over an hour)'));
       det.appendChild(table(head, sesRows(quiet), 'compact')); box.appendChild(det);

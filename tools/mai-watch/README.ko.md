@@ -1,4 +1,4 @@
-상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 105개 통과 (72 + 12 + 14 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
+상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 116개 통과 (72 + 12 + 25 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
 
 [English](README.md)
 
@@ -39,7 +39,7 @@ RTX 5080 두 장의 Windows 11 에서 잰 것: 화면 값이 `nvidia-smi` 와 �
 
 이 저장소의 세션 계기판 ([mai-gauge](../../mods/mai-gauge), [mai-codex-gauge](../../mods/mai-codex-gauge)) 이 `~/.mai` (또는 `$MAI_HOME`, `--mai-home`) 에 기록하는 것을 읽는다. 계기판은 이미 로그인한 CLI 에서 한도 정보를 받으므로 따로 넣을 키가 없다.
 
-mai-watch 는 그 폴더의 `limits.json`, `sessions/`, `costlog/` 만 연다. `~/.codex/auth.json` 같은 인증 파일은 열지 않고, 비용 기록의 프롬프트 글은 보여 주지 않는다 (개수와 합계만). 비용은 계기판이 계산한 API 가격 추정이지 청구액이 아니다. 계기판이 없으면 화면에 「사용량 원천 없음」 으로 나온다.
+mai-watch 는 그 폴더의 `limits.json`, `sessions/`, `costlog/` 만, 그리고 실제 경로가 그 폴더 안에 있는 파일만 읽는다. 다른 곳(예: `~/.codex/auth.json`)으로 이어지는 링크나 정션, 하드 링크된 파일은 거부하고 화면에 이름을 적는다. 보여 주는 것은 칸마다 다시 만든 값이다: 세션 이름과 그 세션이 스스로 적은 「하는 일」 한 줄, 숫자, 개수와 합계. 프롬프트 글과 형식이 맞지 않는 값은 버린다. 토큰이나 비용 값이 없으면 0 이 아니라 unknown 이고, 일부 턴만으로 낸 합계는 몇 턴을 덮는지 적는다. 비용은 계기판이 계산한 API 가격 추정이지 청구액이 아니다. 계기판이 없으면 화면에 「사용량 원천 없음」 으로 나온다.
 
 ## 작업과 놀고 있음 기록
 
@@ -51,7 +51,7 @@ mai-watch 는 그 폴더의 `limits.json`, `sessions/`, `costlog/` 만 연다. `
 mai-watch demo
 ```
 
-`~/mai-watch-demo` 에 설정과 `running` 이라고 보고하는 예시 작업 하나를 만들고, 실시간 화면 아래에 작업 표가 붙은 화면을 연다. 예시 작업은 스스로 갱신하지 않으므로 심장박동을 세 번 놓치면 (3분) `stale` 로 바뀐다. 경보가 동작하는 모습이다. `mai-watch check --config ~/mai-watch-demo/mai-watch.toml` 도 같은 것을 찍고 종료 코드 1 을 낸다. 끝나면 폴더를 지운다.
+`~/mai-watch-demo` (또는 지정한 폴더) 에 설정과 `running` 이라고 보고하는 예시 작업 하나를 만들고, 실시간 화면 아래에 작업 표가 붙은 화면을 연다. 예시 작업은 스스로 갱신하지 않으므로 심장박동을 세 번 놓치면 (3분) `stale` 로 바뀐다. 경보가 동작하는 모습이다. `mai-watch check --config ~/mai-watch-demo/mai-watch.toml` 도 같은 것을 찍고 종료 코드 1 을 낸다 (PowerShell 에서도 `~` 가 된다). demo 는 새 폴더, 빈 폴더, 자기가 만든 폴더에만 쓰므로 실제 설정은 건드리지 않는다. 끝나면 폴더를 지운다.
 
 실제로 쓸 때: `mai-watch init <폴더>` 로 만들고, 작업이 그 `status` 폴더에 쓰게 한 뒤 `mai-watch live --config <폴더>/mai-watch.toml` 로 띄운다. 설정의 `watch_paths = ["D:/runs", "//nas/share"]` 로 지켜볼 폴더를 정한다.
 

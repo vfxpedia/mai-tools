@@ -52,6 +52,7 @@ def exe_name(name):
 
 def load_config(path):
     import tomllib
+    path = os.path.expanduser(path)       # PowerShell passes ~ through to native programs unexpanded (review R7)
     with open(path, 'rb') as f:
         raw = tomllib.load(f)
     base = os.path.dirname(os.path.abspath(path))

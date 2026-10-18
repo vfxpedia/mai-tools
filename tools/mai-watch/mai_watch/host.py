@@ -9,6 +9,11 @@ import shutil
 import threading
 import time
 
+MAX_PATHS = 64
+# Windows reports the largest 32-bit bits-per-second value for adapters without a real link (Hyper-V, VPN): 4294 Mbps after psutil's
+# division. Only that exact value is unknown; a real 2.5, 5, 10 or 25 Gbps link is shown (review R5)
+VIRTUAL_LINK_MBPS = 4294
+
 GIB = 2 ** 30
 MIB = 2 ** 20
 
@@ -35,12 +40,15 @@ class PathWatcher:
     """Free space, reachability and answer time of each watched path. check() starts at most one probe per path at a time."""
 
     def __init__(self, paths, timeout_s=3.0, usage=shutil.disk_usage, clock=time.monotonic):
-        self.paths = list(dict.fromkeys(paths))
+        uniq = list(dict.fromkeys(paths))
+        self.dropped = uniq[MAX_PATHS:]          # one thread per path at most: the list itself is bounded too
+        self.paths = uniq[:MAX_PATHS]
         self.timeout_s = timeout_s
         self._usage = usage
         self._clock = clock
         self._lock = threading.Lock()
         self._running = {}
+        self._overdue = set()
         self.results = {p: {'path': p, 'state': 'not checked yet', 'total_gib': None, 'free_gib': None, 'used_pct': None, 'answer_ms': None, 'checked_at': None} for p in self.paths}
 
     def _probe(self, path, wall):
@@ -49,13 +57,14 @@ class PathWatcher:
             u = self._usage(path)
             r = {'state': 'ok', 'total_gib': round(u.total / GIB, 2), 'free_gib': round(u.free / GIB, 2),
                  'used_pct': round(100.0 * (u.total - u.free) / u.total, 1) if u.total else None}
-        except OSError as e:
+        except Exception as e:      # any failure ends the probe with a state; a probe that died silently would stay "running" forever
             r = {'state': 'unreachable', 'error': type(e).__name__ + (': ' + e.strerror if getattr(e, 'strerror', None) else ''),
                  'total_gib': None, 'free_gib': None, 'used_pct': None}
         r.update(path=path, answer_ms=round((self._clock() - t0) * 1000, 1), checked_at=wall)
         with self._lock:
             self.results[path] = r
             self._running.pop(path, None)
+            self._overdue.discard(path)
 
     def check(self, wall=None):
         """Starts a probe for every path that has none running, waits up to timeout_s, and returns the current results."""
@@ -72,6 +81,12 @@ class PathWatcher:
         end = self._clock() + self.timeout_s
         for th in started:
             th.join(max(0.0, end - self._clock()))
+        with self._lock:
+            # decided by whether the probe finished within the wait, not by comparing clock readings: on Windows the monotonic clock
+            # ticks in about 15 ms steps, so "waited >= timeout" could be false right after a full wait (review R6, Windows CI)
+            for p, (th, _) in self._running.items():
+                if th.is_alive() and th in started:
+                    self._overdue.add(p)
         return self.snapshot()
 
     def snapshot(self):
@@ -82,7 +97,7 @@ class PathWatcher:
                 r = dict(self.results[p])
                 if p in self._running:
                     waited = now - self._running[p][1]
-                    if waited >= self.timeout_s:     # the earlier answer is kept but marked: the path is not answering now
+                    if p in self._overdue or waited >= self.timeout_s:   # the earlier answer is kept but marked: no answer now
                         r['state'] = 'no answer'
                         r['waiting_s'] = round(waited, 1)
                 out.append(r)
@@ -113,7 +128,9 @@ class Rates:
 def disk_io(ps, rates):
     """Per physical disk read and write MiB/s. None when the source cannot give it."""
     try:
-        per = ps.disk_io_counters(perdisk=True)
+        # nowrap=False: psutil's default hides a counter that went back by adding the old total, which would turn a reset into a
+        # normal-looking rate; we want the raw counter and our own rule (review R4)
+        per = ps.disk_io_counters(perdisk=True, nowrap=False)
     except Exception:
         return None
     if not per:
@@ -134,7 +151,7 @@ def network(ps, rates):
     """Per adapter that is up (loopback left out): receive and send MiB/s and the link speed the OS reports. Adapters are never summed:
     a VPN adapter carries traffic that also crosses the physical one, so a total would count it twice."""
     try:
-        counters = ps.net_io_counters(pernic=True)
+        counters = ps.net_io_counters(pernic=True, nowrap=False)
         stats = ps.net_if_stats()
     except Exception:
         return None
@@ -151,7 +168,7 @@ def network(ps, rates):
     for name in sorted(names):
         rx, tx = r.get(name + '/rx'), r.get(name + '/tx')
         speed = stats[name].speed
-        # 0 means not reported; virtual adapters on Windows report the largest 32-bit value (4294 Mbps), which is not a link speed
+        # 0 means not reported; VIRTUAL_LINK_MBPS is the Windows value for "no real link"
         out.append({'nic': name, 'rx_mib_s': None if rx is None else round(rx / MIB, 3), 'tx_mib_s': None if tx is None else round(tx / MIB, 3),
-                    'link_mbps': speed if speed and 0 < speed < 4294 else None})
+                    'link_mbps': speed if isinstance(speed, int) and speed > 0 and speed != VIRTUAL_LINK_MBPS else None})
     return out

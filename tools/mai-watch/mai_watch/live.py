@@ -29,6 +29,8 @@ def decode_throttle(field):
         mask = int(s, 16) if s.startswith('0x') else int(s)
     except ValueError:
         return None
+    if not 0 <= mask < 2 ** 64:            # a 64-bit mask; anything else is a damaged field, unknown (review R8)
+        return None
     names = []
     for bit, name in THROTTLE_BITS:
         if mask & bit:
@@ -169,34 +171,50 @@ class LiveSampler:
                  'temperature_c': d['temperature_c'], 'power_w': d['power_w']}
             ex = extras.get(d['index']) or [None] * len(EXTRA_KEYS)
             for k, cell in zip(EXTRA_KEYS, ex):
-                if k == 'throttle':
-                    g[k] = None if cell is None else decode_throttle(cell)
-                else:
-                    g[k] = nvidia.num(cell)
+                try:                                 # one bad extra field is that field unknown, never the whole sample
+                    g[k] = (None if cell is None else decode_throttle(cell)) if k == 'throttle' else nvidia.num(cell)
+                except Exception:
+                    g[k] = None
+                    problems.append('unreadable %s for GPU %s' % (k, d['index']))
             out.append(g)
         return out
 
+    def check_paths(self):
+        self.paths.check(wall=self.clock())
+
+    def read_usage(self):
+        if not self.usage_on:
+            return
+        try:
+            u = self._usage_reader()
+        except Exception as e:                     # a broken usage file must not stop the resource view
+            u = {'available': False, 'reason': 'usage read failed: %s' % type(e).__name__}
+        with self.lock:
+            self.slow = dict(self.slow, usage=u, updated_at=_z(self.clock()))
+
     def slow_once(self):
-        """Watched paths and usage. Runs in its own thread, so a hanging network path never delays the one-second samples."""
-        paths = self.paths.check(wall=self.clock())
-        for r in paths:
+        """Paths and usage once, in the calling thread (tests). run() keeps them in two loops of their own."""
+        self.check_paths()
+        self.read_usage()
+        return self.payload()['slow']
+
+    def _paths_now(self):
+        """Path state at this moment: built on every payload, so a path that just answered or just stopped answering is shown as it
+        is now, not as it was at the last 30 s round (review R6)."""
+        out = []
+        for r in self.paths.snapshot():
+            r = dict(r)
             if isinstance(r.get('checked_at'), (int, float)):
                 r['checked_at'] = _z(r['checked_at'])
-        u = self.slow['usage']
-        if self.usage_on:
-            try:
-                u = self._usage_reader()
-            except Exception as e:                 # a broken usage file must not stop the resource view
-                u = {'available': False, 'reason': 'usage read failed: %s' % type(e).__name__}
-        slow = {'paths': paths, 'usage': u, 'updated_at': _z(self.clock())}
-        with self.lock:
-            self.slow = slow
-        return slow
+            out.append(r)
+        return out
 
     def payload(self, since=None):
         with self.lock:
             items = list(self.samples)
-            slow = self.slow
+            slow = dict(self.slow)
+        slow['paths'] = self._paths_now()
+        slow['paths_dropped'] = list(self.paths.dropped)
         if since:
             items = [x for x in items if x['t'] > since]
         return {'schema': LIVE_SCHEMA, 'interval_s': self.interval_s, 'history_s': self.history_s, 'host': self.host_info,
@@ -204,14 +222,25 @@ class LiveSampler:
 
     def run(self, stop, sleep=time.sleep):
         """Samples until stop is set. A slow source delays the next sample; samples are never invented to fill a gap."""
-        def slow_loop():
+        def loop(step):
             while not stop.is_set():
-                self.slow_once()
+                try:
+                    step()
+                except Exception:                  # a failed round is retried next round; the other loops keep going
+                    pass
                 stop.wait(self.slow_interval_s)
-        threading.Thread(target=slow_loop, daemon=True).start()
+        # paths and usage in separate threads: a share that hangs cannot hold back usage, and a slow usage read cannot hold back paths
+        threading.Thread(target=loop, args=(self.check_paths,), daemon=True).start()
+        threading.Thread(target=loop, args=(self.read_usage,), daemon=True).start()
         while not stop.is_set():
             started = time.monotonic()
-            self.sample_once()
+            try:
+                self.sample_once()
+            except Exception as e:                 # damaged input must not end the sampler thread (review R8)
+                with self.lock:
+                    self.samples.append({'t': _z(self.clock()), 'cpu_pct': None, 'cpu_per_core': None, 'ram_used_gib': None, 'ram_total_gib': None,
+                                         'ram_pct': None, 'swap_used_gib': None, 'swap_total_gib': None, 'gpus': None, 'disks': None,
+                                         'nics': None, 'problems': ['sample failed: %s' % type(e).__name__]})
             rest = self.interval_s - (time.monotonic() - started)
             if rest > 0:
                 stop.wait(rest)

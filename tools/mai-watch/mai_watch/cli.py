@@ -117,16 +117,26 @@ def main(argv=None):
     return 1 if alerts else 0
 
 
+DEMO_MARKER = '.mai-watch-demo'
+
+
 def write_demo(folder, now=None):
-    """A folder with a configuration and one sample job that reports running now. Returns the configuration path. Refuses to touch an
-    existing configuration so a real one is never overwritten; the sample job file is rewritten each time so its time is fresh."""
+    """A folder with a configuration and one sample job that reports running now. Returns the configuration path.
+    The demo writes only into a folder that does not exist yet, an empty folder, or a folder that carries the marker file it left there
+    itself. Any other folder is refused untouched, so a real configuration or a real job file is never overwritten (review R2)."""
+    folder = os.path.expanduser(folder)
+    marker = os.path.join(folder, DEMO_MARKER)
+    if os.path.isdir(folder) and os.listdir(folder) and not os.path.isfile(marker):
+        raise FileExistsError('%s is not empty and was not made by mai-watch demo; nothing was changed. Pick a new folder, or for a real '
+                              'setup use: mai-watch live --config <folder>/mai-watch.toml' % folder)
     os.makedirs(os.path.join(folder, 'status'), exist_ok=True)
+    if not os.path.isfile(marker):
+        with open(marker, 'w', encoding='utf-8', newline='\n') as f:
+            f.write('made by mai-watch demo; the demo rewrites only folders that carry this file\n')
     cfg = os.path.join(folder, 'mai-watch.toml')
     if not os.path.exists(cfg):
         with open(cfg, 'w', encoding='utf-8', newline='\n') as f:
             f.write(DEFAULT_TOML)
-    elif not os.path.exists(os.path.join(folder, 'status', 'my-first-job.json')):
-        raise FileExistsError('%s already has a configuration that is not a demo; use: mai-watch live --config %s' % (folder, cfg))
     now = now or datetime.datetime.now(datetime.timezone.utc)
     job = {'schema_version': 1, 'id': 'my-first-job', 'kind': 'job', 'state': 'running', 'updated_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
            'heartbeat_interval_s': 60, 'device_uuids': []}
@@ -157,7 +167,7 @@ def run_live(a):
             print('config problem in %s: %s' % (a.config, e), file=sys.stderr)
             return 2
     try:
-        paths = list(a.path) + (cfg.watch_paths if cfg else [])
+        paths = [os.path.expanduser(p) for p in a.path] + (cfg.watch_paths if cfg else [])
         sampler = live.LiveSampler(nvidia_cmd=[a.nvidia_smi] if cfg is None else cfg.nvidia_smi, interval_s=a.interval, history_s=a.history,
                                    paths=paths or None, mai_home=a.mai_home or (cfg.mai_home if cfg else None), usage_on=not a.no_usage)
     except ValueError as e:

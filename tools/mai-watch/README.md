@@ -1,4 +1,4 @@
-Status: draft (M2, live view, wider resources). 105 tests pass on Windows (72 + 12 + 14 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
+Status: draft (M2, live view, wider resources). 116 tests pass on Windows (72 + 12 + 25 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
@@ -39,7 +39,7 @@ Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one 
 
 Read from what the session gauges in this repository ([mai-gauge](../../mods/mai-gauge), [mai-codex-gauge](../../mods/mai-codex-gauge)) record in `~/.mai` (or `$MAI_HOME`, or `--mai-home`). The gauges take the plan limits from the CLIs you are already signed in to, so there is no key to set.
 
-mai-watch opens only `limits.json`, `sessions/` and `costlog/` in that folder. It never opens credential files such as `~/.codex/auth.json`, and it never shows prompt text from the cost log, only counts and sums. Cost is the API price estimate the gauges compute, not a bill. Without the gauges the page says there is no usage source.
+mai-watch reads only `limits.json`, `sessions/` and `costlog/` in that folder, and only files whose real path stays inside it: a link or junction that leads elsewhere (for example to `~/.codex/auth.json`) and a hard-linked file are refused and named on the page. What it shows is rebuilt field by field: each session's name and the one line it says it is doing, numbers, counts and sums. Prompt text and anything of an unexpected type are dropped. A missing token or cost value is unknown, not 0, and a sum over fewer turns than were made says how many it covers. Cost is the API price estimate the gauges compute, not a bill. Without the gauges the page says there is no usage source.
 
 ## Job and idle record
 
@@ -51,7 +51,7 @@ Try it:
 mai-watch demo
 ```
 
-This makes `~/mai-watch-demo` with a configuration and one sample job that reports `running`, and opens the page with the job table under the live view. The sample job does not update itself, so after 3 missed heartbeats (3 minutes) it turns `stale`: that is the alarm working. `mai-watch check --config ~/mai-watch-demo/mai-watch.toml` prints the same and exits 1. Delete the folder when done.
+This makes `~/mai-watch-demo` (or the folder you give) with a configuration and one sample job that reports `running`, and opens the page with the job table under the live view. The sample job does not update itself, so after 3 missed heartbeats (3 minutes) it turns `stale`: that is the alarm working. `mai-watch check --config ~/mai-watch-demo/mai-watch.toml` prints the same and exits 1 (`~` works in PowerShell too). The demo only writes into a new or empty folder or one it made itself, so it never touches a real setup. Delete the folder when done.
 
 For real use: `mai-watch init <folder>`, point your jobs at its `status` folder, and run `mai-watch live --config <folder>/mai-watch.toml`. In the configuration, `watch_paths = ["D:/runs", "//nas/share"]` sets the watched folders.
 

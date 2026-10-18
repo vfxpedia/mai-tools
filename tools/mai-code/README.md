@@ -57,9 +57,24 @@ Workspace leases live in `.mai-code-locks` beside the physical worktree director
 
 Starting verification again invalidates the previous success before launching any test. An interrupted or failed launch cannot reuse that success; its previous receipt remains on disk. Unknown child liveness retains the workspace lease. Inspect and reconcile the incomplete attempt explicitly. Worktrees containing Git submodules/gitlinks are currently refused because their nested files are not covered by this version's inventory.
 
-If Claude's native permission layer refuses an implementation write, the owner can explicitly grant only a declared file for that invocation: `mai-code resume <run-path> --allow-write module.py`. Repeat the flag for individually approved outputs. No wildcard, traversal, input, analysis/plan output or undeclared path is accepted. This creates a native `Edit(exact-path)` rule, which Claude uses for Write too, not a global setting or bypass mode. On Windows the rule's drive is normalized as `/c/...`, per the official permission contract. Existing deny/ask rules can still refuse it. Never substitute a shell write for a native refusal.
+If Claude's native permission layer refuses an implementation write, the owner can explicitly grant only a declared file for that invocation: `mai-code resume <run-path> --allow-write module.py`. Repeat the flag for individually approved outputs. No wildcard, traversal, input, analysis/plan output or undeclared path is accepted. This creates a native `Edit(exact-path)` rule, which Claude uses for Write too, not a global setting or bypass mode. On Windows the rule's drive is normalized as `/c/...`, per the official permission contract. Managed restrictions can still refuse it. Never substitute a shell write for a native refusal.
 
 When a call exceeds its attention threshold, `attempts/<id>/lifecycle.jsonl` records the live PID and attention event while both streams continue draining. This is **not cancellation or completion**. `status` reports the current attempt. Native permissions can refuse a write, especially in non-interactive mode. Do not disable permissions/hooks to turn a refusal into success.
+
+## Stage permissions
+
+New calls and exact-ID resumes use the same explicit policy. The final argv is retained in each attempt's `command.json`.
+
+| Engine | Analyze / plan | Implement |
+|---|---|---|
+| Codex | `--sandbox read-only` | `--sandbox workspace-write`, with the owned worktree as cwd |
+| Claude | `--permission-mode default --tools Read,Glob,Grep` | Default permission mode; `Read,Glob,Grep,Edit,Write`; only owner-specified `--allow-write` paths become native Edit grants |
+
+Codex also pins `approval_policy="never"`, uses `--ignore-user-config` and `--ignore-rules`, and places sandbox flags before `resume`. Claude uses `--restricted` to exclude user/project/local settings, `--strict-mcp-config` and `--disallowedTools mcp__*` to exclude MCP tools, and `--permission-prompts none` to reject unresolved permission requests. No shell tool is exposed to Claude in any stage. Missing required flags make doctor and execution refuse with `missing-capability:<flag>`; there is no permissive fallback.
+
+This deliberately does **not** inherit every personal CLI setting or hook for a child run. Authentication homes, installed configurations and running sessions are not edited. Managed host policy remains trusted. Native enforcement is not replaced by the wrapper, and Codex workspace-write is not an exact-file sandbox; post-run output inventory still checks declared outputs. We do not claim every user/admin setting can only narrow these controls, or that the new policy has passed an adversarial native-model test. Measured: stage argv, flag-removal regressions, missing-capability doctor exits, and no-model parser acceptance on Codex 0.163.0 / Claude Code 2.1.302. Earlier native fixture results predate this tightening.
+
+References checked 2026-10-18: [Codex CLI reference](https://developers.openai.com/codex/cli/reference/), [Claude CLI reference](https://code.claude.com/docs/en/cli-reference), [Claude permissions](https://code.claude.com/docs/en/permissions).
 
 ## Limits
 

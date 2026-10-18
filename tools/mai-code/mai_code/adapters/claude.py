@@ -1,9 +1,12 @@
 import json
 
 
-def command(executable,attempt,model,resume_id):
+def command(executable,attempt,model,resume_id,stage):
     schema=json.loads((attempt/'response-schema.json').read_text(encoding='utf-8'))
-    args=[executable,'--print','--verbose','--output-format','stream-json','--json-schema',json.dumps(schema,separators=(',',':'))]
+    tools='Read,Glob,Grep,Edit,Write' if stage=='implement' else 'Read,Glob,Grep'
+    args=[executable,'--print','--verbose','--output-format','stream-json','--json-schema',json.dumps(schema,separators=(',',':')),
+          '--permission-mode','default','--tools',tools,'--restricted',
+          '--strict-mcp-config','--disallowedTools','mcp__*','--permission-prompts','none']
     if resume_id: args += ['--resume',resume_id]
     if model: args += ['--model',model]
     # Native stream's result is validated again locally; raw stream is retained.

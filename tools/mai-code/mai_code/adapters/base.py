@@ -44,9 +44,10 @@ def probe_cli(engine,executable=None):
         return result.returncode,result.stdout+result.stderr
     rc,version=call(['--version'])
     if rc or (engine=='codex' and not version.startswith('codex-cli ')) or (engine=='claude' and '(Claude Code)' not in version): raise ValueError('unrecognized official executable version')
-    _,helptext=call(['exec','--help'] if engine=='codex' else ['--help'])
-    flags=['--json','--output-last-message','--output-schema','--model'] if engine=='codex' else ['--print','--output-format','--json-schema','--resume','--model']
-    missing=[f for f in flags if f not in helptext]
+    help_rc,helptext=call(['exec','--help'] if engine=='codex' else ['--help'])
+    flags=['--json','--output-last-message','--output-schema','--model','--sandbox','--config','--ignore-user-config','--ignore-rules'] if engine=='codex' else ['--print','--output-format','--json-schema','--resume','--model','--permission-mode','--tools','--allowedTools','--restricted','--strict-mcp-config','--disallowedTools','--permission-prompts']
+    supported=[] if help_rc else re.findall(r'--[a-zA-Z][a-zA-Z-]*',helptext)
+    missing=[f for f in flags if f not in supported]
     auth_rc,auth=call(['login','status'] if engine=='codex' else ['auth','status','--json'])
     mode='unknown'
     if not auth_rc:
@@ -61,17 +62,18 @@ def probe_cli(engine,executable=None):
             except ValueError:pass
     resume_help=call(['exec','resume','--help'])[1] if engine=='codex' else helptext
     resume_supported=('--json' in resume_help and '--output-schema' in resume_help and 'SESSION_ID' in resume_help) if engine=='codex' else '--resume' in helptext
-    return dict(engine=engine,executable=p,version=version.strip(),supported_flags=[f for f in flags if f in helptext],reported_auth_mode=mode,resume_supported=resume_supported,diagnostic_codes=(['missing-capability:'+f for f in missing]+([] if mode=='subscription' else ['subscription-not-confirmed'])),effective_home=str(Path(env.get('CODEX_HOME' if engine=='codex' else 'CLAUDE_CONFIG_DIR',str(Path.home()/('.codex' if engine=='codex' else '.claude')))).expanduser()))
+    return dict(engine=engine,executable=p,version=version.strip(),supported_flags=[f for f in flags if f in supported],reported_auth_mode=mode,resume_supported=resume_supported,diagnostic_codes=(['missing-capability:'+f for f in missing]+([] if mode=='subscription' else ['subscription-not-confirmed'])),effective_home=str(Path(env.get('CODEX_HOME' if engine=='codex' else 'CLAUDE_CONFIG_DIR',str(Path.home()/('.codex' if engine=='codex' else '.claude')))).expanduser()))
 
 
 def build_command(engine,stage,attempt,model=None,resume_id=None):
+    if stage not in ('analyze','plan','implement'):raise ValueError('unknown model stage')
     info=read_json(attempt/'cli.json')
     if info['engine']!=engine: raise ValueError('engine identity mismatch')
     if resume_id:
         try:uuid.UUID(resume_id)
         except (ValueError,AttributeError) as e:raise ValueError('exact native UUID required') from e
         if not info.get('resume_supported'):raise ValueError('exact resume unsupported')
-    return (codex if engine=='codex' else claude).command(info['executable'],attempt,model,resume_id)
+    return (codex if engine=='codex' else claude).command(info['executable'],attempt,model,resume_id,stage)
 
 
 def parse_event(engine,record):

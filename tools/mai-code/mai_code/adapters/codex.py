@@ -1,5 +1,7 @@
-def command(executable,attempt,model,resume_id):
-    args=[executable,'exec']
+def command(executable,attempt,model,resume_id,stage):
+    # exec owns --sandbox; the resume subcommand does not accept it afterward.
+    args=[executable,'exec','--sandbox','workspace-write' if stage=='implement' else 'read-only',
+          '--config','approval_policy="never"','--ignore-user-config','--ignore-rules']
     if resume_id: args += ['resume',resume_id]
     args += ['--json','--output-last-message',str(attempt/'final.json'),'--output-schema',str(attempt/'response-schema.json')]
     if model: args += ['--model',model]

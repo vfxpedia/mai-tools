@@ -254,7 +254,7 @@ class LiveSampler:
         reason = None if fresh else ('no sample yet' if age is None else 'last sample %.0f s ago, more than %.0f s' % (age, limit))
         return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'sample_age_s': age,
                 'max_sample_age_s': limit, 'fresh': fresh, 'stale_reason': reason, 'counts': counts, 'judgments': found,
-                'blind': judge.blind(items, slow), 'notify': self.notify_state}
+                'blind': judge.blind(items, slow), 'observable': judge.observable(items, slow), 'notify': self.notify_state}
 
     def payload(self, since=None):
         with self.lock:

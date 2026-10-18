@@ -9,9 +9,13 @@ What is announced is decided by Notifier, kept apart from whether it was deliver
   for hold_s (new), one that rose from warn to bad (worse), and one that has been observed absent for hold_s (cleared)
 - commit() records events as delivered. Nothing is marked announced or cleared until the command succeeded, so a failed send is
   proposed again at the next check, together with anything newer, and one success never hides an earlier failure
-- a finding whose source cannot be read right now (the GPU source broke, a folder not checked yet, the usage file missing) is not
-  "absent": its clear timer stops, because not seeing a problem is not seeing it gone (review R14)
-- time only counts while observed: a gap between checks longer than max_gap_s restarts the hold and the clear timer (review R15)
+- a finding that met its hold and was proposed but went away before any send succeeded is still delivered, as "came and went",
+  never dropped silently (recheck of R13)
+- a finding that cannot be judged right now is not "absent": its clear timer waits. The status document lists what is observable as
+  'kind|subject' keys; a GPU row without a temperature, a folder that does not answer, a removed device are not observable for the
+  findings that need them, because not seeing a problem is not seeing it gone (review R14 and its recheck)
+- time only counts while observed: a gap between checks longer than max_gap_s, or any stale stretch, restarts the hold and the clear
+  timers (review R15 and its recheck)
 A finding is identified by kind and subject, so a changing number inside the same finding is not a new finding.
 """
 import math
@@ -54,11 +58,18 @@ class Notifier:
         self.announced = {}     # key -> level delivered
         self.gone = {}          # key -> time it was first observed absent, for announced keys
         self.last_update = None
+        self.interrupted = False
 
-    def update(self, findings, now, blind=()):
-        """Current findings at time now (monotonic seconds), and the sources that could not be read. Returns the events to send:
-        a list of {'event': new|worse|cleared, 'key': k, 'finding': f}. Does not mark anything delivered."""
-        gap = self.last_update is not None and now - self.last_update > self.max_gap_s
+    def interrupt(self):
+        """The samples went stale: what was being timed was not observed. Hold and clear timers restart at the next update; delivered
+        and due findings are kept."""
+        self.interrupted = True
+
+    def update(self, findings, now, blind=(), observable=None):
+        """Current findings at time now (monotonic seconds); blind sources and, when given, the observable 'kind|subject' keys. Returns
+        the events to send: a list of {'event': new|worse|cleared|passed, 'key': k, 'finding': f}. Marks nothing delivered."""
+        gap = self.interrupted or (self.last_update is not None and now - self.last_update > self.max_gap_s)
+        self.interrupted = False
         self.last_update = now
         current = {}
         for f in findings:
@@ -75,6 +86,7 @@ class Notifier:
                 continue
             was = self.announced.get(k)
             if was is None:
+                s['due'] = True                           # met its hold: from now on it must be delivered, even if it goes away
                 events.append({'event': 'new', 'key': k, 'finding': f})
             elif LEVELS[f['level']] < LEVELS[was]:
                 events.append({'event': 'worse', 'key': k, 'finding': f})
@@ -84,11 +96,14 @@ class Notifier:
             if k in current:
                 continue
             f = self.seen[k]['finding']
-            if is_blind(f, blind):
-                self.gone.pop(k, None)                    # cannot see it: neither present nor gone, the timer waits
+            if k not in self.announced and self.seen[k].get('due'):
+                events.append({'event': 'passed', 'key': k, 'finding': f})     # due but never delivered: tell it, do not drop it
+                continue
+            if is_blind(f, blind) or (observable is not None and k not in observable):
+                self.gone.pop(k, None)                    # cannot judge it now: neither present nor gone, the timer waits
                 continue
             if k not in self.announced:
-                del self.seen[k]                          # gone before it was ever announced: a blip, forget it
+                del self.seen[k]                          # gone before it met its hold: a blip, forget it
                 continue
             if k not in self.gone or gap:
                 self.gone[k] = now
@@ -102,20 +117,22 @@ class Notifier:
             k = e['key']
             if e['event'] in ('new', 'worse'):
                 self.announced[k] = e['finding']['level']
-            elif e['event'] == 'cleared':
+            elif e['event'] in ('cleared', 'passed'):
                 for d in (self.seen, self.announced, self.gone):
                     d.pop(k, None)
 
 
 def message(events, host=None):
     host = host or socket.gethostname()
-    by = {'new': [], 'worse': [], 'cleared': []}
+    by = {'new': [], 'worse': [], 'passed': [], 'cleared': []}
     for e in events:
         by[e['event']].append(e['finding'])
-    parts = ['%d %s' % (len(by[k]), k) for k in ('new', 'worse', 'cleared') if by[k]]
+    parts = ['%d %s' % (len(by[k]), {'passed': 'came and went'}.get(k, k)) for k in ('new', 'worse', 'passed', 'cleared') if by[k]]
     lines = ['mai-watch %s: %s' % (host, ', '.join(parts))]
     for f in sorted(by['new'] + by['worse'], key=lambda f: LEVELS[f['level']]):
         lines.append('%s  %s' % (LABEL[f['level']], f['text']))
+    for f in by['passed']:
+        lines.append('came and went  %s (gone again before a message got through)' % f['text'])
     for f in by['cleared']:
         lines.append('cleared  %s' % f['text'])
     return '\n'.join(lines) + '\n'
@@ -165,7 +182,8 @@ def split_cmd(s):
 
 def loop(sampler, notifier, cmd, stop, notify_file=None, every_s=30, clock=time.monotonic, sender=send, log=None, max_backoff_s=1800):
     """Checks the judgment list every every_s seconds and sends what Notifier.update proposes. A failed send is kept and tried again
-    after a growing wait (every_s doubled per failure, at most max_backoff_s). While the samples are stale nothing is judged.
+    after a growing wait (every_s after the first failure, doubled per further failure, at most max_backoff_s). While the samples are
+    stale nothing is judged and the timers restart afterwards.
     The state is recorded on the sampler and shown in status.json."""
     delivered, fails, next_try = 0, 0, 0.0
     state = sampler.notify_state = {'last_attempt_at': None, 'ok': None, 'detail': 'no message needed yet', 'delivered': 0,
@@ -174,9 +192,11 @@ def loop(sampler, notifier, cmd, stop, notify_file=None, every_s=30, clock=time.
         try:
             st = sampler.status()
             if not st.get('fresh', False):
+                notifier.interrupt()
                 state.update(detail='samples are stale: nothing judged until they resume (%s)' % st.get('stale_reason'))
             else:
-                events = notifier.update(st['judgments'], clock(), set(st.get('blind') or ()))
+                obs = st.get('observable')
+                events = notifier.update(st['judgments'], clock(), set(st.get('blind') or ()), set(obs) if obs is not None else None)
                 state['pending'] = len(events)
                 if events and clock() >= next_try:
                     ok, detail = sender(cmd, message(events), notify_file)
@@ -188,7 +208,7 @@ def loop(sampler, notifier, cmd, stop, notify_file=None, every_s=30, clock=time.
                         state['pending'] = 0
                     else:
                         fails += 1
-                        next_try = clock() + min(every_s * 2 ** fails, max_backoff_s)
+                        next_try = clock() + min(every_s * 2 ** (fails - 1), max_backoff_s)
                         if log:
                             log('notify command failed (%d in a row, %d waiting): %s' % (fails, len(events), detail))
                     state.update(delivered=delivered, failures_in_row=fails)

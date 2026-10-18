@@ -94,6 +94,59 @@ class NotifierRules(unittest.TestCase):
         self.assertEqual(step(p, [], 10, blind={'path:D:'}), [])     # one folder not checked: its finding waits
         self.assertEqual(step(p, [], 20, blind={'path:E:'}), [('cleared', 'D:')])
 
+    def test_r14_recheck_a_missing_measurement_is_not_a_clear_real_sampler(self):
+        # the real path: sample_once -> status -> Notifier; only the nvidia-smi text is made up
+        rows = {'hot': '0, GPU-a, RTX A, 50, 9000, 16303, 90, 200\n', 'na': '0, GPU-a, RTX A, 50, 9000, 16303, [N/A], 200\n',
+                'cool': '0, GPU-a, RTX A, 50, 9000, 16303, 60, 200\n'}
+        cur = ['hot']
+        c = [1800000000.0]
+        s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: rows[cur[0]], paths=['.'], usage_on=False, disk_reader=lambda: {},
+                             nic_reader=lambda: {}, clock=lambda: c[0])
+        n = notify.Notifier(hold_s=60)
+        got = []
+        for t, phase in ((0, 'hot'), (30, 'hot'), (60, 'hot'), (90, 'na'), (120, 'na'), (150, 'na'), (180, 'na'), (210, 'cool'),
+                         (240, 'cool'), (270, 'cool')):
+            cur[0] = phase
+            c[0] = 1800000000.0 + t
+            s.sample_once()
+            st = s.status()
+            e = n.update(st['judgments'], t, set(st['blind']), set(st['observable']))
+            n.commit(e)
+            got += [(t, x['event'], x['key']) for x in e if x['key'].startswith('gpu_hot')]
+        # announced at 60; temperature unknown from 90 to 180: no clear; readable and cool from 210: cleared 60 s later
+        self.assertEqual(got, [(60, 'new', 'gpu_hot|GPU 0'), (270, 'cleared', 'gpu_hot|GPU 0')])
+
+    def test_r14_recheck_an_unreachable_folder_does_not_clear_its_space_warning(self):
+        n = notify.Notifier(hold_s=0)
+        step(n, [W], 0)
+        unreachable = {'level': 'bad', 'kind': 'path_unreachable', 'subject': 'D:', 'text': 'D: does not answer'}
+        e = n.update([unreachable], 10, (), {'path_unreachable|D:', 'source_problem|sampler'})      # free space not observable now
+        n.commit(e)
+        self.assertEqual(ev(e), [('new', 'D:')])                             # the new problem is told; the old one is not cleared
+        self.assertEqual(e[0]['finding']['kind'], 'path_unreachable')
+        self.assertIn('disk_space|D:', n.announced)
+
+    def test_r14_recheck_observable_keys_from_the_judge(self):
+        from mai_watch import judge
+        slow = {'paths': [{'path': 'D:\\', 'label': 'D:', 'state': 'unreachable', 'free_gib': None, 'used_pct': None},
+                          {'path': 'E:\\', 'label': 'E:', 'state': 'ok', 'free_gib': 900.0, 'used_pct': 80.0},
+                          {'path': 'F:\\', 'label': 'F:', 'state': 'not checked yet', 'free_gib': None, 'used_pct': None},
+                          # a folder that stopped answering keeps its last numbers on the page; they are not a current reading
+                          {'path': 'G:\\', 'label': 'G:', 'state': 'no answer', 'free_gib': 50.0, 'used_pct': 99.0}]}
+        last = {'t': '2026-10-18T00:00:00.00Z', 'ram_pct': None, 'nics': [{'nic': 'LAN', 'link_mbps': None}],
+                'gpus': [{'index': 0, 'temperature_c': None, 'throttle': [], 'util_pct': 5, 'vram_used_mib': 10}]}
+        obs = set(judge.observable([last], slow))
+        self.assertIn('path_unreachable|D:', obs)
+        self.assertNotIn('disk_space|D:', obs)            # it does not answer: its free space is not known
+        self.assertIn('disk_space|E:', obs)
+        self.assertNotIn('path_unreachable|F:', obs)
+        self.assertNotIn('disk_space|G:', obs)
+        self.assertIn('path_unreachable|G:', obs)
+        self.assertNotIn('gpu_hot|GPU 0', obs)            # no temperature
+        self.assertIn('gpu_clock_limited|GPU 0', obs)
+        self.assertNotIn('slow_link|LAN', obs)
+        self.assertNotIn('ram_high|RAM', obs)
+
     def test_r15_unobserved_time_is_not_hold_time(self):
         n = notify.Notifier(hold_s=60, max_gap_s=90)
         self.assertEqual(step(n, [W], 0), [])
@@ -191,8 +244,8 @@ class Loop(unittest.TestCase):
             at.append(c.t)
             return (len(calls) >= 3), 'exit %d' % (0 if len(calls) >= 3 else 1)
         st = self.run_loop(FakeSampler([W]), sender, checks=8, c=c)
-        # tried at 0 s (fails, wait 60), 60 s (fails, wait 120), 180 s (succeeds); the checks in between do not send
-        self.assertEqual(at, [0.0, 60.0, 180.0])
+        # tried at 0 s (fails, wait 30), 30 s (fails, wait 60), 90 s (succeeds); the checks in between do not send
+        self.assertEqual(at, [0.0, 30.0, 90.0])
         self.assertTrue(all('D: has 37 GiB free' in t for t in calls))
         self.assertEqual((st['ok'], st['delivered'], st['pending'], st['failures_in_row']), (True, 1, 0, 0))
 
@@ -209,6 +262,56 @@ class Loop(unittest.TestCase):
         self.assertIn('D: has 37 GiB free', calls[1])
         self.assertIn('LAN (wired)', calls[1])
         self.assertEqual(st['delivered'], 2)
+
+    def test_r13_recheck_a_due_finding_that_went_away_is_still_delivered(self):
+        # recheck input: W held 60 s and its send failed at 60; W gone at 90; L held from 120; L sent at 180
+        seq = {0: [W], 30: [W], 60: [W], 90: [], 120: [L], 150: [L], 180: [L], 210: [L]}
+        sampler, calls, c = FakeSampler([W]), [], Clock()
+
+        def sender(cmd, text, nfile):
+            calls.append((c.t, text))
+            return c.t != 60, 'exit %d' % (1 if c.t == 60 else 0)
+        orig = sampler.status
+        sampler.status = lambda: dict(orig(), judgments=seq.get(c.t, []))
+        n, k = notify.Notifier(hold_s=60), [0]
+
+        class Stop:
+            def is_set(self_):
+                return k[0] >= 8
+
+            def wait(self_, s):
+                k[0] += 1
+                c.t += s
+        notify.loop(sampler, n, ['x'], Stop(), every_s=30, clock=c, sender=sender)
+        self.assertEqual(calls[0][0], 60.0)
+        self.assertIn('came and went  D: has 37 GiB free', calls[1][1])      # retried at 90: W is told, not dropped
+        self.assertTrue(any('LOOK SOON  LAN' in t for _, t in calls))
+        self.assertEqual(sampler.notify_state['delivered'], 2)
+
+    def test_r15_recheck_a_short_stale_stretch_restarts_the_hold(self):
+        n = notify.Notifier(hold_s=60)
+        self.assertEqual(step(n, [W], 0), [])
+        n.interrupt()                                                        # t=30: stale, not observed
+        self.assertEqual(step(n, [W], 60), [])                               # the hold restarted at 60
+        self.assertEqual(step(n, [W], 90), [])
+        self.assertEqual(step(n, [W], 120), [('new', 'D:')])
+
+    def test_r15_recheck_the_loop_restarts_the_hold_after_stale(self):
+        sampler, calls, c, k = FakeSampler([W]), [], Clock(), [0]
+        fresh = {0: True, 30: False, 60: True, 90: True, 120: True}
+        orig = sampler.status
+        sampler.status = lambda: dict(orig(), fresh=fresh.get(c.t, True))
+
+        class Stop:
+            def is_set(self_):
+                return k[0] >= 5
+
+            def wait(self_, s):
+                k[0] += 1
+                c.t += s
+        notify.loop(sampler, notify.Notifier(hold_s=60), ['x'], Stop(), every_s=30, clock=c,
+                    sender=lambda cmd, t, f: calls.append(c.t) or (True, 'ok'))
+        self.assertEqual(calls, [120.0])          # not at 60: the stale check at 30 broke the observation
 
     def test_r15_stale_samples_are_not_judged(self):
         calls = []
@@ -247,7 +350,9 @@ def run_status(url, *extra):
 
 class StatusCommand(unittest.TestCase):
     def test_exit_codes_and_lines_from_a_real_sampler(self):
-        s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: '', paths=['.'], usage_on=False, disk_reader=lambda: {}, nic_reader=lambda: {})
+        # a fixed clock keeps the one sample fresh however slow the machine is (a macOS runner took 35 s here, and the sample went stale)
+        s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: '', paths=['.'], usage_on=False, disk_reader=lambda: {}, nic_reader=lambda: {},
+                             clock=lambda: 1800000000.0)
         s.sample_once()
         srv = server.make_server(None, 0, live=s)
         threading.Thread(target=srv.serve_forever, daemon=True).start()

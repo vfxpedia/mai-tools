@@ -154,6 +154,41 @@ def sources(last):
 ORDER = {'bad': 0, 'warn': 1, 'info': 2}
 
 
+def observable(samples, slow):
+    """The findings that could be judged right now, as 'kind|subject' keys: the measurement each rule needs is present (recheck of
+    review R14). A finding that is absent but not observable is not gone: a GPU row without a temperature says nothing about heat, a
+    folder that does not answer says nothing about its free space, a removed device says nothing at all."""
+    out = {'source_problem|sampler'}
+    last = samples[-1] if samples else None
+    for g in (last or {}).get('gpus') or []:
+        name = 'GPU %s' % g.get('index')
+        if g.get('temperature_c') is not None:
+            out.add('gpu_hot|' + name)
+        if g.get('throttle') is not None:
+            out.add('gpu_clock_limited|' + name)
+        if g.get('util_pct') is not None and g.get('vram_used_mib') is not None:
+            out.add('gpu_vram_idle|' + name)
+    for n in (last or {}).get('nics') or []:
+        if n.get('link_mbps') is not None:
+            out.add('slow_link|' + str(n.get('nic')))
+    if last and last.get('ram_pct') is not None:
+        out.add('ram_high|RAM')
+    for p in (slow or {}).get('paths') or []:
+        name = p.get('label') or p.get('path')
+        if p.get('state') in ('ok', 'unreachable', 'no answer'):
+            out.add('path_unreachable|' + name)          # reachability is known either way
+        if p.get('state') == 'ok' and p.get('free_gib') is not None and p.get('used_pct') is not None:
+            out.add('disk_space|' + name)
+    u = (slow or {}).get('usage') or {}
+    if u:
+        out.add('usage_source|usage')
+    for r in u.get('limits') or []:
+        for w, label in (('five_hour', '5-hour'), ('seven_day', '7-day')):
+            if (r.get(w) or {}).get('pct') is not None:
+                out.add('plan_limit|%s %s' % (r.get('engine'), label))
+    return sorted(out)
+
+
 def blind(samples, slow):
     """Sources that cannot be read right now, so their findings can be neither confirmed nor declared gone (review R14). Names match
     notify.SOURCE; a single folder is 'path:<label or path>'."""

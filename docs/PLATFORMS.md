@@ -14,7 +14,7 @@ Updated only from real runs. A cell that says "not measured" means no one ran it
 | Mod | Windows | Ubuntu | macOS |
 |---|---|---|---|
 | mai-gauge (`claude plugin validate` and `test`, 81 tests) | passes on the author's machine | passes on the runner | not run |
-| mai-codex-gauge (`node --test`, 114 tests) | 109 pass, 5 skipped | passes | **1 known failure**: test 83, a hook installed into a home whose path has spaces and launched by `/bin/sh` with a minimal PATH exits 0 but prints nothing. Not yet explained. Before the store path fix it was about 70 failures, all from `/var` being a link on macOS. This suite does not block macOS CI until it is fixed. |
+| mai-codex-gauge (`node --test`, 117 tests) | 112 pass, 5 skipped (opt-in live tests) | passes | 0 failed, 7 skipped (d181c93). The earlier failure (a hook launched through a linked folder printed nothing) came from comparing the typed script path with the module's real path; fixed by comparing real paths. Before the store path fix there were about 70 failures, all from `/var` being a link. |
 
 ## mai-code alpha (2026-10-18)
 

@@ -1,5 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {pathToFileURL} from 'node:url';
-import {safePath,validateId,readJson,saveSession} from './store.mjs';
+import {safePath,validateId,readJson,saveSession,isEntry} from './store.mjs';
 import {bandRows,renderRows,freshLimits,pace,recentRate} from './band.mjs';
 import {normalizeProviderUsage,readProviderUsage} from './provider.mjs';
 import {sessionTokens,tallyTokens} from './telemetry.mjs';
@@ -59,4 +59,4 @@ export async function main(args=process.argv.slice(2)){
  if(command==='scan'||command==='observe'||command==='diagnose'){if(opts.rebuild!==undefined&&(command!=='scan'||!['true',true].includes(opts.rebuild)))throw Error('--rebuild true requires scan');const {observe}=await import('./hook.mjs');const result=await observe({base,sessionId,transcript:opts.transcript,codexHome:opts.home??process.env.CODEX_HOME,account:opts.account,full:command==='scan',rebuild:!!opts.rebuild});return console.log(JSON.stringify(result));}
  throw Error('commands: show, watch, live, status, scan, observe, diagnose, api');
 }
-if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url)main().catch(()=>{console.error('Gauge command failed. Run diagnose or inspect the private source state.');process.exitCode=1;});
+if(isEntry(import.meta.url))main().catch(()=>{console.error('Gauge command failed. Run diagnose or inspect the private source state.');process.exitCode=1;});

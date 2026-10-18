@@ -2,8 +2,12 @@ import fs from 'node:fs';import path from 'node:path';import crypto from 'node:c
 const idPattern=/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
 export function validateId(id){if(typeof id!=='string'||!idPattern.test(id))throw Error('invalid session id');return id;}
 export function safePath(base,...parts){
- if(parts.some(p=>typeof p!=='string'||p==='..'||p.includes('..')||/[\\/]/.test(p)))throw Error('unsafe path component');
- const target=path.resolve(base,...parts),root=path.resolve(base);let p=target;
+ if(parts.some(p=>typeof p!=='string'||p==='..'||p.includes('..')||/[\\/]/.test(p)||/^[A-Za-z]:/.test(p)||path.isAbsolute(p)))throw Error('unsafe path component');
+ const target=path.resolve(base,...parts),root=path.resolve(base),inside=path.relative(root,target);
+ if(inside.startsWith('..')||path.isAbsolute(inside))throw Error('path outside its base');
+ // Trust model: base is the trusted root. Links above it are trusted on purpose (macOS /var); a link at or below it is refused.
+ // This is a check at call time; a change between the check and the use (TOCTOU) is not defended against.
+ let p=target;
  // A link planted at or inside the store is refused. The folders above the store belong to the system or the user and are not checked:
  // on macOS /var and /tmp are themselves links, so checking up to the disk root refused every store below them.
  while(true){try{if(fs.lstatSync(p).isSymbolicLink())throw Error('symlink/junction refused');}catch(e){if(e.code!=='ENOENT')throw e;}if(p===root)break;const up=path.dirname(p);if(up===p)break;p=up;}
@@ -136,4 +140,10 @@ export function saveProvider(base,id,account,ob){
   if(old.codex.provider?.at>=sample.at)return null;
   return {...old,codex:{...old.codex,provider:sample}};
  });
+}
+// True when this module is the script node was started with. Compares real file paths: an ESM module's URL is its real path, while
+// argv[1] keeps the path as typed, so a script reached through a linked folder (macOS /var, a junction) otherwise never runs main.
+export function isEntry(moduleUrl){
+ if(!process.argv[1])return false;
+ try{return fs.realpathSync(process.argv[1])===fs.realpathSync(new URL(moduleUrl));}catch{return false;}
 }

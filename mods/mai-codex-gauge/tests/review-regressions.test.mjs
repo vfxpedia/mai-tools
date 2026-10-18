@@ -87,7 +87,10 @@ test('installed root and native hook commands launch without Node on PATH, inclu
   // Native COMSPEC fallback uses raw_arg with the whole command wrapped.
   const cmd=process.platform==='win32'&&shell.endsWith('cmd.exe');
   const invocation=cmd?[...args.slice(0,-1),'"'+args.at(-1)+'"']:args;
-  const r=spawnSync(shell,invocation,{env,input:payload,encoding:'utf8',timeout:5000,windowsHide:true,windowsVerbatimArguments:cmd});assert.equal(r.status,0,r.stderr);assert.deepEqual(JSON.parse(r.stdout),{});
+  // A cold PowerShell on a hosted Windows runner can take more than 5 s to start (seen once: status null after 7 s). The limit only
+  // guards against a hang, so it is generous, and a timeout is named as one instead of showing up as a null status.
+  const r=spawnSync(shell,invocation,{env,input:payload,encoding:'utf8',timeout:30000,windowsHide:true,windowsVerbatimArguments:cmd});
+  assert.equal(r.status,0,`${path.basename(shell)}: status ${r.status}, signal ${r.signal}, error ${r.error?.code??'none'}, stderr ${r.stderr}`);assert.deepEqual(JSON.parse(r.stdout),{});
  }
  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'.mai','units','self.json'))).codex.events.length,2,'positive stdin must survive both shells');
  const f=fixture();applyInstall(planInstall({codexHome:f.home,source,account:'codex:test',mode:'hooks'}),path.join(f.root,'backup'));

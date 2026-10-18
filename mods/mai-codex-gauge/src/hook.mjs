@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {pathToFileURL} from 'node:url';
 import {newState,readIncrement,reduceRecord} from './usage.mjs';
-import {validateId,safePath,atomicUpdate,readJson,saveSession,saveTurns,saveLimits} from './store.mjs';
+import {validateId,safePath,atomicUpdate,readJson,saveSession,saveTurns,saveLimits,isEntry} from './store.mjs';
 import {otherSessionsText,updateContextPolicy} from './context-policy.mjs';
 import {refreshProvider} from './provider.mjs';
 import {recordHookFailure} from './hook-diagnostics.mjs';
@@ -8,10 +8,10 @@ const events=new Set(['SessionStart','UserPromptSubmit','PreToolUse','PostToolUs
 export function validateTranscript(file,home,id){
  validateId(id);if(typeof file!=='string'||typeof home!=='string'||file.split(/[\\/]/).includes('..'))throw Error('invalid transcript reference');
  const root=path.resolve(home,'sessions'),target=path.resolve(file),relative=path.relative(root,target);if(relative.startsWith('..')||path.isAbsolute(relative))throw Error('transcript outside sessions');
- safePath(path.dirname(target),path.basename(target));const fd=fs.openSync(target,'r');
+ safePath(path.resolve(home),'sessions',...relative.split(/[\\/]/));const fd=fs.openSync(target,'r');
  try{const b=Buffer.alloc(Math.min(fs.fstatSync(fd).size,8*1024*1024));fs.readSync(fd,b,0,b.length,0);const end=b.indexOf(10);if(end<0)throw Error('metadata exceeds read budget');const meta=JSON.parse(b.subarray(0,end).toString('utf8'));if(meta.type!=='session_meta'||(meta.payload?.id??meta.payload?.session_id)!==id)throw Error('transcript owner mismatch');}finally{fs.closeSync(fd);}return target;
 }
-export function findTranscript(home,id){validateId(id);const root=path.resolve(home,'sessions');safePath(path.dirname(root),path.basename(root));const found=[];function walk(p){for(const e of fs.readdirSync(p,{withFileTypes:true})){if(e.isSymbolicLink())continue;const f=path.join(p,e.name);if(e.isDirectory())walk(f);else if(e.name.endsWith(`${id}.jsonl`))found.push(f);}}walk(root);if(found.length!==1)throw Error('unique own transcript not found');return validateTranscript(found[0],home,id);}
+export function findTranscript(home,id){validateId(id);const root=safePath(path.resolve(home),'sessions');const found=[];function walk(p){for(const e of fs.readdirSync(p,{withFileTypes:true})){if(e.isSymbolicLink())continue;const f=path.join(p,e.name);if(e.isDirectory())walk(f);else if(e.name.endsWith(`${id}.jsonl`))found.push(f);}}walk(root);if(found.length!==1)throw Error('unique own transcript not found');return validateTranscript(found[0],home,id);}
 const turnVersion=t=>`${t.at}:${t.requests}:${t.input}:${t.read}:${t.out}:${t.total}`;
 export async function observe({base=path.join(os.homedir(),'.mai'),sessionId,transcript,codexHome=process.env.CODEX_HOME,account,full=false,rebuild=false,event=null,providerReader=null,rpc=null,budgetMs=full?20000:400,recordBudget=full?100000:400}){
  validateId(sessionId);if(!/^codex:[\w-]+$/.test(account??''))throw Error('verified local account alias required');
@@ -102,4 +102,4 @@ export async function handleHook(input,environment={}){
  }return policyOutput;
  }catch(e){return fail(`${stage}_failed`,e);}
 }
-if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url){let raw='',tooLarge=false;process.stdin.setEncoding('utf8');process.stdin.on('data',s=>{if(raw.length+s.length>1024*1024)tooLarge=true;else raw+=s;});process.stdin.on('end',async()=>{let input=null;try{if(!tooLarge)input=JSON.parse(raw);}catch{}const out=await handleHook(input);process.stdout.write(JSON.stringify(out)+'\n');});}
+if(isEntry(import.meta.url)){let raw='',tooLarge=false;process.stdin.setEncoding('utf8');process.stdin.on('data',s=>{if(raw.length+s.length>1024*1024)tooLarge=true;else raw+=s;});process.stdin.on('end',async()=>{let input=null;try{if(!tooLarge)input=JSON.parse(raw);}catch{}const out=await handleHook(input);process.stdout.write(JSON.stringify(out)+'\n');});}

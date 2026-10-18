@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
-import {safePath} from './store.mjs';
+import {safePath,isEntry} from './store.mjs';
 import {hookCommand,isGaugeCommand,resolveHookRuntime} from './hook-command.mjs';
 
 const hash = bytes => bytes === null ? null : crypto.createHash('sha256').update(bytes).digest('hex');
@@ -183,7 +183,7 @@ export function rollback(manifest) {
   return {restored: true, files: manifest.files.length};
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+if (isEntry(import.meta.url)) {
   try {
     const [command, home, account, backup] = process.argv.slice(2);
     if (command === 'rollback') console.log(JSON.stringify(rollback(JSON.parse(fs.readFileSync(home, 'utf8')))));

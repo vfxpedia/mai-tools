@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {planInstall,applyInstall,rollback} from './install.mjs';
-import {safePath,readJson,validateId} from './store.mjs';
+import {safePath,readJson,validateId,isEntry} from './store.mjs';
 import {recordIssueReceipt} from './checkpoint.mjs';
 import {readProviderUsage,discoverProviderRpc} from './provider.mjs';
 import {readHookDiagnostics} from './hook-diagnostics.mjs';
@@ -85,4 +85,4 @@ export async function main(args=process.argv.slice(2)){
  if(plan.changes.length){const backup=options.backup??path.join(home,'mai-codex-gauge-backups',`${Date.now()}-${crypto.randomUUID()}`);manifest=path.join(applyInstall(plan,backup).backup,'manifest.json');}
  console.log(JSON.stringify({home,mode,changedFiles:plan.changes.length,manifest,trust:'review in /hooks',alreadyRunningSessions:'not restarted or claimed active'}));
 }
-if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url)main().catch(error=>{console.error(`Codex Mods operation refused: ${error.message}. No trust bypass or automatic session restart.`);process.exitCode=1;});
+if(isEntry(import.meta.url))main().catch(error=>{console.error(`Codex Mods operation refused: ${error.message}. No trust bypass or automatic session restart.`);process.exitCode=1;});

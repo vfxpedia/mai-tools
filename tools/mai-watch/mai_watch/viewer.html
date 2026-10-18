@@ -8,13 +8,13 @@
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6;
     --ok: #0b7a3b; --ok-bg: #d9f2e3; --warn: #8a5a00; --warn-bg: #fdecc8; --bad: #a3191f; --bad-bg: #fbdcdd;
-    --bar: #2b6fd6; --bar-idle: #6b7380;
+    --bar: #2b6fd6; --bar-idle: #6b7380; --vram: #b0570a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #101215; --panel: #1a1d22; --fg: #eceef1; --muted: #c3c8d0; --line: #3a4049;
       --ok: #62d68c; --ok-bg: #12301f; --warn: #f2c14e; --warn-bg: #3a2c0a; --bad: #ff8b90; --bad-bg: #3d1618;
-      --bar: #6ea2f5; --bar-idle: #8b93a0;
+      --bar: #6ea2f5; --bar-idle: #8b93a0; --vram: #f0a35c;
     }
   }
   * { box-sizing: border-box; }
@@ -66,6 +66,53 @@
   .meter-fill { display: block; height: 100%; background: var(--bar); }
   .meter.hot .meter-fill { background: var(--bad); }
   .meter.off .meter-fill { background: var(--bar-idle); }
+  .attention { display: grid; gap: 6px; margin-bottom: 18px; }
+  .att-row { display: flex; gap: 14px; align-items: baseline; padding: 9px 14px; border-radius: 6px; background: var(--panel); border-left: 5px solid var(--line); }
+  .att-row.lvl-bad { border-left-color: var(--bad); background: var(--bad-bg); }
+  .att-row.lvl-warn { border-left-color: var(--warn); background: var(--warn-bg); }
+  .att-row.ok-row { border-left-color: var(--ok); background: var(--ok-bg); font-weight: 600; }
+  .att-level { font-weight: 700; min-width: 6.5rem; flex: none; }
+  .lvl-bad .att-level { color: var(--bad); } .lvl-warn .att-level { color: var(--warn); }
+  .att-text { font-weight: 600; overflow-wrap: anywhere; }
+  .gpus { display: grid; gap: 10px; margin-bottom: 18px; }
+  .gpu-row { display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(13rem, 15rem) minmax(0, 1fr) minmax(12rem, 16rem); gap: 16px; align-items: center;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+  .gpu-index { font-size: 20px; font-weight: 700; }
+  .gpu-name { color: var(--muted); overflow-wrap: anywhere; }
+  .gpu-nums { display: grid; gap: 4px; }
+  .gpu-num { display: flex; align-items: baseline; gap: 8px; }
+  .num-big { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .num-mid { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .num-label { color: var(--muted); }
+  .u-key::before, .v-key::before { content: ""; display: inline-block; width: 14px; height: 3px; margin: 0 6px 3px 0; vertical-align: middle; background: var(--bar); }
+  .v-key::before { background: var(--vram); }
+  .legend { display: flex; gap: 18px; justify-content: flex-end; }
+  .spark.gpu-graph { height: 72px; margin: 0; }
+  .spark polyline.line-vram { stroke: var(--vram); }
+  .gpu-facts { color: var(--muted); display: grid; gap: 2px; }
+  .host-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 12px; margin-bottom: 18px; align-items: start; }
+  .host-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+  .host-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .host-title { font-weight: 600; }
+  .spark.host-graph { height: 36px; }
+  .host-detail { color: var(--muted); }
+  .io { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+  .io h3 { margin: 0 0 4px; font-size: 14px; } .io h3 + .scroll, .io .fold { margin-bottom: 8px; }
+  .fold summary { font-size: 13px; padding: 4px 0; }
+  .quiet { color: var(--muted); font-size: 13px; margin: 2px 0; }
+  .live-block { margin-bottom: 18px; }
+  .limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 8px 22px; margin-bottom: 10px; }
+  .limit-name { font-weight: 600; }
+  @media (max-width: 900px) {
+    .gpu-row { grid-template-columns: 1fr 1fr; }
+    .spark.gpu-graph, .gpu-facts { grid-column: 1 / -1; }
+    .host-band { grid-template-columns: 1fr 1fr; }
+    .io { grid-column: 1 / -1; }
+  }
+  @media (max-width: 560px) {
+    .gpu-row, .host-band { grid-template-columns: 1fr; }
+    .att-row { flex-direction: column; gap: 2px; }
+  }
   .live-problems { margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
   #live-section { display: none; }
   .section-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 8px; }

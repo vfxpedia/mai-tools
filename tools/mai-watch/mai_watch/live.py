@@ -9,9 +9,10 @@ import datetime
 import threading
 import time
 
-from . import host, nvidia, usage
+from . import disks, host, judge, nvidia, usage
 
 LIVE_SCHEMA = 'mai-watch-live-v1'
+STATUS_SCHEMA = 'mai-watch-status-v1'
 LIVE_GPU_QUERY = 'index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw'
 # asked in the same call when the driver supports them; one unsupported field fails the whole call, so on failure the core query is used
 EXTRA_FIELDS = ('clocks.sm', 'clocks.max.sm', 'clocks.mem', 'clocks_throttle_reasons.active', 'power.limit', 'fan.speed', 'utilization.memory',
@@ -55,7 +56,8 @@ def _gib(n):
 
 class LiveSampler:
     def __init__(self, nvidia_cmd=('nvidia-smi',), interval_s=1.0, history_s=600, clock=time.time, psutil_module=None, gpu_reader=None,
-                 paths=None, mai_home=None, usage_on=True, slow_interval_s=30, path_timeout_s=3.0, rate_clock=time.monotonic, usage_reader=None):
+                 paths=None, mai_home=None, usage_on=True, slow_interval_s=30, path_timeout_s=3.0, rate_clock=time.monotonic, usage_reader=None,
+                 disk_reader=None, thresholds=None):
         if not (isinstance(interval_s, (int, float)) and 0.2 <= interval_s <= 60):
             raise ValueError('interval_s must be between 0.2 and 60 seconds')
         if not (isinstance(history_s, (int, float)) and interval_s <= history_s <= 24 * 3600):
@@ -77,6 +79,9 @@ class LiveSampler:
         self.usage_on = usage_on
         self._usage_reader = usage_reader or (lambda: usage.read(self.mai_home, clock=self.clock))
         self.slow_interval_s = float(slow_interval_s)
+        self._disk_reader = disk_reader or disks.read
+        self.disk_map = {}              # filled once, in the background, at start: names for PhysicalDriveN and the like
+        self.thresholds = thresholds or {}
         self.slow = {'paths': self.paths.snapshot(), 'usage': None if usage_on else {'available': False, 'reason': 'usage view turned off (--no-usage)'},
                      'updated_at': None}
 
@@ -182,6 +187,14 @@ class LiveSampler:
     def check_paths(self):
         self.paths.check(wall=self.clock())
 
+    def load_disks(self):
+        try:
+            m = self._disk_reader()
+        except Exception:
+            m = {}
+        with self.lock:
+            self.disk_map = m if isinstance(m, dict) else {}
+
     def read_usage(self):
         if not self.usage_on:
             return
@@ -206,8 +219,21 @@ class LiveSampler:
             r = dict(r)
             if isinstance(r.get('checked_at'), (int, float)):
                 r['checked_at'] = _z(r['checked_at'])
+            model = disks.label_for_place(r['path'], self.disk_map)
+            r['label'] = r['path'].rstrip('\\/') + (' ' + model if model else '') if model else r['path']
             out.append(r)
         return out
+
+    def status(self):
+        """The judgment list with its evidence (/status.json): what agents and notifiers read instead of the page."""
+        with self.lock:
+            items = list(self.samples)
+            slow = dict(self.slow)
+        slow['paths'] = self._paths_now()
+        found = judge.judge(items, slow, self.thresholds)
+        counts = {k: sum(1 for f in found if f['level'] == k) for k in ('bad', 'warn', 'info')}
+        last = items[-1]['t'] if items else None
+        return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'counts': counts, 'judgments': found}
 
     def payload(self, since=None):
         with self.lock:
@@ -215,10 +241,11 @@ class LiveSampler:
             slow = dict(self.slow)
         slow['paths'] = self._paths_now()
         slow['paths_dropped'] = list(self.paths.dropped)
+        judgments = judge.judge(items, slow, self.thresholds)
         if since:
             items = [x for x in items if x['t'] > since]
         return {'schema': LIVE_SCHEMA, 'interval_s': self.interval_s, 'history_s': self.history_s, 'host': self.host_info,
-                'generated_at': _z(self.clock()), 'samples': items, 'slow': slow}
+                'generated_at': _z(self.clock()), 'samples': items, 'slow': slow, 'disks': self.disk_map, 'judgments': judgments}
 
     def run(self, stop, sleep=time.sleep):
         """Samples until stop is set. A slow source delays the next sample; samples are never invented to fill a gap."""
@@ -230,6 +257,7 @@ class LiveSampler:
                     pass
                 stop.wait(self.slow_interval_s)
         # paths and usage in separate threads: a share that hangs cannot hold back usage, and a slow usage read cannot hold back paths
+        threading.Thread(target=self.load_disks, daemon=True).start()
         threading.Thread(target=loop, args=(self.check_paths,), daemon=True).start()
         threading.Thread(target=loop, args=(self.read_usage,), daemon=True).start()
         while not stop.is_set():

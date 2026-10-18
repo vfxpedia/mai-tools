@@ -158,6 +158,16 @@ The session gauges already record plan limits and spend under `~/.mai` (or `$MAI
 
 Measured on the reference machine: Claude 5-hour and 7-day percent, Codex 7-day percent, per session turns and cost (Claude) or tokens (Codex). Not measured: where these files live on Linux and macOS, a Codex 5-hour reading (the gauge does not record one yet), usage without the gauges.
 
+## 9f. Judgments first, then the page (stage 2 and 3 of direction B)
+
+`judge.py` turns the live samples and the slow state into one list of findings: level (bad, warn, info), kind, subject, a sentence, and the numbers it was decided on. Rules: a watched folder under 10 GiB free is bad, under 50 GiB or at least 95 % used is warn; a folder that does not answer is bad; a wired adapter that is up but linked under 1000 Mbps is warn (wireless and adapters without a reported speed are skipped); a GPU clock held back by power or thermal reasons is warn (`gpu_idle` is not a slowdown); a GPU at 85 C or more is warn; a GPU that held at least 1 GiB while every sample of the last 5 minutes was under 5 % use is warn, and only when the window is at least 80 % covered and no reading in it is unknown; RAM at 90 % or more is warn; a plan window at 80 % is warn and at 95 % bad; sampler and usage source problems are info. A rule without the data it needs says nothing. Thresholds are named in `judge.DEFAULTS` and can be passed in.
+
+The list travels in live.json (`judgments`) for the page and at `/status.json` (`mai-watch-status-v1`, with counts) for agents and notifiers, so all three read the same judgment (stage 4 connects them).
+
+The page now puts order to work: the attention list first; each GPU as a wide row with use and VRAM on one shared graph and temperature, power against its limit, clock and limit reason beside it; CPU, RAM, network and disk activity in a smaller band; storage sorted by free space; AI sessions with the plan windows as meters that state the age of the gauge's reading. Idle disks, adapters without link speed or traffic, and sessions idle for over an hour are folded. Disks are named by model and drive letter (`disks.py`: PowerShell Get-Disk and Get-Partition on Windows, lsblk on Linux, read once in the background at start; macOS keeps the OS name).
+
+Measured on the reference machine: the list gave H: 7.4 GiB free (bad), D: and I: nearly full, and the 100 Mbps link, the same as measured by hand; disk names matched Get-Disk; the page was checked in a browser. Removing each of 11 rules makes a test fail. Not measured: the idle-VRAM rule against a real held-but-idle job, Linux disk names on a real machine.
+
 ## 10. Security and safety
 
 - Read-only. v1 contains no stop, kill, or launch capability.

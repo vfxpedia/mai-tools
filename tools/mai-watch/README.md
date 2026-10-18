@@ -1,16 +1,18 @@
-Status: draft (M2, live view, wider resources). 116 tests pass on Windows (72 + 12 + 25 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
+Status: draft (M2, live view, wider resources). 128 tests pass on Windows (72 + 12 + 25 + 12 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
 # mai-watch
 
-A read-only monitor for one machine. In the browser it shows, live:
+A read-only monitor for one machine. The page opens with what needs attention (for example a nearly full drive, a slow network link, a GPU that holds memory but does nothing), each line decided from measured numbers. Below that it shows, live:
 
 - CPU (every core), RAM and swap
 - each GPU: use, VRAM, temperature, power against its limit, SM clock against its maximum, and whether the clock is being limited and why
 - watched folders: free space, how full, and whether they answer (local drives, NAS shares)
 - network adapters and disks: how fast data moves right now
 - AI coding sessions: Claude Code and Codex plan limits, and per session today's turns, cost and tokens
+
+The same attention list is at http://127.0.0.1:28765/status.json with the numbers behind each line, for scripts and AI agents.
 
 It also keeps a record of your jobs: which are alive, and since when a GPU has been idle. It never starts, stops or changes anything.
 
@@ -32,6 +34,8 @@ How to read it:
 - Free space is shown in GiB first. 99.9 % used can still be 7 GiB or 7 TiB.
 - Network adapters are shown one by one and never added up: a VPN adapter carries traffic that also crosses the physical one.
 - Graph lines break where samples are missing, so an unobserved stretch never looks like a steady value.
+- Plan limit percentages are the gauges' last reading, taken when a session takes a turn; the page shows how old that reading is. They are not measured live.
+- Disks are named by model and drive letter. Rows that show nothing (idle disks, virtual adapters, quiet sessions) are folded.
 
 Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one `nvidia-smi` query takes about 0.08 s; a NAS address that does not answer took Windows 21 s to fail, and the page marked it `no answer` after 3 s while the rest kept updating.
 

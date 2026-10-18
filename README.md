@@ -1,5 +1,7 @@
 # mai-tools
 
+[한국어](README.ko.md)
+
 Small, general-purpose tools for people who run long, unattended AI and GPU work and want to trust what ran, when, and whether it is still alive.
 
 Each tool started as something its author needed, was checked against real measurements on one machine, and was then made to work for anyone. The rule is in [PRINCIPLES.md](PRINCIPLES.md): **Start with myself. Validate with evidence. Generalize for others.**
@@ -13,6 +15,10 @@ Each tool started as something its author needed, was checked against real measu
 Session mods live in [mods/](mods/): **mai-gauge** for Claude Code (install with `/plugin marketplace add vfxpedia/mai-tools` then `/plugin install mai-gauge@mai-mods`) and **mai-codex-gauge** for Codex.
 
 Python 3.12 (Linux) and 3.13 (Windows) are the versions measured so far; older versions are not measured. No build step. Tests need `jsonschema`; mai-tabs process reports and one test need `psutil`; the viewer and mai-tabs tests need Node.js.
+
+## Start here
+
+Each tool's README has a five-minute **Try it** section with commands that were run as written and the output they gave: [mai-approve](tools/mai-approve/README.md), [mai-watch](tools/mai-watch/README.md), [mai-tabs](tools/mai-tabs/README.md). Korean versions are next to them as `README.ko.md`.
 
 ## Naming
 

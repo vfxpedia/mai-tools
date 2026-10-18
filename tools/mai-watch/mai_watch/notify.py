@@ -79,16 +79,19 @@ class Notifier:
         for k, f in current.items():
             s = self.seen.get(k)
             if s is None or gap:
-                s = self.seen[k] = {'first': now}
+                # a gap restarts the timer, never the debt: a finding already due stays due (recheck B)
+                s = self.seen[k] = {'first': now, 'due': bool(s and s.get('due'))}
             s.update(last=now, level=f['level'], finding=f)
             self.gone.pop(k, None)
-            if now - s['first'] < self.hold_s:
-                continue
             was = self.announced.get(k)
             if was is None:
-                s['due'] = True                           # met its hold: from now on it must be delivered, even if it goes away
-                events.append({'event': 'new', 'key': k, 'finding': f})
-            elif LEVELS[f['level']] < LEVELS[was]:
+                if s.get('due') or now - s['first'] >= self.hold_s:
+                    s['due'] = True                       # met its hold: from now on it must be delivered, even if it goes away
+                    events.append({'event': 'new', 'key': k, 'finding': f})
+                continue
+            if now - s['first'] < self.hold_s:
+                continue
+            if LEVELS[f['level']] < LEVELS[was]:
                 events.append({'event': 'worse', 'key': k, 'finding': f})
             elif LEVELS[f['level']] > LEVELS[was]:
                 self.announced[k] = f['level']            # eased from bad to warn: no message; cleared when it goes
@@ -96,10 +99,16 @@ class Notifier:
             if k in current:
                 continue
             f = self.seen[k]['finding']
+            unseen = is_blind(f, blind) or (observable is not None and k not in observable)
             if k not in self.announced and self.seen[k].get('due'):
-                events.append({'event': 'passed', 'key': k, 'finding': f})     # due but never delivered: tell it, do not drop it
+                # due but never delivered: tell it, never drop it. "Came and went" only when its absence is observed; when it cannot be
+                # read now it goes out as the announcement it was, marked as not readable now, and its clear waits (recheck A)
+                if unseen:
+                    events.append({'event': 'new', 'key': k, 'finding': dict(f, now_unreadable=True)})
+                else:
+                    events.append({'event': 'passed', 'key': k, 'finding': f})
                 continue
-            if is_blind(f, blind) or (observable is not None and k not in observable):
+            if unseen:
                 self.gone.pop(k, None)                    # cannot judge it now: neither present nor gone, the timer waits
                 continue
             if k not in self.announced:
@@ -130,7 +139,7 @@ def message(events, host=None):
     parts = ['%d %s' % (len(by[k]), {'passed': 'came and went'}.get(k, k)) for k in ('new', 'worse', 'passed', 'cleared') if by[k]]
     lines = ['mai-watch %s: %s' % (host, ', '.join(parts))]
     for f in sorted(by['new'] + by['worse'], key=lambda f: LEVELS[f['level']]):
-        lines.append('%s  %s' % (LABEL[f['level']], f['text']))
+        lines.append('%s  %s%s' % (LABEL[f['level']], f['text'], ' (cannot be read now; the current state is unknown)' if f.get('now_unreadable') else ''))
     for f in by['passed']:
         lines.append('came and went  %s (gone again before a message got through)' % f['text'])
     for f in by['cleared']:

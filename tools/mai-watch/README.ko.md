@@ -1,4 +1,4 @@
-상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 158개 통과 (72 + 12 + 25 + 16 + 26 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
+상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 160개 통과 (72 + 12 + 25 + 16 + 28 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
 
 [English](README.md)
 

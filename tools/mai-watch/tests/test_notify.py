@@ -296,6 +296,57 @@ class Loop(unittest.TestCase):
         self.assertEqual(step(n, [W], 90), [])
         self.assertEqual(step(n, [W], 120), [('new', 'D:')])
 
+    def test_recheck_b_a_due_finding_survives_a_stale_stretch(self):
+        # pipeline input B: W due at 60 and its send failed; stale at 90; W back at 120; gone and observable from 150
+        seq = {0: [W], 30: [W], 60: [W], 90: [W], 120: [W], 150: [], 180: [], 210: []}
+        fresh = {90: False}
+        sampler, calls, c, k = FakeSampler([W]), [], Clock(), [0]
+        orig = sampler.status
+        sampler.status = lambda: dict(orig(), judgments=seq.get(c.t, []), fresh=fresh.get(c.t, True), observable=['disk_space|D:'])
+
+        class Stop:
+            def is_set(self_):
+                return k[0] >= 8
+
+            def wait(self_, s):
+                k[0] += 1
+                c.t += s
+
+        def sender(cmd, text, nfile):
+            calls.append((c.t, text))
+            return c.t != 60, 'x'
+        notify.loop(sampler, notify.Notifier(hold_s=60), ['x'], Stop(), every_s=30, clock=c, sender=sender)
+        self.assertEqual(calls[0][0], 60.0)
+        # the debt from 60 is paid at the first fresh check after the retry wait, as the warning it was (W is back at 120)
+        self.assertEqual(calls[1][0], 120.0)
+        self.assertIn('LOOK SOON  D: has 37 GiB free', calls[1][1])
+        self.assertEqual(calls[2][0], 210.0)                                 # observed gone from 150, cleared after the 60 s hold
+        self.assertIn('cleared  D: has 37 GiB free', calls[2][1])
+        self.assertEqual(sampler.notify_state['delivered'], 2)
+
+    def test_recheck_a_an_unreadable_due_finding_is_not_called_gone(self):
+        rows = {'hot': '0, GPU-a, RTX A, 50, 9000, 16303, 90, 200\n', 'na': '0, GPU-a, RTX A, 50, 9000, 16303, [N/A], 200\n'}
+        cur, c = ['hot'], [1800000000.0]
+        s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: rows[cur[0]], paths=['.'], usage_on=False, disk_reader=lambda: {},
+                             nic_reader=lambda: {}, clock=lambda: c[0])
+        n = notify.Notifier(hold_s=60)
+        for t, phase in ((0, 'hot'), (30, 'hot'), (60, 'hot')):
+            cur[0], c[0] = phase, 1800000000.0 + t
+            s.sample_once()
+            st = s.status()
+            e = n.update(st['judgments'], t, set(st['blind']), set(st['observable']))     # t=60 proposes new; the send fails
+        cur[0], c[0] = 'na', 1800000090.0
+        s.sample_once()
+        st = s.status()
+        e = n.update(st['judgments'], 90, set(st['blind']), set(st['observable']))
+        hot = [x for x in e if x['key'] == 'gpu_hot|GPU 0']
+        self.assertEqual([x['event'] for x in hot], ['new'])                  # not 'passed': its absence is not observed
+        text = notify.message(hot, host='box')
+        self.assertIn('GPU 0 is at 90 C (cannot be read now; the current state is unknown)', text)
+        self.assertNotIn('came and went', text)
+        n.commit(hot)
+        self.assertEqual(n.update(st['judgments'], 120, set(st['blind']), set(st['observable'])), [])   # announced; clear waits
+
     def test_r15_recheck_the_loop_restarts_the_hold_after_stale(self):
         sampler, calls, c, k = FakeSampler([W]), [], Clock(), [0]
         fresh = {0: True, 30: False, 60: True, 90: True, 120: True}

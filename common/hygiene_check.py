@@ -51,7 +51,7 @@ def scan_text(name, text, deny_hosts=()):
     found = []
     for no, line in enumerate(text.splitlines(), 1):
         for m in HOME.finditer(line):
-            if m.group(1).lower() not in PLACEHOLDER_USERS:
+            if m.group(1).lower() not in PLACEHOLDER_USERS and len(m.group(1)) > 1:   # one letter is a placeholder
                 found.append((name, no, 'personal_path', m.group(0)))
         for m in EMAIL.finditer(line):
             if not PLACEHOLDER_MAIL.search(m.group(0)):

@@ -1,0 +1,7 @@
+{
+  "name": "mai-codex-gauge",
+  "version": "0.2.2",
+  "description": "MAI Codex usage observations, work-unit checkpoints and original-conversation continuity.",
+  "hooks": "./hooks.json",
+  "skills": "./skills/"
+}

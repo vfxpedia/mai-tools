@@ -10,6 +10,8 @@ Each tool started as something its author needed, was checked against real measu
 | [mai-watch](tools/mai-watch/) | Read-only monitor for GPU use and workload status: collector, idle detection with explicit unknowns, liveness, event log, local viewer | M2, reviewed | `python -m mai_watch --help` (inside `tools/mai-watch`) |
 | [mai-tabs](tools/mai-tabs/) | Saves open browser tabs as categorized Markdown before a cleanup, proposes what could be closed, never closes anything | M1, exercised once in an isolated profile | `python -m mai_tabs --help` (inside `tools/mai-tabs`) |
 
+Session mods live in [mods/](mods/): **mai-gauge** for Claude Code (install with `/plugin marketplace add vfxpedia/mai-tools` then `/plugin install mai-gauge@mai-mods`) and **mai-codex-gauge** for Codex.
+
 Python 3.12 (Linux) and 3.13 (Windows) are the versions measured so far; older versions are not measured. No build step. Tests need `jsonschema`; mai-tabs process reports and one test need `psutil`; the viewer and mai-tabs tests need Node.js.
 
 ## Naming

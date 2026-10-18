@@ -1,0 +1,1 @@
+{"name":"mai-codex-gauge","version":"0.2.2","private":true,"type":"module","engines":{"node":">=22"},"bin":{"mai-codex-mods":"bin/mai-codex-mods.mjs"},"files":["bin/","src/","skills/",".codex-plugin/",".agents/","hooks.json","plugin.json","types.d.ts","README.md"],"scripts":{"test":"node --test tests/*.test.mjs"}}

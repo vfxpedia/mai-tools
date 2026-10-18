@@ -29,6 +29,20 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: pip install -r requirements-dev.txt
       - run: python common/run_all_tests.py
+
+  mai-gauge:
+    # Runs the Claude Code mod checks with the public CLI and no signed-in account. Not yet known to work on a runner:
+    # reported, not blocking, until its first result has been read.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate mods/mai-gauge
+      - run: claude plugin test mods/mai-gauge

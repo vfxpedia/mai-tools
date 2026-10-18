@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mai-mods",
+  "description": "Claude Code mods shared by every session: context, limits and cost gauge, session board, guard for destructive commands",
+  "owner": {
+    "name": "vfxpedia"
+  },
+  "plugins": [
+    {
+      "name": "mai-gauge",
+      "source": "./mods/mai-gauge",
+      "description": "Shows context use, the tool being called, this turn's tokens and per-tool cost above the prompt and in /gauge"
+    }
+  ]
+}

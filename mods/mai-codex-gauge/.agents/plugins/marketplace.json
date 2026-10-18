@@ -1,0 +1,10 @@
+{
+  "name": "mai-codex-local",
+  "interface": {"displayName": "MAI Codex Local"},
+  "plugins": [{
+    "name": "mai-codex-gauge",
+    "source": {"source": "local", "path": "./"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"},
+    "category": "Productivity"
+  }]
+}

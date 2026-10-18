@@ -25,7 +25,7 @@ class HygieneTests(unittest.TestCase):
         self.assertEqual(rules('/Users/realname/lab'), ['personal_path'])
 
     def test_placeholder_users_pass(self):
-        for t in ('C:/Users/user/lab', '/home/user/lab', '/Users/someone/x', 'C:/Users/Public/x'):
+        for t in ('C:/Users/user/lab', '/home/user/lab', '/Users/someone/x', 'C:/Users/Public/x', 'C:/Users/u/.mai', '/Users/a/b'):
             self.assertEqual(rules(t), [], t)
 
     def test_email_and_secrets(self):

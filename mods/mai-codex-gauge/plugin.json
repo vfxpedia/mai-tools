@@ -1,0 +1,7 @@
+{
+  "name": "mai-codex-gauge",
+  "version": "0.2.2",
+  "description": "Local Codex usage gauge and original-transcript continuity index. No model calls.",
+  "hooks": "./hooks.json",
+  "skills": "./skills/"
+}

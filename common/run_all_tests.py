@@ -15,6 +15,10 @@ SUITES = {
     'mai-tabs': ['tests/test_mai_tabs.py'],
     'common': ['tests/test_hygiene.py'],
 }
+# suites that are not Python: (folder, command, how to read the count)
+NODE_SUITES = {
+    'mai-codex-gauge': ('mods/mai-codex-gauge', ['node', '--test', 'tests/*.test.mjs']),
+}
 
 
 def run_file(tool, rel):
@@ -28,11 +32,29 @@ def run_file(tool, rel):
     return ok, n, int(skipped.group(1)) if skipped else 0, out
 
 
+def run_node(name):
+    folder, cmd = NODE_SUITES[name]
+    p = subprocess.run(cmd, cwd=os.path.join(ROOT, folder), capture_output=True, text=True, encoding='utf-8', errors='replace')
+    out = p.stdout + p.stderr
+    get = lambda k: int((re.search(r'^\S* ?' + k + r' (\d+)', out, re.M) or [0, 0])[1])
+    n, failed, sk = get('tests'), get('fail'), get('skipped')
+    ok = p.returncode == 0 and n > 0 and failed == 0
+    return ok, n, sk, out
+
+
 def main(argv):
-    wanted = argv or list(SUITES)
+    wanted = argv or list(SUITES) + list(NODE_SUITES)
     bad = 0
     total = 0
     for tool in wanted:
+        if tool in NODE_SUITES:
+            ok, n, sk, out = run_node(tool)
+            total += n
+            print('%-4s %-12s %-34s tests=%d skipped=%d' % ('OK' if ok else 'FAIL', tool, ' '.join(NODE_SUITES[tool][1]), n, sk))
+            if not ok:
+                bad += 1
+                print(chr(10).join(out.splitlines()[-25:]))
+            continue
         if tool not in SUITES:
             print('unknown tool: ' + tool)
             return 2

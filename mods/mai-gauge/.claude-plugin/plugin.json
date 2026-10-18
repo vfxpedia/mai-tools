@@ -1,0 +1,6 @@
+{
+  "name": "mai-gauge",
+  "version": "1.6.1",
+  "description": "컨텍스트 사용량 · 지금 부르는 도구 · 이번 턴 토큰 · 도구별 토큰과 비용을 프롬프트 위 띠와 /gauge 로 보여준다",
+  "types": "./types/index.d.ts"
+}

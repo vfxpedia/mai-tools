@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the session mods `mods/mai-gauge` (Claude Code, marketplace `mai-mods` at the repository root, ids unchanged) and `mods/mai-codex-gauge` (Codex 0.2.2), with test data scrubbed of personal names and paths and English READMEs; detailed Korean guides kept as README.ko.md.
+
 - Naming rule: Python package `maiwatch` is now `mai_watch` (`python -m mai_watch`), config file `mai-watch.toml`, snapshot id `mai-watch-snapshot-v1`; mai-approve ids are `mai-approve-approval-v1` and `mai-approve-receipt-v1`, the old ids are still read.
 
 - First import of mai-approve, mai-watch and mai-tabs, with the findings of two independent review rounds each fixed with a reproducing test.

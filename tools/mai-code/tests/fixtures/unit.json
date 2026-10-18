@@ -1,0 +1,13 @@
+{
+  "schema":"mai-code-unit-v1",
+  "unit_id":"test-only-template",
+  "issue_url":"https://github.com/example/project/issues/1",
+  "workspace":"/path/to/owned-linked-worktree",
+  "inputs":[{"path":"paper.txt","sha256":"0000000000000000000000000000000000000000000000000000000000000000","references":["section 1"]}],
+  "contract":{"module":"TEST ONLY template. Replace workspace and hashes or use the opt-in fixture builder. This file is deliberately not runnable as supplied.","negative_test_id":"__main__.AffineTests.test_known_gradients","negative_failures":1},
+  "outputs":["analysis.json","plan.json","affine.py"],
+  "engines":{"analyze":{"engine":"codex"},"plan":{"engine":"codex"},"implement":{"engine":"codex"}},
+  "test_argv":["python","-B","test_affine.py"],
+  "test_framework":"unittest",
+  "negative_control_argv":["python","-B","test_affine.py","--negative"]
+}

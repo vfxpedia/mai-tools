@@ -1,2 +1,0 @@
-[console_scripts]
-mai-watch = mai_watch.cli:main

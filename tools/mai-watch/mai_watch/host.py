@@ -147,7 +147,7 @@ def disk_io(ps, rates):
     return out
 
 
-def network(ps, rates):
+def network(ps, rates, kinds=None):
     """Per adapter that is up (loopback left out): receive and send MiB/s and the link speed the OS reports. Adapters are never summed:
     a VPN adapter carries traffic that also crosses the physical one, so a total would count it twice."""
     try:
@@ -170,5 +170,6 @@ def network(ps, rates):
         speed = stats[name].speed
         # 0 means not reported; VIRTUAL_LINK_MBPS is the Windows value for "no real link"
         out.append({'nic': name, 'rx_mib_s': None if rx is None else round(rx / MIB, 3), 'tx_mib_s': None if tx is None else round(tx / MIB, 3),
-                    'link_mbps': speed if isinstance(speed, int) and speed > 0 and speed != VIRTUAL_LINK_MBPS else None})
+                    'link_mbps': speed if isinstance(speed, int) and speed > 0 and speed != VIRTUAL_LINK_MBPS else None,
+                    'kind': (kinds or {}).get(name, 'unknown')})
     return out

@@ -24,7 +24,6 @@ DEFAULTS = {
 }
 
 LIMIT_REASONS = ('sw_power_cap', 'hw_slowdown', 'sw_thermal_slowdown', 'hw_thermal_slowdown', 'hw_power_brake_slowdown')
-WIRELESS_HINTS = ('wi-fi', 'wifi', 'wlan', 'wireless', 'bluetooth', 'wl')
 
 
 def _f(level, kind, subject, text, **evidence):
@@ -50,19 +49,24 @@ def paths(slow, t):
 
 
 def network(last, t):
+    """A slow link is a cable or port question only for an adapter the OS reports as wired (review R10). An adapter of unknown kind
+    gets a note without a cause; wireless and virtual adapters get nothing (their reported speed is not a cable property)."""
     out = []
     for n in (last or {}).get('nics') or []:
         speed = n.get('link_mbps')
         name = n.get('nic') or ''
-        if speed is None or any(h in name.lower() for h in WIRELESS_HINTS):
+        kind = n.get('kind') or 'unknown'
+        if speed is None or speed >= t['slow_link_mbps'] or kind in ('wireless', 'virtual'):
             continue
-        if speed < t['slow_link_mbps']:
-            out.append(_f('warn', 'slow_link', name, '%s is linked at %d Mbps; a cable or switch port can hold a faster adapter back' % (name, speed),
-                          link_mbps=speed))
+        if kind == 'wired':
+            out.append(_f('warn', 'slow_link', name, '%s (wired) is linked at %d Mbps; a cable or switch port can hold a faster adapter back' % (name, speed),
+                          link_mbps=speed, adapter_kind=kind))
+        else:
+            out.append(_f('info', 'slow_link', name, '%s is linked at %d Mbps (adapter kind unknown)' % (name, speed), link_mbps=speed, adapter_kind=kind))
     return out
 
 
-def gpus(samples, t):
+def gpus(samples, t, max_gap_s):
     out = []
     if not samples:
         return out
@@ -76,7 +80,7 @@ def gpus(samples, t):
         temp = g.get('temperature_c')
         if temp is not None and temp >= t['gpu_temp_warn']:
             out.append(_f('warn', 'gpu_hot', name, '%s is at %s C' % (name, temp), temperature_c=temp))
-        held = idle_holding(samples, g.get('uuid'), t)
+        held = idle_holding(samples, g.get('uuid'), t, max_gap_s)
         if held:
             out.append(_f('warn', 'gpu_vram_idle', name, '%s holds %.1f GiB but has been below %s%% use for %d min' % (
                 name, held['vram_mib'] / 1024, t['idle_util_pct'], round(held['span_s'] / 60)), **held))
@@ -91,9 +95,10 @@ def _sec(iso):
         return None
 
 
-def idle_holding(samples, uuid, t):
+def idle_holding(samples, uuid, t, max_gap_s):
     """Evidence when the GPU held memory and stayed below the use threshold for the whole window, else None. Needs the window to be
-    covered: a short or gappy history is not enough to say it has been idle."""
+    covered by observation: the time between consecutive samples counts only up to max_gap_s (the gap the graph also breaks at), so two
+    end points or a long hole in the middle are not enough to say it has been idle (review R9)."""
     now = _sec(samples[-1].get('t'))
     if now is None:
         return None
@@ -106,6 +111,8 @@ def idle_holding(samples, uuid, t):
         rows.append((_sec(s['t']), g['util_pct'], g['vram_used_mib']))
     if len(rows) < 2:
         return None
+    if any(b[0] - a[0] > max_gap_s for a, b in zip(rows, rows[1:])):
+        return None                                   # a hole longer than the allowed gap: that time was not observed
     span = rows[-1][0] - rows[0][0]
     if span < t['idle_coverage'] * t['idle_window_s']:
         return None
@@ -147,8 +154,9 @@ def sources(last):
 ORDER = {'bad': 0, 'warn': 1, 'info': 2}
 
 
-def judge(samples, slow, thresholds=None):
+def judge(samples, slow, thresholds=None, interval_s=1.0):
     t = dict(DEFAULTS, **(thresholds or {}))
     last = samples[-1] if samples else None
-    found = paths(slow, t) + network(last, t) + gpus(samples, t) + host(last, t) + usage(slow, t) + sources(last)
+    max_gap_s = max(3 * interval_s, 5)              # the same gap at which the page breaks a graph line
+    found = paths(slow, t) + network(last, t) + gpus(samples, t, max_gap_s) + host(last, t) + usage(slow, t) + sources(last)
     return sorted(found, key=lambda f: ORDER[f['level']])

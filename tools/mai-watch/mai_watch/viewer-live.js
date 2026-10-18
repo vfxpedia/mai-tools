@@ -5,7 +5,7 @@
  * read is shown as unknown, never as 0. Without a live sampler (plain `serve`) the panel stays hidden. */
 (function (root) {
   'use strict';
-  var state = { active: false, interval: 1, history: 600, samples: [], host: null, slow: null, judgments: [], disks: {}, timer: null };
+  var state = { active: false, interval: 1, history: 600, samples: [], host: null, slow: null, judgments: [], disks: {}, timer: null, open: {} };
   root.MaiLive = state;
 
   function $(id) { return document.getElementById(id); }
@@ -84,8 +84,13 @@
     var wrap = el('div', undefined, 'scroll'); wrap.appendChild(t); return wrap;
   }
 
-  function fold(summary, node) {
-    var d = el('details', undefined, 'fold'); d.appendChild(el('summary', summary)); d.appendChild(node); return d;
+  /* A folded group keeps the reader's choice across redraws: the page is rebuilt every second, so the open state lives in state.open
+   * under a stable key (review R12). */
+  function fold(summary, node, key) {
+    var d = el('details', undefined, 'fold');
+    if (key && state.open[key]) d.open = true;
+    d.addEventListener('toggle', function () { if (key) state.open[key] = d.open; });
+    d.appendChild(el('summary', summary)); d.appendChild(node); return d;
   }
 
   /* ---------- 1. what needs attention ---------- */
@@ -157,9 +162,23 @@
     return c;
   }
 
-  function moved(list, key, field, name) {
-    return list.some(function (s) { return (s[key] || []).some(function (x) { return x[field] === name && ((x.rx_mib_s || 0) + (x.tx_mib_s || 0) + (x.read_mib_s || 0) + (x.write_mib_s || 0)) > 0.01; }); });
+  /* Pure: 'active' when a rate above 0.01 MiB/s was seen in the window, 'idle' when rates were read and all were at or below it,
+   * 'unknown' when no rate was read at all (first reading, counter reset). Unknown is never called idle (review R11). Exported for tests. */
+  function activity(list, key, field, name, a, b) {
+    var seen = false, moving = false;
+    list.forEach(function (s) {
+      (s[key] || []).forEach(function (x) {
+        if (x[field] !== name) return;
+        [x[a], x[b]].forEach(function (v) {
+          if (v === null || v === undefined || !isFinite(v)) return;
+          seen = true;
+          if (v > 0.01) moving = true;
+        });
+      });
+    });
+    return moving ? 'active' : seen ? 'idle' : 'unknown';
   }
+  state.activity = activity;
 
   function diskName(d) {
     var m = state.disks && state.disks[d];
@@ -169,24 +188,27 @@
 
   function ioBand(list) {
     var last = list[list.length - 1], box = el('div', undefined, 'io');
-    var nicRow = function (n) { return [n.nic, rate(n.rx_mib_s), rate(n.tx_mib_s), n.link_mbps ? (n.link_mbps >= 1000 ? (n.link_mbps / 1000) + ' Gbps' : n.link_mbps + ' Mbps') : 'unknown']; };
+    var nicRow = function (n) { return [n.nic, n.kind || 'unknown', rate(n.rx_mib_s), rate(n.tx_mib_s), n.link_mbps ? (n.link_mbps >= 1000 ? (n.link_mbps / 1000) + ' Gbps' : n.link_mbps + ' Mbps') : 'unknown']; };
     if (!last.nics) box.appendChild(el('p', 'network unknown (needs psutil)', 'mono'));
     else {
-      var live = last.nics.filter(function (n) { return n.link_mbps || moved(list, 'nics', 'nic', n.nic); });
-      var rest = last.nics.filter(function (n) { return live.indexOf(n) < 0; });
+      // folded only when the OS calls it virtual AND rates were read and stayed at zero; unknown rates stay in view
+      var quietVirtual = last.nics.filter(function (n) { return n.kind === 'virtual' && activity(list, 'nics', 'nic', n.nic, 'rx_mib_s', 'tx_mib_s') === 'idle'; });
+      var shown = last.nics.filter(function (n) { return quietVirtual.indexOf(n) < 0; });
+      var nicHead = ['adapter', 'kind', 'receive', 'send', 'link'];
       box.appendChild(el('h3', 'Network'));
-      box.appendChild(table(['adapter', 'receive', 'send', 'link'], live.map(nicRow), 'compact'));
-      if (rest.length) box.appendChild(fold(rest.length + ' adapters with no link speed and no traffic (virtual or VPN)', table(['adapter', 'receive', 'send', 'link'], rest.map(nicRow), 'compact')));
+      box.appendChild(table(nicHead, shown.map(nicRow), 'compact'));
+      if (quietVirtual.length) box.appendChild(fold(quietVirtual.length + ' virtual adapters with no traffic', table(nicHead, quietVirtual.map(nicRow), 'compact'), 'nics-virtual'));
     }
     if (!last.disks) box.appendChild(el('p', 'disk activity unknown (needs psutil)', 'mono'));
     else {
       var diskRow = function (d) { return [diskName(d.disk), rate(d.read_mib_s), rate(d.write_mib_s)]; };
-      var busy = last.disks.filter(function (d) { return moved(list, 'disks', 'disk', d.disk); });
-      var idle = last.disks.filter(function (d) { return busy.indexOf(d) < 0; });
+      var cls = function (d) { return activity(list, 'disks', 'disk', d.disk, 'read_mib_s', 'write_mib_s'); };
+      var idle = last.disks.filter(function (d) { return cls(d) === 'idle'; });
+      var shown = last.disks.filter(function (d) { return idle.indexOf(d) < 0; });          // active and unknown both stay in view
       box.appendChild(el('h3', 'Disk activity'));
-      if (busy.length) box.appendChild(table(['disk', 'read', 'write'], busy.map(diskRow), 'compact'));
-      else box.appendChild(el('p', 'no disk moved data in the graph window', 'quiet'));
-      if (idle.length) box.appendChild(fold(idle.length + ' idle disks', table(['disk', 'read', 'write'], idle.map(diskRow), 'compact')));
+      if (shown.length) box.appendChild(table(['disk', 'read', 'write'], shown.map(diskRow), 'compact'));
+      else box.appendChild(el('p', 'every disk was read and moved no data in the graph window', 'quiet'));
+      if (idle.length) box.appendChild(fold(idle.length + ' disks that moved no data', table(['disk', 'read', 'write'], idle.map(diskRow), 'compact'), 'disks-idle'));
     }
     return box;
   }
@@ -251,7 +273,7 @@
     var quiet = all.filter(function (r) { return busy.indexOf(r) < 0; });
     if (busy.length) box.appendChild(table(head, rows(busy), 'compact'));
     else box.appendChild(el('p', 'no session active in the last hour', 'quiet'));
-    if (quiet.length) box.appendChild(fold(quiet.length + ' sessions idle for over an hour', table(head, rows(quiet), 'compact')));
+    if (quiet.length) box.appendChild(fold(quiet.length + ' sessions idle for over an hour', table(head, rows(quiet), 'compact'), 'sessions-quiet'));
     if (u.problems && u.problems.length) box.appendChild(el('p', u.problems.join('; '), 'quiet'));
     return box;
   }
@@ -319,5 +341,5 @@
   }
 
   if (typeof document !== 'undefined' && document.getElementById && document.getElementById('live')) poll();
-  if (typeof module !== 'undefined') module.exports = { sparkPoints: sparkPoints };
+  if (typeof module !== 'undefined') module.exports = { sparkPoints: sparkPoints, activity: activity };
 })(typeof window !== 'undefined' ? window : this);

@@ -9,7 +9,7 @@ import datetime
 import threading
 import time
 
-from . import disks, host, judge, nvidia, usage
+from . import disks, host, judge, nics, nvidia, usage
 
 LIVE_SCHEMA = 'mai-watch-live-v1'
 STATUS_SCHEMA = 'mai-watch-status-v1'
@@ -57,7 +57,7 @@ def _gib(n):
 class LiveSampler:
     def __init__(self, nvidia_cmd=('nvidia-smi',), interval_s=1.0, history_s=600, clock=time.time, psutil_module=None, gpu_reader=None,
                  paths=None, mai_home=None, usage_on=True, slow_interval_s=30, path_timeout_s=3.0, rate_clock=time.monotonic, usage_reader=None,
-                 disk_reader=None, thresholds=None):
+                 disk_reader=None, thresholds=None, nic_reader=None):
         if not (isinstance(interval_s, (int, float)) and 0.2 <= interval_s <= 60):
             raise ValueError('interval_s must be between 0.2 and 60 seconds')
         if not (isinstance(history_s, (int, float)) and interval_s <= history_s <= 24 * 3600):
@@ -81,6 +81,8 @@ class LiveSampler:
         self.slow_interval_s = float(slow_interval_s)
         self._disk_reader = disk_reader or disks.read
         self.disk_map = {}              # filled once, in the background, at start: names for PhysicalDriveN and the like
+        self._nic_reader = nic_reader or nics.read
+        self.nic_kinds = {}             # adapter name -> wired, wireless, virtual or unknown, also read once at start
         self.thresholds = thresholds or {}
         self.slow = {'paths': self.paths.snapshot(), 'usage': None if usage_on else {'available': False, 'reason': 'usage view turned off (--no-usage)'},
                      'updated_at': None}
@@ -137,7 +139,7 @@ class LiveSampler:
             s['problems'].append('psutil is not installed: CPU and RAM are unknown')
         if ps:
             s['disks'] = host.disk_io(ps, self._rates)
-            s['nics'] = host.network(ps, self._rates)
+            s['nics'] = host.network(ps, self._rates, self.nic_kinds)
         text = self._gpu_reader()
         if text is None or not text.strip():
             s['problems'].append('nvidia-smi unavailable or returned nothing: GPU and VRAM are unknown')
@@ -194,6 +196,12 @@ class LiveSampler:
             m = {}
         with self.lock:
             self.disk_map = m if isinstance(m, dict) else {}
+        try:
+            k = self._nic_reader()
+        except Exception:
+            k = {}
+        with self.lock:
+            self.nic_kinds = k if isinstance(k, dict) else {}
 
     def read_usage(self):
         if not self.usage_on:
@@ -230,7 +238,7 @@ class LiveSampler:
             items = list(self.samples)
             slow = dict(self.slow)
         slow['paths'] = self._paths_now()
-        found = judge.judge(items, slow, self.thresholds)
+        found = judge.judge(items, slow, self.thresholds, self.interval_s)
         counts = {k: sum(1 for f in found if f['level'] == k) for k in ('bad', 'warn', 'info')}
         last = items[-1]['t'] if items else None
         return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'counts': counts, 'judgments': found}
@@ -241,7 +249,7 @@ class LiveSampler:
             slow = dict(self.slow)
         slow['paths'] = self._paths_now()
         slow['paths_dropped'] = list(self.paths.dropped)
-        judgments = judge.judge(items, slow, self.thresholds)
+        judgments = judge.judge(items, slow, self.thresholds, self.interval_s)
         if since:
             items = [x for x in items if x['t'] > since]
         return {'schema': LIVE_SCHEMA, 'interval_s': self.interval_s, 'history_s': self.history_s, 'host': self.host_info,

@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 
-PS = ("Get-Disk | ForEach-Object { $n = $_.Number; [pscustomobject]@{ n = $n; model = $_.FriendlyName; size = $_.Size; "
+PS = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Disk | ForEach-Object { $n = $_.Number; [pscustomobject]@{ n = $n; model = $_.FriendlyName; size = $_.Size; "
       "letters = @(Get-Partition -DiskNumber $n -ErrorAction SilentlyContinue | Where-Object DriveLetter | ForEach-Object { [string]$_.DriveLetter + ':' }) } } "
       "| ConvertTo-Json -Depth 3 -Compress")
 

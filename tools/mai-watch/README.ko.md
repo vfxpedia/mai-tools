@@ -1,4 +1,4 @@
-상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 128개 통과 (72 + 12 + 25 + 12 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
+상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 132개 통과 (72 + 12 + 25 + 16 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
 
 [English](README.md)
 
@@ -76,4 +76,4 @@ mai-watch demo
 
 `mai-watch` (`live` 와 같음) · `demo [폴더]` · `init <폴더>` · `collect [--once]` · `check` (경보가 있으면 종료 코드 1) · `show` (스냅샷 전체를 JSON 으로) · `serve` (따로 도는 수집기용 화면) · `validate <파일>`. 모두 127.0.0.1 에서만 연다.
 
-설계 · 놀고 있음 판정 규칙 · 검토 기록: [DESIGN.md](DESIGN.md). 시험: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_schema_contract.py` (`jsonschema` 필요, 화면 시험은 Node.js 필요).
+설계 · 놀고 있음 판정 규칙 · 검토 기록: [DESIGN.md](DESIGN.md). 시험: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_schema_contract.py` (`jsonschema` 필요, 화면 시험은 Node.js 필요).

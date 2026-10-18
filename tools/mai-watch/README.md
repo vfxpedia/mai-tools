@@ -1,4 +1,4 @@
-Status: draft (M2, live view, wider resources). 128 tests pass on Windows (72 + 12 + 25 + 12 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
+Status: draft (M2, live view, wider resources). 132 tests pass on Windows (72 + 12 + 25 + 16 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
@@ -76,4 +76,4 @@ Full contract: `schema/status.v1.schema.json`; `mai-watch validate <files>` chec
 
 `mai-watch` (same as `live`) · `demo [folder]` · `init <folder>` · `collect [--once]` · `check` (exit 1 on any alert) · `show` (the whole snapshot as JSON) · `serve` (page for a separate collector) · `validate <files>`. Everything listens on 127.0.0.1 only.
 
-Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_schema_contract.py` (needs `jsonschema`; the page tests need Node.js).
+Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_schema_contract.py` (needs `jsonschema`; the page tests need Node.js).

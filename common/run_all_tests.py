@@ -10,6 +10,7 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SUITES = {
+    'mai-code': ['tests/test_unit.py', 'tests/test_store.py', 'tests/test_adapters.py', 'tests/test_transport.py', 'tests/test_workflow.py', 'tests/test_verify.py', 'tests/test_cli.py'],
     'mai-approve': ['tests/test_schema_contract.py', 'tests/test_cli.py', 'tests/test_hardening.py'],
     'mai-watch': ['tests/test_mai_watch.py', 'tests/test_schema_contract.py'],
     'mai-tabs': ['tests/test_mai_tabs.py'],

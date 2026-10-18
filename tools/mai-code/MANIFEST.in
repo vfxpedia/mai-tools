@@ -1,0 +1,4 @@
+include DESIGN.md THIRD_PARTY.md
+recursive-include tests *.py *.json
+prune build
+global-exclude *.pyc

@@ -1,0 +1,1 @@
+{"fixture":"TEST ONLY affine/MSE, not paper results","x":[1,2],"w":[3,4],"b":1,"target":10,"prediction":12,"loss":4,"dw":[4,8],"db":4,"dx":[12,16],"finite_difference_step":0.000001,"absolute_tolerance":0.00001}

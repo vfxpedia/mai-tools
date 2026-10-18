@@ -16,6 +16,12 @@ Updated only from real runs. A cell that says "not measured" means no one ran it
 | mai-gauge (`claude plugin validate` and `test`, 81 tests) | passes on the author's machine | passes on the runner | not run |
 | mai-codex-gauge (`node --test`, 117 tests) | 112 pass, 5 skipped (opt-in live tests) | passes | 0 failed, 7 skipped (d181c93). The earlier failure (a hook launched through a linked folder printed nothing) came from comparing the typed script path with the module's real path; fixed by comparing real paths. Before the store path fix there were about 70 failures, all from `/var` being a link. |
 
+## mai-code alpha (2026-10-18)
+
+At integrated revision 9d3daad, [CI 39107193224](https://github.com/vfxpedia/mai-tools/actions/runs/39107193224) passed on Windows, Linux and macOS. The mai-code offline suite has 46 tests. Local Windows and existing Ubuntu WSL also passed all 46 with zero skips. The full integration runner on Windows ran 335 tests with zero failures and 5 existing optional Codex Mods skips.
+
+Native subscription execution was measured only on Windows with Codex 0.162.1 and Claude 2.1.302, using a labelled affine fixture, fixed numerical tests and exact-ID continuation. WSL native authentication and native macOS execution remain unmeasured. The final independent-review summary was interrupted by a machine reboot; recovered findings have regression fixes, but maintainer sign-off remains pending and the tool stays draft.
+
 ## What the numbers do not cover
 
 - Runner results use mocked or recorded input only: a hosted runner has no GPU, no real Chrome and no desktop.

@@ -1,0 +1,1 @@
+{"fixture":"TEST ONLY synthetic source, not an actual paper","reference":"section 1","equations":["y=sum(x_i*w_i)+b","loss=(y-target)^2","dw_i=2*(y-target)*x_i","db=2*(y-target)","dx_i=2*(y-target)*w_i"],"invalid_inputs":"Raise ValueError for unequal or empty shapes and non-finite inputs."}

@@ -1,10 +1,10 @@
 Status: draft. M0, M1 and M2 are implemented (collector, status schema, idle detection, liveness, event log, CLI, viewer, local server), 72 tests + 7 contract tests, independently reviewed. Windows: all pass. Linux (WSL): all pass, one test skipped without psutil. Viewer checked in light and dark at 390, 768, 1280 px. Not measured: long-running operation, notifier, a real training or render job (M3), macOS.
 
-# maiwatch: resource and workload status monitor (design v0.1)
+# mai_watch: resource and workload status monitor (design v0.1)
 
 ## 1. Purpose and scope
 
-maiwatch answers three questions at a glance, on any machine and OS:
+mai_watch answers three questions at a glance, on any machine and OS:
 
 1. What is the utilization of each resource (GPU first, then host CPU, memory, disk) right now?
 2. Which workloads are running, and are they alive?
@@ -42,7 +42,7 @@ Data flows one way: workloads and the host feed the collector; the collector wri
 1. Workloads write status documents into a configured status directory. They never talk to the collector.
 2. The collector runs every `interval_s` (default 10). It reads resource metrics and the status directory, applies idle detection and staleness checks, writes `snapshot.json` (atomic replace), appends transitions to `events.jsonl`, and refreshes `collector_heartbeat.json`.
 3. The viewer is one static HTML file that polls `snapshot.json` and `collector_heartbeat.json` and renders them. It makes no external requests.
-4. The CLI (`python -m maiwatch`) offers `collect`, `check`, `show`, `validate`. `check` exits non-zero when any alert condition holds, so other tools can use it without parsing.
+4. The CLI (`python -m mai_watch`) offers `collect`, `check`, `show`, `validate`. `check` exits non-zero when any alert condition holds, so other tools can use it without parsing.
 
 A different viewer (terminal table, desktop widget) can replace the HTML page without touching the collector. A second adapter can be added without touching the schema.
 
@@ -109,7 +109,7 @@ All thresholds are configuration, not constants. Defaults are proposals to be tu
 ## 7. Liveness
 
 - Workload liveness: a status document older than its time-to-live is `stale` (section 4). The transition is written to the event log.
-- Collector liveness: the collector refreshes `collector_heartbeat.json` every cycle with its start time, PID, and last cycle time. The viewer shows the age of this heartbeat and turns it red after `3 * interval_s`. `maiwatch check` fails when the heartbeat is stale or missing.
+- Collector liveness: the collector refreshes `collector_heartbeat.json` every cycle with its start time, PID, and last cycle time. The viewer shows the age of this heartbeat and turns it red after `3 * interval_s`. `mai_watch check` fails when the heartbeat is stale or missing.
 - Single instance: the collector takes an exclusive lock file at start and exits with a clear message if it cannot.
 - Supervision: the collector is expected to be restarted by the operating system (a repeating scheduled task on Windows, a service with restart on Linux). Registering that task changes the machine and needs the owner's approval; it is not done by the tool on its own.
 
@@ -122,7 +122,7 @@ The event log is JSON Lines, one object per transition: `idle_started`, `idle_en
 Sinks, in order of delivery:
 
 1. Files (default, always on): `snapshot.json` and `events.jsonl`.
-2. `maiwatch check` exit status.
+2. `mai_watch check` exit status.
 3. Notifier plugins (off by default). A plugin receives events and may, for example, send one line to an idle terminal session. Any such plugin must send only to a session that is idle with an empty input box. A notifier is a separate decision from this design and shares code with the session-resume watcher in the internal issue.
 
 ## 9. Viewer
@@ -139,7 +139,7 @@ One static HTML file with inline script and style, no external requests, no fram
 
 ## 11. Configuration
 
-One TOML file (`tomllib` is in the standard library from Python 3.11): status directory, output directory, `interval_s`, thresholds, per-device `baseline_memory_mib`, notifier list. A documented default is written by `python -m maiwatch init` into a directory the user names.
+One TOML file (`tomllib` is in the standard library from Python 3.11): status directory, output directory, `interval_s`, thresholds, per-device `baseline_memory_mib`, notifier list. A documented default is written by `python -m mai_watch init` into a directory the user names.
 
 ## 12. Testing
 
@@ -154,7 +154,7 @@ Principle (known-answer first): every behavior has an input whose correct output
 
 ## 13. Packaging and distribution
 
-- Location: `tools/mai-watch/` in vfxpedia/mai-tools (the Python package inside is still `maiwatch`). Run as `python -m maiwatch` from that folder. Dependencies: standard library, optional `psutil` and `pynvml`.
+- Location: `tools/mai-watch/` in vfxpedia/mai-tools (the Python package inside is still `mai_watch`). Run as `python -m mai_watch` from that folder. Dependencies: standard library, optional `psutil` and `pynvml`.
 - The schema is versioned independently of the code. A breaking change increments `schema_version`.
 - Distribution to other people is a later step: README, license, tests, and a tagged release. The license is the owner's decision (open question 2).
 
@@ -170,19 +170,19 @@ Principle (known-answer first): every behavior has an input whose correct output
 
 ## 14a. M1 status and the first project's additional requirements (10/17, folded in 10/18)
 
-M1 is implemented in `maiwatch/` (`status.py`, `nvidia.py`, `idle.py`, `collector.py`, `cli.py`). Tests: `python -I tests/test_maiwatch.py` (35, including mutation tests) and `python -I tests/test_schema_contract.py` (7). Read-only run against the real `nvidia-smi` on the test workstation on 10/18: both GPUs listed, memory within 1 MiB of a simultaneous `nvidia-smi` read, utilization within noise (2 and 5 against 0 and 6 a few seconds apart). That is a smoke check, not the M3 criterion.
+M1 is implemented in `mai_watch/` (`status.py`, `nvidia.py`, `idle.py`, `collector.py`, `cli.py`). Tests: `python -I tests/test_mai_watch.py` (35, including mutation tests) and `python -I tests/test_schema_contract.py` (7). Read-only run against the real `nvidia-smi` on the test workstation on 10/18: both GPUs listed, memory within 1 MiB of a simultaneous `nvidia-smi` read, utilization within noise (2 and 5 against 0 and 6 a few seconds apart). That is a smoke check, not the M3 criterion.
 
 | Lead requirement | Where it is |
 |---|---|
 | Per-GPU user processes and the time a GPU went idle | Snapshot device: `processes` (raw list), `user_processes` (view filtered by `ignore_processes`, never used for idle), `idle`, `idle_since` (first sample of the condition), `idle_for_s`, `idle_candidate_since`, `idle_reason` |
 | Execution evidence: heartbeat age, artifact modification time, first progress | Snapshot workload: `heartbeat_age_s`, `artifact_mtime`, `artifact_age_s`, `first_progress_at` (first artifact mtime after `started_at`, or first `progress.done > 0`, then kept). New optional status field `artifacts` (list of paths, additive in schema v1) |
-| Detection outside sessions | The collector is a standalone process that needs no agent session. Starting it at logon is open decision 3 and needs the owner's approval; until then someone runs `python -m maiwatch collect` |
+| Detection outside sessions | The collector is a standalone process that needs no agent session. Starting it at logon is open decision 3 and needs the owner's approval; until then someone runs `python -m mai_watch collect` |
 
 Not done in M1, stated plainly: NVML source (pynvml is not installed, so it cannot be verified), the viewer (M2), the notifier, the registration of automatic start. A lock whose process cannot be checked is kept, never taken over (on Windows without psutil, `os.kill(pid, 0)` would terminate the process, so it is not used).
 
 ## 14b. M2 status (10/18)
 
-`maiwatch/viewer.html` (one file, inline script and style, no external request, data written only as text, never as HTML) and `maiwatch/server.py`. `python -m maiwatch serve --config <file>` listens on `127.0.0.1:28765` by default and serves exactly five things: the page, `snapshot.json`, `collector_heartbeat.json`, `events.jsonl`; everything else, including `state.json`, is 404. The default port is 28765 because Windows had reserved the 8747 to 8846 range on the reference machine (a bind to 8765 failed with access denied); a bind error now prints that hint. A failed fetch shows a visible error instead of an empty page, and a stale collector heartbeat turns the top pill red (seen working: a one-shot collect left the pill at "stale" after 3 intervals, which is the designed behavior). Tests: loopback bind, the four-file whitelist, path traversal attempts, no external URL, no `innerHTML`, no em dash.
+`mai_watch/viewer.html` (one file, inline script and style, no external request, data written only as text, never as HTML) and `mai_watch/server.py`. `python -m mai_watch serve --config <file>` listens on `127.0.0.1:28765` by default and serves exactly five things: the page, `snapshot.json`, `collector_heartbeat.json`, `events.jsonl`; everything else, including `state.json`, is 404. The default port is 28765 because Windows had reserved the 8747 to 8846 range on the reference machine (a bind to 8765 failed with access denied); a bind error now prints that hint. A failed fetch shows a visible error instead of an empty page, and a stale collector heartbeat turns the top pill red (seen working: a one-shot collect left the pill at "stale" after 3 intervals, which is the designed behavior). Tests: loopback bind, the four-file whitelist, path traversal attempts, no external URL, no `innerHTML`, no em dash.
 
 ## 14c. Independent review, findings W1 to W5 (each probe is now a test)
 
@@ -229,7 +229,7 @@ Requested after M1, not before: the reviewer checks that the tests are not tauto
 
 ## 17. Open decisions (owner)
 
-1. ~~Tool name~~ decided: `mai-watch` (folder), `maiwatch` (Python package).
+1. ~~Tool name~~ decided: `mai-watch` (folder), `mai_watch` (Python package).
 2. License for distribution.
 3. Registering the collector for automatic start on Windows logon (changes the machine).
 4. Whether and when a terminal notifier is enabled.

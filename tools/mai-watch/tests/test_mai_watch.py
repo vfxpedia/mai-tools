@@ -1,4 +1,4 @@
-"""Known-answer and mutation tests for maiwatch M1. Run: python -I tools/mai-watch/tests/test_maiwatch.py
+"""Known-answer and mutation tests for mai_watch M1. Run: python -I tools/mai-watch/tests/test_mai_watch.py
 
 Every expected value was fixed from the design (DESIGN.md sections 4 to 8) or from measured nvidia-smi output before the code
 was written, not read back from the code under test. The mutation tests prove the suites are sensitive: with a rule deliberately
@@ -22,7 +22,7 @@ except ImportError:
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..'))
 sys.path.insert(0, ROOT)
-from maiwatch import collector, idle, nvidia, status  # noqa: E402
+from mai_watch import collector, idle, nvidia, status  # noqa: E402
 
 EXAMPLES = os.path.join(ROOT, 'schema', 'examples')
 T0 = datetime.datetime(2026, 10, 18, 3, 0, 0)
@@ -282,7 +282,7 @@ class IoTests(unittest.TestCase):
                     '    print(%r, end="")\n'
                     'elif "--query-compute-apps" in a:\n'
                     '    print(%r, end="")\n' % (GPU_TWO_IDLE, APPS_WDDM))
-        self.toml = os.path.join(self.tmp, 'maiwatch.toml')
+        self.toml = os.path.join(self.tmp, 'mai-watch.toml')
         py = sys.executable.replace(os.sep, '/')
         with open(self.toml, 'w', encoding='utf-8') as f:
             f.write('status_dir = "status"\nout_dir = "out"\ninterval_s = 10\nnvidia_smi = ["%s", "%s"]\n' % (py, self.stub.replace(os.sep, '/')))
@@ -291,7 +291,7 @@ class IoTests(unittest.TestCase):
         self._t.cleanup()
 
     def cli(self, *args):
-        code = 'import sys; sys.path.insert(0, %r); from maiwatch.cli import main; sys.exit(main(sys.argv[1:]))' % ROOT
+        code = 'import sys; sys.path.insert(0, %r); from mai_watch.cli import main; sys.exit(main(sys.argv[1:]))' % ROOT
         return subprocess.run([sys.executable, '-c', code] + list(args), capture_output=True, text=True, encoding='utf-8')
 
     def test_collect_once_writes_the_four_files_and_check_passes(self):
@@ -363,7 +363,7 @@ class IoTests(unittest.TestCase):
 
 class ViewerTests(unittest.TestCase):
     def setUp(self):
-        from maiwatch import server
+        from mai_watch import server
         self._t = tempfile.TemporaryDirectory()
         self.out = self._t.name
         for name, body in (('snapshot.json', '{"ok": 1}'), ('state.json', 'internal'), ('events.jsonl', '{"type": "x"}' + chr(10))):
@@ -394,17 +394,17 @@ class ViewerTests(unittest.TestCase):
     def test_serves_page_and_three_files(self):
         code, body = self.get('/')
         self.assertEqual(code, 200)
-        self.assertIn('<title>maiwatch</title>', body)
+        self.assertIn('<title>mai_watch</title>', body)
         self.assertEqual(self.get('/snapshot.json'), (200, '{"ok": 1}'))
         self.assertEqual(self.get('/snapshot.json?t=123')[0], 200)
         self.assertEqual(self.get('/events.jsonl')[0], 200)
 
     def test_serves_nothing_else(self):
-        for path in ('/state.json', '/collector.lock', '/../maiwatch/cli.py', '/%2e%2e/maiwatch/cli.py', '/maiwatch/cli.py', '/collector_heartbeat.json'):
+        for path in ('/state.json', '/collector.lock', '/../mai_watch/cli.py', '/%2e%2e/mai_watch/cli.py', '/mai_watch/cli.py', '/collector_heartbeat.json'):
             self.assertEqual(self.get(path)[0], 404, path)
 
     def test_page_makes_no_external_request_and_has_no_em_dash(self):
-        with open(os.path.join(ROOT, 'maiwatch', 'viewer.html'), encoding='utf-8') as f:
+        with open(os.path.join(ROOT, 'mai_watch', 'viewer.html'), encoding='utf-8') as f:
             html = f.read()
         self.assertNotIn('http://', html)
         self.assertNotIn('https://', html)
@@ -615,7 +615,7 @@ class ReviewTwoTests(unittest.TestCase):
             'future_snapshot': (hb, snapshot_for(111, 7200), 5),
             'no_snapshot': (hb, None, 5),
         }
-        health_js = os.path.join(ROOT, 'maiwatch', 'viewer-health.js').replace(os.sep, '/')
+        health_js = os.path.join(ROOT, 'mai_watch', 'viewer-health.js').replace(os.sep, '/')
         script = ("const h=require(%r);let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const c=JSON.parse(s);"
                   "console.log(JSON.stringify(c.map(x=>h.health(x.hb,x.snap,x.now).map(p=>p.type).sort())))})" % health_js)
         payload = []
@@ -704,7 +704,7 @@ class ReviewTwoTests(unittest.TestCase):
         self.assertTrue(snap['devices'][0]['processes_known'])
 
     def test_events_are_served_as_a_bounded_tail(self):
-        from maiwatch import server
+        from mai_watch import server
         import threading
         import urllib.request
         out = os.path.join(self.tmp, 'srv')

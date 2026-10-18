@@ -1,11 +1,11 @@
-// Runs the real inline script of maiwatch/viewer.html against a tiny fake DOM and fake fetch, once per case.
+// Runs the real inline script of mai_watch/viewer.html against a tiny fake DOM and fake fetch, once per case.
 // stdin: JSON list of cases {hb, snapshot, snapshot_status, events, now_ms}. stdout: JSON list of what the page showed.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const dir = path.join(__dirname, '..', 'maiwatch');
+const dir = path.join(__dirname, '..', 'mai_watch');
 const html = fs.readFileSync(path.join(dir, 'viewer.html'), 'utf8');
 const healthSrc = fs.readFileSync(path.join(dir, 'viewer-health.js'), 'utf8');
 const inline = html.split('<script>')[1].split('</script>')[0];

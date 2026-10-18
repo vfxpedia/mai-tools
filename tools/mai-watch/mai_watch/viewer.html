@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>maiwatch</title>
+<title>mai_watch</title>
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6;
@@ -51,7 +51,7 @@
 </head>
 <body>
 <header>
-  <h1>maiwatch</h1>
+  <h1>mai_watch</h1>
   <span id="collector" class="pill warn">reading...</span>
   <span id="generated" class="mono"></span>
 </header>
@@ -192,7 +192,7 @@
     var snapP = get('snapshot.json').then(function (r) { return r.text(); }).then(function (t) {
       try { return { snap: JSON.parse(t) }; } catch (x) { return { fail: 'snapshot.json is not valid JSON: ' + x.message }; }
     }, function (e) {
-      return { fail: 'Cannot read snapshot.json: ' + e.message + '. Open this page through "python -m maiwatch serve" (a file:// page cannot read files).' };
+      return { fail: 'Cannot read snapshot.json: ' + e.message + '. Open this page through "python -m mai_watch serve" (a file:// page cannot read files).' };
     });
     Promise.all([hbP, snapP, evP]).then(function (v) {
       var hb = v[0], got = v[1];

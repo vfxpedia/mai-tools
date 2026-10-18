@@ -11,7 +11,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SUITES = {
     'mai-approve': ['tests/test_schema_contract.py', 'tests/test_cli.py', 'tests/test_hardening.py'],
-    'mai-watch': ['tests/test_maiwatch.py', 'tests/test_schema_contract.py'],
+    'mai-watch': ['tests/test_mai_watch.py', 'tests/test_schema_contract.py'],
     'mai-tabs': ['tests/test_mai_tabs.py'],
     'common': ['tests/test_hygiene.py'],
 }

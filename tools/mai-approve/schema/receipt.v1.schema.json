@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "mai-run-receipt-v1",
-  "title": "mai-run-receipt-v1: record of one run, grants nothing",
+  "$id": "mai-approve-receipt-v1",
+  "title": "mai-approve-receipt-v1: record of one run, grants nothing",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,7 +14,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "mai-run-receipt-v1"
+      "enum": ["mai-approve-receipt-v1", "mai-run-receipt-v1"]
     },
     "run_id": {
       "type": "string",

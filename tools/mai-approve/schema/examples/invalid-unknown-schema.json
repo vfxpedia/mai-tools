@@ -34,6 +34,6 @@
     "external_send",
     "out_of_scope_experiment"
   ],
-  "note": "week of 10/18 nightly runs",
-  "sha256": "d36719859901368c8f8c3ea99d048b01d5cb1194811e8d09364570552d010118"
+  "note": "weekly nightly runs",
+  "sha256": "c1291980d18d0b2914a96d21257590390ff449a76523a032962aef38ad08dcb5"
 }

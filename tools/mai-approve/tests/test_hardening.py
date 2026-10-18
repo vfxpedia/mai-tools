@@ -130,7 +130,7 @@ class A3CorruptReceipts(Base):
         rdir = os.path.join(self.d, 'receipts', 'lab')
         os.makedirs(rdir, exist_ok=True)
         cases = {'previous.json': '{not json', 'odd.json': json.dumps({'schema': 'something-else'}),
-                 'mismatch.json': json.dumps({'schema': 'mai-run-receipt-v1', 'run_id': 'other', 'experiment_unit_id': 'u1', 'attempt_kind': 'normal',
+                 'mismatch.json': json.dumps({'schema': 'mai-approve-receipt-v1', 'run_id': 'other', 'experiment_unit_id': 'u1', 'attempt_kind': 'normal',
                                               'approval_sha256': 'a' * 64, 'started_at': T0}),
                  'empty.json': ''}
         for name, body in cases.items():
@@ -256,6 +256,34 @@ class A7ForeignPathNotation(Base):
     def test_native_paths_still_pass(self):
         self.grant()
         self.assertEqual(run(self.d, 'check', '--scope', 'lab', '--path', os.path.join(self.work, 'a'), '--experiment-unit', 'u1')[0], 0)
+
+
+class SchemaNames(Base):
+    """Naming rule of 2026-10-18: new files carry mai-approve-*-v1, files written under the old ids are still read."""
+
+    def test_new_grant_uses_the_new_id_and_an_old_file_still_checks(self):
+        self.grant()
+        p = os.path.join(self.d, 'lab.json')
+        with open(p, encoding='utf-8') as f:
+            self.assertEqual(json.load(f)['schema'], 'mai-approve-approval-v1')
+        self.reseal(lambda doc: doc.update(schema='mai-approval-v1'))
+        code, data = run(self.d, 'check', '--scope', 'lab', '--path', os.path.join(self.work, 'a'), '--experiment-unit', 'u1')
+        self.assertEqual(code, 0, data)
+        self.reseal(lambda doc: doc.update(schema='mai-approval-v2'))
+        self.assertNotEqual(run(self.d, 'check', '--scope', 'lab', '--inquiry')[0], 0)
+
+    def test_old_receipt_id_is_still_counted(self):
+        self.grant(runs='2')
+        self.assertEqual(self.receipt('r1')[0], 0)
+        rp = os.path.join(self.d, 'receipts', 'lab', 'r1.json')
+        with open(rp, encoding='utf-8') as f:
+            rec = json.load(f)
+        self.assertEqual(rec['schema'], 'mai-approve-receipt-v1')
+        rec['schema'] = 'mai-run-receipt-v1'
+        with open(rp, 'w', encoding='utf-8') as f:
+            json.dump(rec, f)
+        self.assertEqual(self.receipt('r2')[0], 0)
+        self.assertEqual(self.receipt('r3')[1].get('reason'), 'runs_exhausted')
 
 
 class A6AuditHead(Base):

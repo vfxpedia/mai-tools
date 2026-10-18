@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "mai-approval-v1",
-  "title": "mai-approval-v1: owner-run standing approval with expiry",
+  "$id": "mai-approve-approval-v1",
+  "title": "mai-approve-approval-v1: owner-run standing approval with expiry",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "mai-approval-v1"
+      "enum": ["mai-approve-approval-v1", "mai-approval-v1"]
     },
     "scope": {
       "type": "string",

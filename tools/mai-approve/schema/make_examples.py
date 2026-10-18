@@ -10,7 +10,7 @@ def sealed(doc):
     doc = copy.deepcopy(doc); doc['sha256'] = canon_hash(doc); return doc
 
 BASE = {
-    'schema': 'mai-approval-v1', 'scope': 'lab', 'granted_at': '2026-10-18T02:00:00Z', 'valid_until': '2026-10-25T02:00:00Z',
+    'schema': 'mai-approve-approval-v1', 'scope': 'lab', 'granted_at': '2026-10-18T02:00:00Z', 'valid_until': '2026-10-25T02:00:00Z',
     'granted_by': {'os_user': 'owner', 'host': 'example-host'}, 'method': 'owner-run mai-approve',
     'eula': {'accepted': True, 'license': 'NVIDIA Omniverse License', 'subject': 'owner', 'consent_source': 'owner typed at a terminal the owner operates'},
     'execution_mode': 'unattended',
@@ -53,7 +53,7 @@ semantic = {
     'semantic-window-over-31-days.json': mut(valid_until='2026-12-01T02:00:00Z'),
     'semantic-expires-before-grant.json': mut(valid_until='2026-10-17T02:00:00Z'),
 }
-RBASE = {'schema': 'mai-run-receipt-v1', 'run_id': 'r-20261018-01', 'experiment_unit_id': 'unit-b', 'attempt_kind': 'normal', 'approval_sha256': sealed(BASE)['sha256'], 'started_at': '2026-10-18T14:00:00Z'}
+RBASE = {'schema': 'mai-approve-receipt-v1', 'run_id': 'r-20261018-01', 'experiment_unit_id': 'unit-b', 'attempt_kind': 'normal', 'approval_sha256': sealed(BASE)['sha256'], 'started_at': '2026-10-18T14:00:00Z'}
 def rmut(**kw):
     d = dict(RBASE); d.update(kw); return d
 def rdrop(k):

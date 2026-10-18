@@ -1,5 +1,5 @@
 {
-  "schema": "mai-approval-v1",
+  "schema": "mai-approve-approval-v1",
   "scope": "lab",
   "granted_at": "2026-10-18T02:00:00Z",
   "valid_until": "2026-10-25T02:00:00Z",
@@ -29,6 +29,6 @@
   "exclusions": [
     "everything"
   ],
-  "note": "week of 10/18 nightly runs",
-  "sha256": "328f8d9356541d4990fc30a986a16ed3aad59e70767635eb3b8f8e2a05bb7816"
+  "note": "weekly nightly runs",
+  "sha256": "34ae5f51bca8cb5149fcbf49ac4c10affbb900f6f5353db43e1eadc72c56770d"
 }

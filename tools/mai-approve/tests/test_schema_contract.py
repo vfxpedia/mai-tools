@@ -1,4 +1,4 @@
-"""Contract test for mai-approval-v1 (M0). Run: python -I tools/mai-approve/tests/test_schema_contract.py
+"""Contract test for mai-approve-approval-v1 (M0). Run: python -I tools/mai-approve/tests/test_schema_contract.py
 
 Valid examples must pass the schema AND the semantic rules (hash matches, valid_until after granted_at, window at most 31 days).
 Invalid examples must be rejected by the named schema keyword. Semantic examples pass the schema but must fail a semantic rule.
@@ -19,7 +19,7 @@ MAX_DAYS = 31
 
 EXPECTED_REJECTION = {
     'invalid-missing-valid_until.json': ('required', 'valid_until'),
-    'invalid-unknown-schema.json': ('const', 'mai-approval-v1'),
+    'invalid-unknown-schema.json': ('enum', 'mai-approve-approval-v1'),
     'invalid-method-agent.json': ('const', 'owner-run mai-approve'),
     'invalid-time-not-utc.json': ('pattern', '+09:00'),
     'invalid-empty-exclusions.json': ('minItems', '[]'),

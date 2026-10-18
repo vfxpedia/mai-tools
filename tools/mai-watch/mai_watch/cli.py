@@ -1,4 +1,4 @@
-"""Command line: python -m maiwatch {collect,check,show,validate,init}. Read-only toward workloads: no stop, kill or launch."""
+"""Command line: python -m mai_watch {collect,check,show,validate,init}. Read-only toward workloads: no stop, kill or launch."""
 import argparse
 import json
 import os
@@ -6,7 +6,7 @@ import sys
 
 from . import collector, status
 
-DEFAULT_TOML = """# maiwatch configuration. Paths are relative to this file.
+DEFAULT_TOML = """# mai_watch configuration. Paths are relative to this file.
 status_dir = "status"
 out_dir = "out"
 interval_s = 10
@@ -23,11 +23,11 @@ stale_factor = 3
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog='maiwatch', description='Resource and workload status monitor (read-only).')
+    ap = argparse.ArgumentParser(prog='mai-watch', description='Resource and workload status monitor (read-only).')
     sub = ap.add_subparsers(dest='cmd', required=True)
     for name in ('collect', 'check', 'show', 'serve'):
         p = sub.add_parser(name)
-        p.add_argument('--config', default='maiwatch.toml')
+        p.add_argument('--config', default='mai-watch.toml')
     sub.choices['collect'].add_argument('--once', action='store_true')
     sub.choices['serve'].add_argument('--port', type=int, default=28765)
     sub.choices['check'].add_argument('--ignore', action='append', default=[], help='alert type to ignore, e.g. device_idle')
@@ -37,7 +37,7 @@ def main(argv=None):
 
     if a.cmd == 'init':
         os.makedirs(a.dir, exist_ok=True)
-        p = os.path.join(a.dir, 'maiwatch.toml')
+        p = os.path.join(a.dir, 'mai-watch.toml')
         if os.path.exists(p):
             print('refusing to overwrite %s' % p, file=sys.stderr)
             return 2
@@ -60,7 +60,7 @@ def main(argv=None):
     try:
         cfg = collector.load_config(a.config)
     except FileNotFoundError:
-        print('config not found: %s (create one with: python -m maiwatch init <dir>)' % a.config, file=sys.stderr)
+        print('config not found: %s (create one with: python -m mai_watch init <dir>)' % a.config, file=sys.stderr)
         return 2
     except (KeyError, ValueError) as e:
         print('config problem in %s: %s' % (a.config, e), file=sys.stderr)
@@ -79,7 +79,7 @@ def main(argv=None):
         except OSError as e:
             print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port; on Windows some ranges are reserved (netsh int ipv4 show excludedportrange protocol=tcp).' % (a.port, e.strerror or e), file=sys.stderr)
             return 2
-        print('maiwatch viewer: http://127.0.0.1:%d/ (Ctrl+C to stop)' % a.port)
+        print('mai_watch viewer: http://127.0.0.1:%d/ (Ctrl+C to stop)' % a.port)
         try:
             srv.serve_forever()
         except KeyboardInterrupt:

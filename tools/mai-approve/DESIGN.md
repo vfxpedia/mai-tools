@@ -12,7 +12,7 @@ A tiny command the owner types in his own shell to write one time-limited standi
 
 | Path | Purpose |
 |---|---|
-| `schema/approval.v1.schema.json` | JSON Schema 2020-12 for `mai-approval-v1` |
+| `schema/approval.v1.schema.json` | JSON Schema 2020-12 for `mai-approve-approval-v1` |
 | `schema/make_examples.py` | Writes 3 valid, 9 invalid, 3 semantic examples. Owns the hash rule |
 | `tests/test_schema_contract.py` | Schema check, semantic check, 4 mutation checks |
 
@@ -52,7 +52,7 @@ Ruling: yes. Terms and unattended permission come from the owner's standing appr
 |---|---|
 | `eula` and `execution_mode` stated separately, not inferred from `scope` or `note` | `eula` object (accepted, license, subject, consent_source) and `execution_mode` in the approval. `grant` refuses without `--eula-accept` plus license, subject and source |
 | `valid_until` exact (2026-10-24T14:59:00Z), date-only must not turn into UTC midnight or 7 days | `grant --until` accepts only a full UTC timestamp and refuses a date. `--days` applies only when `--until` is absent. Linux migration start is handled by `revoke` |
-| Receipt carries `experiment_unit_id` and `attempt_kind`; counts are fixed to one unit and never reset | `mai-run-receipt-v1`; `limits.count_per` is the constant `experiment_unit_id`; `check` counts receipts per unit across all approvals, so a new run id or `extend` resets nothing; a reused run id is refused |
+| Receipt carries `experiment_unit_id` and `attempt_kind`; counts are fixed to one unit and never reset | `mai-approve-receipt-v1`; `limits.count_per` is the constant `experiment_unit_id`; `check` counts receipts per unit across all approvals, so a new run id or `extend` resets nothing; a reused run id is refused |
 
 Expiry or revoke during a run: the launcher calls `check` again at its own checkpoints; the stop rule is the launcher's (launcher side).
 

@@ -22,8 +22,11 @@ import socket
 import sys
 import time
 
-SCHEMA = 'mai-approval-v1'
-RECEIPT_SCHEMA = 'mai-run-receipt-v1'
+SCHEMA = 'mai-approve-approval-v1'
+RECEIPT_SCHEMA = 'mai-approve-receipt-v1'
+# ids used before the naming rule (2026-10-18); files written with them are still read, new files never use them
+LEGACY_SCHEMAS = {'mai-approval-v1'}
+LEGACY_RECEIPT_SCHEMAS = {'mai-run-receipt-v1'}
 TS_RE = re.compile('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$')
 NAME_RE = re.compile('^[a-z0-9][a-z0-9._-]{0,63}$')
 RUN_ID_RE = re.compile('^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
@@ -201,7 +204,7 @@ def _validate(doc):
     for k in doc:
         if k not in APPROVAL_KEYS:
             out.append('unknown field ' + k)
-    if doc['schema'] != SCHEMA:
+    if doc['schema'] != SCHEMA and doc['schema'] not in LEGACY_SCHEMAS:
         out.append('schema must be %s' % SCHEMA)
     if not isinstance(doc['scope'], str) or not NAME_RE.fullmatch(doc['scope']):
         out.append('scope must match %s' % NAME_RE.pattern)
@@ -266,7 +269,7 @@ def validate_receipt(rec, filename):
     for k in rec:
         if k not in RECEIPT_KEYS:
             out.append('unknown field ' + k)
-    if rec['schema'] != RECEIPT_SCHEMA:
+    if rec['schema'] != RECEIPT_SCHEMA and rec['schema'] not in LEGACY_RECEIPT_SCHEMAS:
         out.append('schema must be %s' % RECEIPT_SCHEMA)
     if not (isinstance(rec['run_id'], str) and RUN_ID_RE.fullmatch(rec['run_id'])):
         out.append('run_id is not a valid id')

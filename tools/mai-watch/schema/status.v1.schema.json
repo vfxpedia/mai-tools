@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vfxpedia/mai-tools/tools/mai-watch/schema/status.v1.schema.json",
-  "title": "maiwatch status document v1",
+  "title": "mai_watch status document v1",
   "description": "One JSON object that a workload writes about itself. Times are RFC 3339 in UTC (suffix Z). Unknown fields are ignored. See DESIGN.md section 4.",
   "type": "object",
   "required": [

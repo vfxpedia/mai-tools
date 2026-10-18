@@ -1,5 +1,5 @@
 /* Health of the collector as the viewer must judge it. Pure function, so Node tests can run it against the same cases as the Python
- * `maiwatch check` (tests/test_maiwatch.py compares both). A fresh heartbeat is not enough: the snapshot must come from the same
+ * `mai_watch check` (tests/test_mai_watch.py compares both). A fresh heartbeat is not enough: the snapshot must come from the same
  * collector run and cycle, have its structure, and not be from the future (independent review M03, W4). */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
   var TIME = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$/;
-  var SNAPSHOT_SCHEMA = 'maiwatch-snapshot-v1';
+  var SNAPSHOT_SCHEMA = 'mai-watch-snapshot-v1';
 
   function ms(s) {
     if (typeof s !== 'string' || !TIME.test(s)) return NaN;

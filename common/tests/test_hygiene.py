@@ -44,7 +44,7 @@ class HygieneTests(unittest.TestCase):
         self.assertEqual(rules('user@example.com and x@host.local'), [])
 
     def test_clean_text_passes(self):
-        self.assertEqual(rules('plain text, a path like tools/mai-watch/maiwatch and C:/lab/runs'), [])
+        self.assertEqual(rules('plain text, a path like tools/mai-watch/mai_watch and C:/lab/runs'), [])
 
     def test_empty_scan_fails(self):
         with tempfile.TemporaryDirectory() as d:

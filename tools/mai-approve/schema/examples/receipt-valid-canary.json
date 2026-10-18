@@ -1,9 +1,9 @@
 {
-  "schema": "mai-run-receipt-v1",
+  "schema": "mai-approve-receipt-v1",
   "run_id": "r-20261018-02",
   "experiment_unit_id": "unit-b",
   "attempt_kind": "canary_retry",
-  "approval_sha256": "dcb16b49fa813b5dfed4c8edb4f6d3dd05fab7bc0d6ed167b4ece7aec200b9ab",
+  "approval_sha256": "cb5d0aedcbbbed4970861bb39e496903f396787c8a26eacb1b13283f537f5919",
   "started_at": "2026-10-18T14:00:00Z",
   "ended_at": "2026-10-18T14:30:00Z"
 }

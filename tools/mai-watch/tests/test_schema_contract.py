@@ -1,11 +1,11 @@
-"""Contract test for the maiwatch status schema (M0).
+"""Contract test for the mai_watch status schema (M0).
 
 Every example under schema/examples is checked against schema/status.v1.schema.json by an independent
 validator (jsonschema). Valid examples must pass. Each invalid example must be rejected for the reason
 named in EXPECTED_REJECTION, not merely rejected. Two mutation checks prove that the expectations are
 sensitive: with a deliberately broken schema, the matching invalid example must start to pass.
 
-Run:  python -I tools/maiwatch/tests/test_schema_contract.py
+Run:  python -I tools/mai_watch/tests/test_schema_contract.py
 A missing jsonschema package is a failure, not a skip: a skipped contract test looks like a pass.
 """
 import copy

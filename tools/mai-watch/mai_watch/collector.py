@@ -14,7 +14,7 @@ from . import idle as idle_mod
 from . import nvidia
 from . import status as status_mod
 
-SNAPSHOT_SCHEMA = 'maiwatch-snapshot-v1'
+SNAPSHOT_SCHEMA = 'mai-watch-snapshot-v1'
 DEFAULT_IGNORE_PROCESSES = ('explorer.exe', 'chatgpt.exe', 'startmenuexperiencehost.exe', 'searchhost.exe', 'dwm.exe')
 
 
@@ -388,7 +388,7 @@ def collect(cfg, once=False, max_cycles=None, sleep=time.sleep):
 # ---------- check ----------
 
 def check(out_dir, now=None, ignore=()):
-    """Alerts for `maiwatch check`. Empty means healthy. A fresh heartbeat is not enough (W4): the snapshot must have its structure, a sane
+    """Alerts for `mai_watch check`. Empty means healthy. A fresh heartbeat is not enough (W4): the snapshot must have its structure, a sane
     generation time, and the same collector and cycle as the heartbeat; otherwise the check fails instead of reading an old or empty
     snapshot as 'no alerts'."""
     now = now or utc_now()

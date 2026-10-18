@@ -524,7 +524,7 @@ describe('세션 이름 (/rename)', () => {
     // 세션 id 는 시험 엔진이 정하므로 상태판 폴더의 파일 하나를 본다.
     return () => {
       // 엔진이 경로를 백슬래시로 바꿔 넘기므로 슬래시로 맞춰 본다.
-      const keys = [...files.keys()].filter(k => k.replace(/\\/g, '/').startsWith('C:/u/.mai/sessions/'))
+      const keys = [...files.keys()].filter(k => k.replace(/\\/g, '/').includes('C:/u/.mai/sessions/'))   // on Linux the engine may put a folder in front
       expect(keys.length).toBeLessThanOrEqual(1)
       return keys[0] ? (JSON.parse(files.get(keys[0])!) as SessionFile) : null
     }

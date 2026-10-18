@@ -17,7 +17,7 @@ SUITES = {
 }
 # suites that are not Python: (folder, command, how to read the count)
 NODE_SUITES = {
-    'mai-codex-gauge': ('mods/mai-codex-gauge', ['node', '--test', 'tests/*.test.mjs']),
+    'mai-codex-gauge': ('mods/mai-codex-gauge', ['node', '--test', '--test-reporter=tap', 'tests/*.test.mjs']),
 }
 
 
@@ -53,7 +53,11 @@ def main(argv):
             print('%-4s %-12s %-34s tests=%d skipped=%d' % ('OK' if ok else 'FAIL', tool, ' '.join(NODE_SUITES[tool][1]), n, sk))
             if not ok:
                 bad += 1
-                print(chr(10).join(out.splitlines()[-25:]))
+                lines = out.splitlines()
+                for i, l in enumerate(lines):           # name and reason of every failed node test, not only the tail
+                    if l.lstrip().startswith('not ok'):
+                        print(chr(10).join(lines[i:i + 14]))
+                print(chr(10).join(lines[-8:]))
             continue
         if tool not in SUITES:
             print('unknown tool: ' + tool)

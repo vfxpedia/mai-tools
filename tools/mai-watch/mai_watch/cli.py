@@ -1,4 +1,4 @@
-"""Command line: python -m mai_watch {collect,check,show,validate,init}. Read-only toward workloads: no stop, kill or launch."""
+"""Command line: python -m mai_watch {live,collect,check,show,serve,validate,init}. Read-only toward workloads: no stop, kill or launch."""
 import argparse
 import json
 import os
@@ -31,6 +31,12 @@ def main(argv=None):
     sub.choices['collect'].add_argument('--once', action='store_true')
     sub.choices['serve'].add_argument('--port', type=int, default=28765)
     sub.choices['check'].add_argument('--ignore', action='append', default=[], help='alert type to ignore, e.g. device_idle')
+    lv = sub.add_parser('live', help='live CPU, RAM, GPU and VRAM in the browser; with --config also records workloads and idle state')
+    lv.add_argument('--config', default=None, help='optional: also run the workload collector of this configuration')
+    lv.add_argument('--port', type=int, default=28765)
+    lv.add_argument('--interval', type=float, default=1.0, help='seconds between live samples (0.2 to 60)')
+    lv.add_argument('--history', type=float, default=600, help='seconds of live history kept in memory')
+    lv.add_argument('--nvidia-smi', default='nvidia-smi')
     v = sub.add_parser('validate'); v.add_argument('files', nargs='+')
     i = sub.add_parser('init'); i.add_argument('dir')
     a = ap.parse_args(argv)
@@ -57,6 +63,8 @@ def main(argv=None):
             print('%s: %s' % (f, 'valid' if not problems else 'INVALID: ' + '; '.join(problems)))
             bad += bool(problems)
         return 1 if bad else 0
+    if a.cmd == 'live':
+        return run_live(a)
     try:
         cfg = collector.load_config(a.config)
     except FileNotFoundError:
@@ -91,6 +99,48 @@ def main(argv=None):
     alerts = collector.check(cfg.out_dir, ignore=a.ignore)
     print(json.dumps({'ok': not alerts, 'alerts': alerts}, indent=2))
     return 1 if alerts else 0
+
+
+def run_live(a):
+    """One process: live sampler, optional workload collector, local server. Ctrl+C stops all of them."""
+    import threading
+    from . import live, server
+    cfg = None
+    if a.config:
+        try:
+            cfg = collector.load_config(a.config)
+        except (FileNotFoundError, KeyError, ValueError) as e:
+            print('config problem in %s: %s' % (a.config, e), file=sys.stderr)
+            return 2
+    try:
+        sampler = live.LiveSampler(nvidia_cmd=[a.nvidia_smi] if cfg is None else cfg.nvidia_smi, interval_s=a.interval, history_s=a.history)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    try:
+        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler)
+    except OSError as e:
+        print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port.' % (a.port, e.strerror or e), file=sys.stderr)
+        return 2
+    stop = threading.Event()
+    threading.Thread(target=sampler.run, args=(stop,), daemon=True).start()
+    if cfg is not None:
+        def record():
+            try:
+                collector.collect(cfg)
+            except collector.LockHeld as e:
+                print('workload collector not started: %s (another collector already writes this folder; the live view still runs)' % e, file=sys.stderr)
+        threading.Thread(target=record, daemon=True).start()
+    print('mai_watch live: http://127.0.0.1:%d/  every %gs, %gs of history%s (Ctrl+C to stop)' % (
+        a.port, a.interval, a.history, ', workloads from ' + a.config if cfg else ''))
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop.set()
+        srv.server_close()
+    return 0
 
 
 if __name__ == '__main__':

@@ -43,6 +43,21 @@
   th { color: var(--muted); font-weight: 600; }
   .scroll { overflow-x: auto; }
   code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+  .tile-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tile-title { font-weight: 600; overflow-wrap: anywhere; }
+  .tile-big { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tile-big.hot { color: var(--bad); }
+  .tile-detail { color: var(--muted); }
+  .spark { width: 100%; height: 48px; display: block; margin: 6px 0 4px; background: var(--bg); border-radius: 4px; }
+  .spark polyline { fill: none; stroke: var(--bar); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .cores { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 6px; }
+  .core { width: 9px; height: 9px; border-radius: 2px; background: var(--bar); }
+  .live-problems { margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
+  #live-section { display: none; }
+  .section-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 8px; }
+  .section-head h2 { margin: 0; }
   @media (max-width: 640px) {
     header, main { padding-left: 16px; padding-right: 16px; }
     .device { grid-template-columns: 1fr; }
@@ -58,11 +73,13 @@
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
-  <section><h2>Devices</h2><div id="devices"></div></section>
-  <section><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section>
-  <section><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section>
+  <section id="live-section"><div class="section-head"><h2>Live: CPU, RAM, GPU, VRAM</h2><span id="live-status" class="pill warn">reading...</span></div><div id="live"></div></section>
+  <section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section>
+  <section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section>
+  <section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section>
 </main>
 <script src="viewer-health.js"></script>
+<script src="viewer-live.js"></script>
 <script>
 (function () {
   'use strict';
@@ -196,6 +213,16 @@
     });
     Promise.all([hbP, snapP, evP]).then(function (v) {
       var hb = v[0], got = v[1];
+      if (got.fail && hb === null && window.MaiLive && window.MaiLive.active && /returned 404/.test(got.fail)) {
+        // live-only mode (`mai_watch live` without --config): there is no workload recording to report, which is not a failure
+        err.style.display = 'none';
+        var pill = document.getElementById('collector');
+        pill.className = 'pill warn';
+        pill.textContent = 'workload recording off (start live with --config to record workloads and idle time)';
+        ['devices-section', 'workloads-section', 'events-section'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = 'none'; });
+        return;
+      }
+      ['devices-section', 'workloads-section', 'events-section'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = ''; });
       if (got.fail) { showFailure(got.fail); showCollector(hb, null); return; }
       var snap = got.snap;
       var shape = MaiWatchHealth.structureProblems(snap);
@@ -219,6 +246,7 @@
       showFailure('The page could not draw snapshot.json: ' + e.message);
     });
   }
+  window.maiWatchTick = tick;      // the live panel calls this once it knows live mode is on, so a live-only page never flashes an error
   tick();
   setInterval(tick, POLL_MS);
 })();

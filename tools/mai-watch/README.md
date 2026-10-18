@@ -1,10 +1,22 @@
-Status: draft (M2). 72 + 7 tests pass on Windows, Linux (WSL and CI) and macOS (CI). Read real `nvidia-smi` on Windows and WSL. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU.
+Status: draft (M2 plus live view). 72 + 12 + 7 tests pass on Windows; earlier 72 + 7 also on on Windows, Linux (WSL and CI) and macOS (CI). Read real `nvidia-smi` on Windows and WSL. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU.
 
 [한국어](README.ko.md)
 
 # mai-watch
 
-A read-only monitor that answers three questions at a glance: how busy each GPU is, which of your jobs are alive, and since when a GPU has been idle.
+A read-only monitor. It shows CPU, RAM, GPU and VRAM live in the browser, and it answers three questions about your jobs: how busy each GPU is, which jobs are alive, and since when a GPU has been idle.
+
+## Live view in one command
+
+```powershell
+python -m mai_watch live
+```
+
+Open http://127.0.0.1:28765/ . CPU (with every core), RAM and swap, and for each GPU its use, VRAM, temperature and power, sampled every second, with graphs of the last 10 minutes. One process does the sampling and the page; Ctrl+C stops it. `--interval 2` samples every 2 s, `--history 1800` keeps 30 minutes, `--port` picks another port. Add `--config <mai-watch.toml>` to also record jobs and idle time below the live panel (the rest of this README). The live history lives in memory only; nothing is written for it. Values a source cannot give are shown as unknown, never as 0 (for example, the first CPU reading, which only opens the measurement window).
+
+Needs `psutil` for CPU and RAM and `nvidia-smi` for the GPUs. Measured on Windows 11 with two RTX 5080: one `nvidia-smi` query takes about 0.08 s, and the page values matched `nvidia-smi` (VRAM identical; GPU use moves from second to second).
+
+## Job and idle record
 
 - Your jobs write a small status file (`status/*.json`) every so often. That is the only integration.
 - The collector reads `nvidia-smi` and those files, and writes `snapshot.json`, `events.jsonl` and a heartbeat.

@@ -129,6 +129,17 @@ Sinks, in order of delivery:
 
 One static HTML file with inline script and style, no external requests, no frameworks. It reads `snapshot.json` and `collector_heartbeat.json` through a relative path. When opened from a file, browsers block reads; the CLI can serve the directory on `127.0.0.1` only. The page shows per device: utilization, memory, temperature, power, idle or busy, the interval so far, and the reason; per workload: state, liveness, age of last heartbeat; and the age of the collector heartbeat at the top.
 
+## 9c. Live view (added 2026-10-18 after the owner's first use)
+
+The owner's first use showed the gap: the page was a picture of one collection (`collect --once`), host CPU and RAM were collected as percentages but never shown, the interval was 10 s and there was no history. What was wanted is a live resource view: CPU, GPU, RAM and VRAM, moving.
+
+- `python -m mai_watch live` runs one process: a sampler thread (default every 1 s), the local server, and with `--config` the existing workload collector. Ctrl+C stops all.
+- Sample (`mai-watch-live-v1`): time, CPU average and per core, RAM used (total minus available), total and percent, swap, and per GPU use, VRAM used and total, temperature, power. A value the source cannot give is None with the reason in `problems`; the first CPU reading is None because psutil's first call only opens the window.
+- History is an in-memory ring of `history_s / interval_s` samples (default 600). It is not written to disk; the durable record stays in snapshot.json and events.jsonl. `/live.json?since=<t>` returns only newer samples, so a poll each second stays small.
+- The page adds a live panel (tiles with a number and a graph whose window grows with the data up to the history). Without a live sampler (`serve`) the panel stays hidden. Live without `--config` shows "workload recording off" instead of an error.
+- Measured: one nvidia-smi query about 0.08 s on the reference machine; page values matched nvidia-smi; tests with a fake psutil and fixed nvidia-smi text (12), graph point math checked in node, removing the first-reading rule fails a test.
+- Not done: GPU clocks, P state and throttle reasons; per-process GPU memory (not available under WDDM); a durable metric history; NVML source.
+
 ## 10. Security and safety
 
 - Read-only. v1 contains no stop, kill, or launch capability.

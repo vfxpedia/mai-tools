@@ -1,10 +1,22 @@
-상태: 초안 (M2). 시험 72 + 7개가 Windows, Linux (WSL과 CI), macOS (CI)에서 통과. Windows 와 WSL 에서 실제 `nvidia-smi` 를 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS.
+상태: 초안 (M2 와 실시간 화면). Windows 에서 시험 72 + 12 + 7개 통과. 앞선 72 + 7개는 Windows, Linux (WSL과 CI), macOS (CI)에서 통과. Windows 와 WSL 에서 실제 `nvidia-smi` 를 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS.
 
 [English](README.md)
 
 # mai-watch
 
-읽기 전용 감시 도구다. 세 가지를 한눈에 답한다: GPU 마다 얼마나 쓰고 있나, 내 작업 중 살아 있는 것은 무엇인가, GPU 가 언제부터 놀고 있나.
+읽기 전용 감시 도구다. CPU · RAM · GPU · VRAM 을 브라우저에서 실시간으로 보여 주고, 작업에 대해 세 가지를 답한다: GPU 마다 얼마나 쓰고 있나, 살아 있는 작업은 무엇인가, GPU 가 언제부터 놀고 있나.
+
+## 명령 하나로 실시간 화면
+
+```powershell
+python -m mai_watch live
+```
+
+http://127.0.0.1:28765/ 를 연다. CPU (코어마다), RAM 과 스왑, GPU 마다 사용률 · VRAM · 온도 · 전력을 1초마다 재고, 최근 10분 그래프를 그린다. 재는 일과 화면을 한 프로세스가 맡고, Ctrl+C 로 끈다. `--interval 2` 는 2초마다, `--history 1800` 은 30분 보관, `--port` 는 다른 포트. `--config <mai-watch.toml>` 을 더하면 실시간 칸 아래에 작업과 놀고 있음 기록도 함께 남긴다 (이 README 의 나머지). 실시간 이력은 메모리에만 있고 파일로 쓰지 않는다. 원천이 주지 못한 값은 0 이 아니라 「unknown」 으로 보인다 (예: 측정 창을 여는 첫 CPU 값).
+
+CPU · RAM 은 `psutil`, GPU 는 `nvidia-smi` 가 필요하다. RTX 5080 두 장의 Windows 11 에서 잰 값: `nvidia-smi` 한 번 약 0.08초, 화면 값은 `nvidia-smi` 와 맞았다 (VRAM 같음, GPU 사용률은 초마다 움직임).
+
+## 작업과 놀고 있음 기록
 
 - 작업은 가끔 작은 상태 파일 (`status/*.json`) 을 쓴다. 연결은 이것 하나뿐이다.
 - 수집기가 `nvidia-smi` 와 그 파일들을 읽어 `snapshot.json`, `events.jsonl`, 심장박동 파일을 쓴다.

@@ -1,4 +1,4 @@
-Status: draft (M2, live view, wider resources). 160 tests pass on Windows (72 + 12 + 25 + 16 + 28 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
+Status: draft (M2, live view, wider resources). 161 tests pass on Windows (72 + 12 + 25 + 16 + 29 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
@@ -24,6 +24,8 @@ mai-watch
 ```
 
 The page opens in your browser at http://127.0.0.1:28765/ . Ctrl+C stops it. Without installing, `python -m mai_watch` from `tools/mai-watch` does the same (CPU, RAM, disks and network then need `pip install psutil`).
+
+Install with `pip install -e ./tools/mai-watch` (editable): a plain `pip install` copies the code, and a running copy keeps the version it was installed at even after the checkout moves on. Restart mai-watch after updating.
 
 Useful options: `--path //nas/share` (watch a folder, repeatable), `--port 28766`, `--interval 2` (sample every 2 s), `--history 1800` (keep 30 minutes), `--no-browser`, `--no-usage`.
 

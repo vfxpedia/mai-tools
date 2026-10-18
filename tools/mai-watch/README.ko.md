@@ -1,4 +1,4 @@
-상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 160개 통과 (72 + 12 + 25 + 16 + 28 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
+상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 161개 통과 (72 + 12 + 25 + 16 + 29 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
 
 [English](README.md)
 
@@ -24,6 +24,8 @@ mai-watch
 ```
 
 브라우저에 http://127.0.0.1:28765/ 가 열린다. Ctrl+C 로 끈다. 설치하지 않고 `tools/mai-watch` 에서 `python -m mai_watch` 로 실행해도 같다 (이때 CPU · RAM · 디스크 · 네트워크는 `pip install psutil` 이 필요하다).
+
+설치는 `pip install -e ./tools/mai-watch` (편집 가능 설치) 로 한다. 그냥 `pip install` 은 코드를 복사해서, 저장소를 최신으로 받아도 설치된 복사본은 설치하던 때의 판으로 남는다. 갱신한 뒤에는 mai-watch 를 다시 띄운다.
 
 자주 쓰는 옵션: `--path //nas/share` (지켜볼 폴더, 여러 번 가능), `--port 28766`, `--interval 2` (2초마다), `--history 1800` (30분 보관), `--no-browser`, `--no-usage`.
 

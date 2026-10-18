@@ -14,6 +14,9 @@ APPS_QUERY = 'gpu_uuid,pid,process_name,used_memory'
 GPU_COLUMNS = GPU_QUERY.split(',')
 APPS_COLUMNS = APPS_QUERY.split(',')
 NA_MARKERS = ('[n/a]', '[not supported]', '[unknown error]', 'n/a')
+# On Windows a child console program started by a process without a console (pythonw, a scheduled task) opens a visible window,
+# every call; nvidia-smi runs every second. CREATE_NO_WINDOW keeps every child mai-watch starts invisible (mai-os os/tool-hazards.md)
+NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 
 
 def num(field):
@@ -69,7 +72,7 @@ def run_csv(cmd, query_flag, query, timeout=20):
     """Runs nvidia-smi (cmd is a list, so tests can substitute a stub). Returns text, or None when the tool is missing or fails."""
     full = list(cmd) + ['--%s=%s' % (query_flag, query), '--format=csv,noheader,nounits']
     try:
-        p = subprocess.run(full, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
+        p = subprocess.run(full, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, creationflags=NO_WINDOW)
     except (OSError, subprocess.SubprocessError):
         return None
     if p.returncode != 0:

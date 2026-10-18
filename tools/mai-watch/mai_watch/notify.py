@@ -24,6 +24,8 @@ import socket
 import subprocess
 import time
 
+from .nvidia import NO_WINDOW
+
 LEVELS = {'info': 2, 'warn': 1, 'bad': 0}
 LABEL = {'bad': 'ACT NOW', 'warn': 'LOOK SOON', 'info': 'NOTE'}
 
@@ -157,7 +159,8 @@ def send(cmd, text, notify_file=None, timeout=30, run=subprocess.run):
         if notify_file:
             with open(notify_file, 'w', encoding='utf-8', newline='\n') as f:
                 f.write(text)
-        p = run(list(cmd), input=text, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, env=env)
+        p = run(list(cmd), input=text, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, env=env,
+                creationflags=NO_WINDOW)
     except (OSError, subprocess.SubprocessError) as e:
         return False, '%s: %s' % (type(e).__name__, e)
     out = ((p.stdout or '') + (p.stderr or '')).strip().splitlines()

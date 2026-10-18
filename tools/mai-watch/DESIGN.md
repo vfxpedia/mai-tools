@@ -180,6 +180,8 @@ Notifications (`notify.py`): mai-watch holds no messaging token. A command chose
 
 Measured on the reference machine: with the existing Telegram sender as the command and its outbox as the file, one message with the four current findings, sender result `exit 0: sent ok=True`; arrival on the phone is confirmed by the owner, not by the sender's word. Review R13 to R18 (pipeline, vfxpedia/mai-os#43) each has its reproduction as a regression test, and removing each of 21 notifier and status rules makes a test fail (run with bytecode caching off, see os/tool-hazards.md in mai-os). Not done: a mai-gauge MCP tool over the same status (agents use the CLI now), notifications from the workload record (stale job) through the same path.
 
+Every child program (nvidia-smi each second, the PowerShell disk and adapter queries, the notification command) is started with CREATE_NO_WINDOW on Windows. Measured: a console-less parent (pythonw, as a scheduled task runs it) calling nvidia-smi 10 times without the flag opened 10 visible console windows; mai-watch itself under pythonw for 20 s opened none.
+
 ## 10. Security and safety
 
 - Read-only toward workloads. No stop or kill capability, and nothing is launched except two things the owner asks for: the read-only OS queries (nvidia-smi, PowerShell Get-Disk and Get-NetAdapter, lsblk) and, only when `notify_cmd` is set, the owner's notification command.

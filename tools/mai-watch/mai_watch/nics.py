@@ -9,6 +9,8 @@ import os
 import subprocess
 import sys
 
+from .nvidia import NO_WINDOW
+
 PS = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-NetAdapter -IncludeHidden | Select-Object Name, Virtual, HardwareInterface, PhysicalMediaType | ConvertTo-Json -Compress")
 KINDS = ('wired', 'wireless', 'virtual', 'unknown')
 
@@ -61,7 +63,7 @@ def read_linux(root='/sys/class/net'):
 def read(timeout=15):
     if os.name == 'nt':
         try:
-            p = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', PS], capture_output=True, text=True,
+            p = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', PS], capture_output=True, text=True, creationflags=NO_WINDOW,
                                encoding='utf-8', errors='replace', timeout=timeout)
         except (OSError, subprocess.SubprocessError):
             return {}

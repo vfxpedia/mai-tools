@@ -9,6 +9,8 @@ import os
 import subprocess
 import sys
 
+from .nvidia import NO_WINDOW
+
 PS = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Disk | ForEach-Object { $n = $_.Number; [pscustomobject]@{ n = $n; model = $_.FriendlyName; size = $_.Size; "
       "letters = @(Get-Partition -DiskNumber $n -ErrorAction SilentlyContinue | Where-Object DriveLetter | ForEach-Object { [string]$_.DriveLetter + ':' }) } } "
       "| ConvertTo-Json -Depth 3 -Compress")
@@ -16,7 +18,7 @@ PS = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Disk | ForEach-Obj
 
 def _run(cmd, timeout):
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
+        p = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, creationflags=NO_WINDOW)
     except (OSError, subprocess.SubprocessError):
         return None
     return p.stdout if p.returncode == 0 else None

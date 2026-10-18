@@ -474,6 +474,30 @@ class StatusCommand(unittest.TestCase):
         self.assertIn('is mai-watch running', p.stderr)
 
 
+class NoWindows(unittest.TestCase):
+    def test_every_child_is_started_without_a_window(self):
+        # measured on Windows: a console-less parent (pythonw, a scheduled task) running nvidia-smi without the flag opened a visible
+        # window per call (10 OpenConsole in 10 calls), with it none; nvidia-smi runs every second
+        from mai_watch import disks, nics, nvidia
+        seen = []
+
+        def fake_run(*a, **kw):
+            seen.append(kw.get('creationflags'))
+            raise OSError('not run')
+        old = subprocess.run
+        subprocess.run = fake_run
+        try:
+            nvidia.run_csv(['nvidia-smi'], 'query-gpu', 'index')
+            disks._run(['x'], 1)
+            nics.read()
+            notify.send(['x'], 'hi', run=fake_run)                         # send takes its runner as an argument
+        finally:
+            subprocess.run = old
+        expected = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        self.assertEqual(len(seen), 4 if os.name == 'nt' else 3)            # nics.read asks PowerShell only on Windows
+        self.assertEqual(set(seen), {expected})
+
+
 class Settings(unittest.TestCase):
     def test_r18_notify_file_in_a_config_is_relative_to_the_config(self):
         d = tempfile.mkdtemp()

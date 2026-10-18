@@ -18,7 +18,7 @@ node src/setup.mjs rollback --manifest ABSOLUTE_BACKUP_MANIFEST
 
 ## Tests
 
-`node --test tests/*.test.mjs` (Node 22 or newer). 113 tests: 108 pass; 5 are skipped in a normal run because they drive a real Codex CLI or a real package install.
+`node --test tests/*.test.mjs` (Node 22 or newer). 117 tests: 112 pass; 5 are skipped in a normal run because they drive a real Codex CLI or a real package install.
 
 ## Not finished or not measured
 

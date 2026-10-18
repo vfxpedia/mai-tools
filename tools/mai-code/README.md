@@ -2,9 +2,11 @@
 > Author: MAI maintainers · 2026-10-18
 > Basis: mai-tools #1 · mai-os #49 · official local CLI contracts
 > Summary: Analyze paper extracts and implement bounded modules with existing CLI login and retained evidence
-> Status: Draft alpha 0.1.0a1. Windows native fixtures and three-OS offline CI measured; final maintainer review pending
+> Status: Draft alpha 0.1.0a1. Windows native fixtures and three-OS offline CI measured; merged after maintainer review (2026-10-18). Real paper units (MARG, START, AME-2) not measured
 
 # mai-code
+
+[한국어](README.ko.md)
 
 mai-code prepares an owner-authored work unit, runs **official logged-in Codex or Claude Code** in an existing dedicated Git worktree, and retains original inputs, requests, raw streams, native session IDs and fixed-test receipts. It does not route provider APIs, copy credentials or replace your current conversations. It is not the upstream DeepCode product.
 

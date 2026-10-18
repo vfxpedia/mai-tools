@@ -5,7 +5,7 @@ Add-ons that run inside AI coding sessions, so a session can be left alone for a
 | Mod | Engine | What it does | Status |
 |---|---|---|---|
 | [mai-gauge](mai-gauge/) | Claude Code | A strip above the prompt and `/gauge`: context use against the compact threshold, 5 hour and 7 day limits with a forecast, this turn's requests, tokens and cost. 50, 75 and 85 % notices, compact at a turn boundary above 85 %. A shared session board (`/sessions`). Holds five history-destroying git commands for an explicit yes (deletes and process kills: see the guide). | in daily use by its author; 81 tests |
-| [mai-codex-gauge](mai-codex-gauge/) | Codex | Turn and session tokens and account limits from what the engine reports; cost only when the engine reports it. Same session board format as mai-gauge. | 0.2.2; 108 tests pass, 5 skipped; compact control at a work-unit boundary and some native hook behavior are not finished |
+| [mai-codex-gauge](mai-codex-gauge/) | Codex | Turn and session tokens and account limits from what the engine reports; cost only when the engine reports it. Same session board format as mai-gauge. | 0.2.2; 112 tests pass, 5 skipped; compact control at a work-unit boundary and some native hook behavior are not finished |
 
 Detailed guides are in Korean for now: [README.ko.md](README.ko.md) for mai-gauge and [mai-codex-gauge/README.ko.md](mai-codex-gauge/README.ko.md). English versions are pending.
 
@@ -41,4 +41,3 @@ The type check needs `mods/mai-gauge/.claude-plugin/types/`, which Claude Code w
 
 - mai-gauge on Linux or macOS sessions.
 - mai-codex-gauge automatic compact at a work-unit boundary; whether every running Codex session uses the latest installed copy.
-- `claude plugin test` on a CI runner (no account is signed in there); see the CI job result.

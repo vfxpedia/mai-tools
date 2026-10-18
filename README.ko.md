@@ -8,6 +8,7 @@
 
 | 도구 | 하는 일 | 상태 |
 |---|---|---|
+| [mai-code](tools/mai-code/README.ko.md) | 이미 로그인된 공식 CLI 로 논문을 분석하고 경계가 정해진 모듈을 구현. 증거를 남기고 고정 시험으로 확인 | 초안 알파 0.1.0a1, maintainer 검수 뒤 병합. 실제 논문 단위는 미측정 |
 | [mai-approve](tools/mai-approve/README.ko.md) | 무인 실행을 위한 기한 있는 상시 승인: 해시로 봉인한 승인 파일, 실행마다 영수증, 실행 id 를 바꿔도 초기화되지 않는 횟수, 변조를 드러내는 감사 기록 | M1, 검토 받음 |
 | [mai-watch](tools/mai-watch/README.ko.md) | GPU 사용과 작업 상태를 읽기만 하는 감시: 수집기, 「모름」 을 따로 다루는 놀고 있음 판정, 생존 확인, 사건 기록, 로컬 화면 | M2, 검토 받음 |
 | [mai-tabs](tools/mai-tabs/README.ko.md) | 탭 정리 전에 열린 탭을 분류된 Markdown 으로 남기고 닫을 후보를 제안. 아무것도 닫지 않는다 | M1, 격리 프로필에서 한 번 확인 |

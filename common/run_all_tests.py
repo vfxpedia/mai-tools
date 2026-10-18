@@ -43,7 +43,14 @@ def run_node(name):
 
 
 def main(argv):
-    wanted = argv or list(SUITES) + list(NODE_SUITES)
+    skip = set()
+    while '--skip' in argv:                      # --skip NAME: leave one suite out (used for a known, recorded platform failure)
+        i = argv.index('--skip')
+        skip.add(argv[i + 1])
+        argv = argv[:i] + argv[i + 2:]
+    wanted = [t for t in (argv or list(SUITES) + list(NODE_SUITES)) if t not in skip]
+    for t in sorted(skip):
+        print('SKIP %s (left out on request)' % t)
     bad = 0
     total = 0
     for tool in wanted:

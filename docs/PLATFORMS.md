@@ -9,6 +9,13 @@ Updated only from real runs. A cell that says "not measured" means no one ran it
 | Ubuntu on a GitHub-hosted runner | 3.12 | 20 | CI, `MAI_TOOLS_STRICT=1`, `psutil` installed | 173 tests, 0 failed, 0 skipped (first push, 2026-10-18) |
 | macOS on a GitHub-hosted runner | 3.12 | 20 | CI, same settings | 173 tests, 0 failed, 0 skipped (first push, 2026-10-18) |
 
+## Session mods (CI, 2026-10-18)
+
+| Mod | Windows | Ubuntu | macOS |
+|---|---|---|---|
+| mai-gauge (`claude plugin validate` and `test`, 81 tests) | passes on the author's machine | passes on the runner | not run |
+| mai-codex-gauge (`node --test`, 114 tests) | 109 pass, 5 skipped | passes | **1 known failure**: test 83, a hook installed into a home whose path has spaces and launched by `/bin/sh` with a minimal PATH exits 0 but prints nothing. Not yet explained. Before the store path fix it was about 70 failures, all from `/var` being a link on macOS. This suite does not block macOS CI until it is fixed. |
+
 ## What the numbers do not cover
 
 - Runner results use mocked or recorded input only: a hosted runner has no GPU, no real Chrome and no desktop.

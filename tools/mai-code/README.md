@@ -2,7 +2,7 @@
 > Author: MAI maintainers · 2026-10-18
 > Basis: mai-tools #1 · mai-os #49 · official local CLI contracts
 > Summary: Analyze paper extracts and implement bounded modules with existing CLI login and retained evidence
-> Status: Draft alpha 0.1.0a1. Windows native Codex/Claude fixture and exact-ID resume measured; release review and CI pending
+> Status: Draft alpha 0.1.0a1. Windows native fixtures and three-OS offline CI measured; final maintainer review pending
 
 # mai-code
 

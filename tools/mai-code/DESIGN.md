@@ -2,7 +2,7 @@
 > Author: MAI maintainers · 2026-10-18
 > Basis: Approved implementation plan · mai-tools #1 · mai-os #49
 > Summary: Versioned units, immutable process evidence, conservative leases and fixed-test verification
-> Status: Draft alpha. Windows native integration and WSL offline measured; independent review and CI pending
+> Status: Draft alpha. Native Windows and three-OS offline CI measured; final maintainer review pending
 
 # Design
 
@@ -21,10 +21,10 @@ The verifier runs fixed unittest argv and a fixed negative control. It rejects z
 | G1 Real input | Local subscription CLI probes and owned affine fixture | Windows Codex 0.162.1 and Claude 2.1.302: full stages, 4 mathematical tests, declared negative control and exact-ID failed-stage continuation passed |
 | G2 Known answers | Seven offline test files, process fixtures, fixed affine oracle | Windows 46/46 after recovery fixes. Hash-check removal and lease-exclusion removal each failed their known-answer mutation probe before the reboot |
 | G3 Independent review | One whole-branch reviewer and regression findings | Four Important findings recovered and independently reproduced. Covered by RED then GREEN regression tests. Reviewer final summary was interrupted by reboot; final sign-off pending |
-| G4 Systems | Shared runner on Windows/Linux/macOS | Windows and WSL offline core measured; hosted CI pending. WSL native Codex unavailable, Claude subscription not confirmed; no credential copy or native call there |
-| G5 Hygiene | Repository hygiene gate and archive inventory | Staged source hygiene: zero findings. Wheel contains package and metadata only; source archive final check pending |
+| G4 Systems | Shared runner on Windows/Linux/macOS | [CI 39107193224](https://github.com/vfxpedia/mai-tools/actions/runs/39107193224) passed on all three systems at integration 9d3daad. Local integration: 335 tests, zero failed, 5 existing optional Mods skips. WSL native Codex unavailable, Claude subscription not confirmed; no credential copy or native call there |
+| G5 Hygiene | Repository hygiene gate and archive inventory | Source hygiene: zero findings. Wheel: 18 entries; source archive: 46, including labelled JSON fixtures. No run evidence or authentication files shipped |
 | G6 English first | README, DESIGN, provenance | Written |
-| G7 User layer | Fresh-shell CLI and isolated package install | Install-free CLI and isolated venv console entry measured; native `resume` passed both engine fixtures |
+| G7 User layer | Fresh-shell CLI and isolated package install | Earlier isolated venv console entry and native `resume` passed both engine fixtures. Post-recovery wheel directly read and validated both original fixture receipts with `verify --existing`; installed copies untouched |
 | G8 Limits stated | This table and README | Missing measurements explicitly pending |
 
 Not measured: scientific equivalence to any paper, GPU experiments, unattended long-duration quotas, native macOS login, independent Ubuntu desktop login, adversarial same-user filesystem modification. Existing other MAI tools and Mods are not recertified by mai-code's tests.

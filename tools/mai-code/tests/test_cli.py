@@ -29,4 +29,13 @@ class CliTests(unittest.TestCase):
         result=self.call('prepare',self.f.root/'missing')
         self.assertEqual(result.returncode,2)
 
+    def test_packaging_contract(self):
+        import tomllib
+        path=Path(__file__).resolve().parents[1]/'pyproject.toml'
+        self.assertTrue(path.is_file(),'installable package metadata missing')
+        project=tomllib.loads(path.read_text())['project']
+        self.assertEqual(project['scripts']['mai-code'],'mai_code.cli:main')
+        self.assertEqual(project.get('dependencies',[]),[])
+        self.assertEqual(project['version'],'0.1.0a1')
+
 if __name__=='__main__':unittest.main()

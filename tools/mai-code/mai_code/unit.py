@@ -50,6 +50,10 @@ def argv(value):
 def load_unit(path):
     try: u = json.loads(Path(path).read_text(encoding='utf-8-sig'))
     except (OSError,ValueError) as e: raise ValueError('invalid unit JSON') from e
+    return validate_unit(u)
+
+
+def validate_unit(u):
     if not isinstance(u,dict) or set(u)!=FIELDS or u['schema']!='mai-code-unit-v1': raise ValueError('unit schema or unknown keys')
     if not isinstance(u['unit_id'],str) or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}', u['unit_id']): raise ValueError('unit ID')
     if not isinstance(u['issue_url'],str) or not re.fullmatch(r'https://github\.com/[^/\s]+/[^/\s]+/issues/[1-9][0-9]*',u['issue_url']): raise ValueError('issue URL')
@@ -64,7 +68,7 @@ def load_unit(path):
         seen.add(p)
         if not isinstance(item['sha256'],str) or not re.fullmatch('[0-9a-f]{64}',item['sha256']): raise ValueError('input hash')
         if not isinstance(item['references'],list) or not item['references'] or any(not isinstance(x,str) or not x.strip() for x in item['references']): raise ValueError('references required')
-    if not isinstance(u['outputs'],list) or not u['outputs']: raise ValueError('outputs required')
+    if not isinstance(u['outputs'],list) or len(u['outputs'])<2: raise ValueError('reserved analysis and plan outputs required')
     outs=[os.path.normcase(str(confined(work,p))) for p in u['outputs']]
     if len(outs)!=len(set(outs)) or any(Path(p) in seen for p in outs): raise ValueError('duplicate output or input overlap')
     if not isinstance(u['engines'],dict) or set(u['engines'])!=set(STAGES): raise ValueError('three engines required')
@@ -97,6 +101,7 @@ def validate_workspace(unit):
 
 
 def prepare_packet(unit):
+    unit=validate_unit(unit)
     work=Path(unit['workspace']).resolve()
     for item in unit['inputs']:
         p=confined(work,item['path'])

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mai-code"
+version = "0.1.0a1"
+description = "Locally authenticated CLI workflow with preserved evidence and fixed verification"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = []
+
+[project.scripts]
+mai-code = "mai_code.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mai_code", "mai_code.*"]
+
+[tool.setuptools]
+include-package-data = false

@@ -37,6 +37,14 @@ class UnitTests(unittest.TestCase):
         self.f.unit['inputs'][0]['sha256']='0'*64
         with self.assertRaisesRegex(ValueError,'hash'): self.api.prepare_packet(self.load())
 
+    def test_prepare_api_checks_schema(self):
+        self.f.unit['unexpected']=True
+        with self.assertRaisesRegex(ValueError,'schema'):self.api.prepare_packet(self.f.unit)
+
+    def test_reserved_outputs_required(self):
+        self.f.unit['outputs']=['one-file.json']
+        with self.assertRaises(ValueError):self.load()
+
     def test_primary_refused(self):
         self.f.unit['workspace']=str(self.f.primary)
         with self.assertRaisesRegex(ValueError,'primary'): self.api.prepare_packet(self.load())

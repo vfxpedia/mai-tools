@@ -17,6 +17,7 @@ def verify_unit(run,test_argv,negative_control_argv):
     token=acquire_lease(run,{'pid':os.getpid(),'stage':'verify'})
     try:
         state,packet,work,parent,expected=context(run);u=packet['unit']
+        if 'verify' in state['completed']:parent=state['completed']['implement']['sha256']
         if state['current']:raise ValueError('unfinished model attempt requires reconciliation')
         if test_argv!=u['test_argv'] or negative_control_argv!=u['negative_control_argv']:raise ValueError('verification argv differs from prepared unit')
         if inventory(work)!=expected:raise ValueError('workspace changed before verification')

@@ -64,4 +64,23 @@ class WorkflowTests(unittest.TestCase):
         self.w.execute_stage(self.run,'analyze',self.command('analyze','empty'))
         self.assertEqual(self.w.resume_decision(self.run,{'active':False,'session_id':'wrong'})['decision'],'needs_attention')
 
+    def test_closed_failed_implementation_resumes_without_rewriting_code(self):
+        for s in ('analyze','plan'):self.w.execute_stage(self.run,s,self.command(s))
+        bad=self.command('implement');bad[-1]=bad[-1].replace("'changes': ['module.py']","'changes': ['Added module.py']")
+        # JSON text is embedded in the subprocess string, so change its actual serialized value.
+        bad[-1]=bad[-1].replace('"changes": ["module.py"]','"changes": ["Added module.py"]')
+        first=self.w.execute_stage(self.run,'implement',bad)
+        self.assertEqual(first['status'],'failed')
+        source=(self.f.work/'module.py').read_bytes()
+        result=self.w.execute_stage(self.run,'implement',self.command('implement'),resume_id='12345678-1234-4234-8234-123456789abc')
+        self.assertEqual(result['status'],'passed',result.get('diagnostic'))
+        self.assertEqual((self.f.work/'module.py').read_bytes(),source)
+
+    def test_repeated_verification_keeps_chain(self):
+        from mai_code.verify import verify_unit,check_existing
+        for s in ('analyze','plan','implement'):self.w.execute_stage(self.run,s,self.command(s))
+        for _ in range(2):
+            self.assertTrue(verify_unit(self.run,self.f.unit['test_argv'],self.f.unit['negative_control_argv'])['unit_passed'])
+            self.assertTrue(check_existing(self.run)['passed'])
+
 if __name__=='__main__':unittest.main()

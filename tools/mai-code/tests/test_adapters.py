@@ -62,4 +62,11 @@ class AdapterTests(unittest.TestCase):
         shim=self.path/'codex.ps1';shim.write_text('not an executable')
         with self.assertRaises(ValueError):self.a.resolve_launcher('codex',shim)
 
+    def test_claude_uses_native_schema(self):
+        immutable(self.path/'cli.json',{'engine':'claude','executable':sys.executable,'resume_supported':True})
+        immutable(self.path/'response-schema.json',{'type':'object'})
+        args=self.a.build_command('claude','analyze',self.path)
+        self.assertIn('--json-schema',args)
+        self.assertEqual(json.loads(args[args.index('--json-schema')+1]),{'type':'object'})
+
 if __name__=='__main__':unittest.main()

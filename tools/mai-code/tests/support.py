@@ -20,7 +20,7 @@ class Fixture:
         git(self.primary, 'config', 'user.name', 'Fixture')
         git(self.primary, 'config', 'user.email', 'fixture@example.invalid')
         (self.primary / 'paper.txt').write_text('TEST ONLY. Affine: y=w*x+b. Loss=(y-target)^2.', encoding='utf-8')
-        (self.primary / 'fixed_test.py').write_text('import unittest\nclass Fixed(unittest.TestCase):\n def test_answer(self): self.assertEqual(2+2,4)\nif __name__ == "__main__": unittest.main()\n', encoding='utf-8')
+        (self.primary / 'fixed_test.py').write_text('import unittest,sys\nnegative="--negative" in sys.argv\nif negative: sys.argv.remove("--negative")\nclass Fixed(unittest.TestCase):\n def test_answer(self): self.assertEqual(0 if negative else 2+2,4)\nif __name__ == "__main__": unittest.main()\n', encoding='utf-8')
         git(self.primary, 'add', '.')
         git(self.primary, 'commit', '-qm', 'fixture baseline')
         self.work = self.root / 'owned space 유니코드 & work'

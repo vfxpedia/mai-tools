@@ -1,5 +1,9 @@
+import json
+
+
 def command(executable,attempt,model,resume_id):
-    args=[executable,'--print','--verbose','--output-format','stream-json']
+    schema=json.loads((attempt/'response-schema.json').read_text(encoding='utf-8'))
+    args=[executable,'--print','--verbose','--output-format','stream-json','--json-schema',json.dumps(schema,separators=(',',':'))]
     if resume_id: args += ['--resume',resume_id]
     if model: args += ['--model',model]
     # Native stream's result is validated again locally; raw stream is retained.

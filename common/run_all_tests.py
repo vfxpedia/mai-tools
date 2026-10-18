@@ -44,6 +44,10 @@ def run_node(name):
 
 
 def main(argv):
+    try:                      # a failing test may print text the console code page cannot show (cp1252 on CI)
+        sys.stdout.reconfigure(errors='replace')
+    except AttributeError:
+        pass
     skip = set()
     while '--skip' in argv:                      # --skip NAME: leave one suite out (used for a known, recorded platform failure)
         i = argv.index('--skip')

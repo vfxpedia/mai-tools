@@ -89,12 +89,15 @@ def message(new, raised, cleared, host=None):
 
 
 def send(cmd, text, notify_file=None, timeout=30, run=subprocess.run):
-    """Writes text to notify_file (when given), runs cmd with text on standard input. Returns (ok, detail)."""
+    """Writes text to notify_file (when given), runs cmd with text on standard input as UTF-8 bytes. Returns (ok, detail).
+    A receiver that decodes stdin with the system code page (cp1252, cp949 on Windows) would break Korean text, so Python receivers
+    are also told to use UTF-8 (PYTHONIOENCODING, PYTHONUTF8); any other receiver should read stdin as UTF-8 bytes."""
+    env = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUTF8='1')
     try:
         if notify_file:
             with open(notify_file, 'w', encoding='utf-8', newline='\n') as f:
                 f.write(text)
-        p = run(list(cmd), input=text, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
+        p = run(list(cmd), input=text, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, env=env)
     except (OSError, subprocess.SubprocessError) as e:
         return False, '%s: %s' % (type(e).__name__, e)
     out = ((p.stdout or '') + (p.stderr or '')).strip().splitlines()

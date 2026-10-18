@@ -69,6 +69,9 @@ class Sending(unittest.TestCase):
     def test_command_gets_the_text_on_stdin_and_in_the_file(self):
         got, box = os.path.join(self.d, 'got.txt'), os.path.join(self.d, 'outbox.txt')
         cmd = [sys.executable, '-c', 'import sys; open(sys.argv[1], "w", encoding="utf-8").write(sys.stdin.read()); print("sent ok")', got]
+        # without the variables a developer machine may set: a plain Windows receiver decodes stdin with its code page
+        saved = {k: os.environ.pop(k) for k in ('PYTHONIOENCODING', 'PYTHONUTF8') if k in os.environ}
+        self.addCleanup(os.environ.update, saved)
         ok, detail = notify.send(cmd, 'hello \uc548\ub155\n', box)
         self.assertEqual((ok, detail), (True, 'exit 0: sent ok'))
         with open(got, encoding='utf-8') as f:
@@ -121,8 +124,9 @@ class Loop(unittest.TestCase):
 
 class StatusCommand(unittest.TestCase):
     def run_status(self, url, *extra):
+        # the OS error text can be in the system language (Korean on the reference machine); read it without assuming a code page
         return subprocess.run([sys.executable, '-m', 'mai_watch', 'status', '--url', url] + list(extra), cwd=ROOT,
-                              capture_output=True, text=True, encoding='utf-8', timeout=30)
+                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
 
     def test_exit_codes_and_lines(self):
         s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: '', paths=['.'], usage_on=False, disk_reader=lambda: {}, nic_reader=lambda: {})

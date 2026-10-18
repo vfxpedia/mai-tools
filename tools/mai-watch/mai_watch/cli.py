@@ -32,6 +32,11 @@ stale_factor = 3
 
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):    # an OS message or a Korean name the console code page cannot show must not change the exit code
+        try:
+            stream.reconfigure(errors='replace')
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(prog='mai-watch', description='Resource and workload status monitor (read-only).')
     sub = ap.add_subparsers(dest='cmd')
     for name in ('collect', 'check', 'show', 'serve'):

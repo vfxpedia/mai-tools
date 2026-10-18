@@ -46,12 +46,24 @@ def resume_decision(run,observations):
     if observations.get('active') is not False or lease_path(run).exists():return dict(decision='needs_attention',reason='activity unknown or lease present')
     s,p,work,parent,expected=context(run)
     if not s['current']:return next_action(run)
-    a=run/'attempts'/s['current']['attempt_id']
+    a=confined(run/'attempts',s['current']['attempt_id'])
     if not (a/'receipt.json').is_file():return dict(decision='needs_attention',reason='interrupted before receipt; reconcile manually')
-    r=read_json(a/'receipt.json');sid=r.get('native_session_id')
+    r=failed_attempt(run,s,parent);sid=r.get('native_session_id')
     if not sid or sid!=observations.get('session_id') or r.get('transport',{}).get('exit_code') is None:return dict(decision='needs_attention',reason='exact closed native session not confirmed')
     if inventory(work)!=r.get('workspace_after'):return dict(decision='needs_attention',reason='workspace changed after failed attempt')
     return dict(decision='continue_exact_session',stage=r['stage'],session_id=sid,reason='explicit continuation of closed owned attempt')
+
+
+def failed_attempt(run,state,parent):
+    cur=state['current'];a=confined(run/'attempts',cur['attempt_id'])
+    if not cur.get('receipt_sha256') or digest(a/'receipt.json')!=cur['receipt_sha256']:
+        raise ValueError('failed receipt hash missing or changed; reconcile manually')
+    r=read_json(a/'receipt.json')
+    if r.get('schema')!='mai-code-receipt-v1' or r.get('stage')!=cur['stage'] or r.get('status')!='failed' or r.get('parent_sha256')!=parent:
+        raise ValueError('failed receipt chain invalid')
+    for path,sha in r.get('evidence_hashes',{}).items():
+        if digest(confined(a,path))!=sha:raise ValueError('failed evidence changed')
+    return r
 
 
 def request_packet(run,stage,p,parent):
@@ -82,7 +94,7 @@ def execute_stage(run,stage,command=None,resume_id=None,attention_after_s=300,ap
             # Lease was acquired by this invocation; validate closed predecessor directly.
             cur=s['current']
             if not cur or cur['stage']!=stage:raise ValueError('no owned stage to resume')
-            old=read_json(run/'attempts'/cur['attempt_id']/'receipt.json')
+            old=failed_attempt(run,s,parent)
             if old.get('native_session_id')!=resume_id or old.get('transport',{}).get('exit_code') is None or inventory(work)!=old.get('workspace_after'):raise ValueError('resume identity or workspace not confirmed')
             start_expected=old['workspace_after']
         elif s['current'] or next_action(run)['stage']!=stage:raise ValueError('stage boundary requires explicit reconciliation/resume')
@@ -141,12 +153,14 @@ def execute_stage(run,stage,command=None,resume_id=None,attention_after_s=300,ap
             receipt.update(status='passed',answer=answer,outputs={x:after[x] for x in changed})
         except (ValueError,OSError,KeyError) as e:receipt['diagnostic']=str(e)
         receipt['workspace_after']=inventory(work)
-        receipt['evidence_hashes']={name:digest(a/name) for name in ('request.json','stdout.bin','stderr.bin','events.jsonl','response-schema.json')}
+        receipt['evidence_hashes']={name:digest(a/name) for name in ('attempt.json','request.json','command.json','stdout.bin','stderr.bin','events.jsonl','response-schema.json','cli.json','lifecycle.jsonl','final.json') if (a/name).is_file()}
         write_receipt(a,receipt)
         if receipt['status']=='passed':
             s['completed'][stage]={'attempt_id':a.name,'sha256':digest(a/'receipt.json')};s['current']=None;s['status']='awaiting-verification' if stage=='implement' else 'prepared'
-        else:s['status']='needs-attention'
-        save_state(run,s);record_event(run,dict(type='stage-closed',attempt=a.name,status=receipt['status']))
+        else:
+            s['status']='needs-attention'
+            s['current']['receipt_sha256']=digest(a/'receipt.json')
+        save_state(run,s);record_event(run,dict(type='stage-closed',attempt=a.name,status=receipt['status'],receipt_sha256=digest(a/'receipt.json')))
         release_lease(run,token)
         return receipt
     except BaseException:

@@ -64,4 +64,11 @@ class UnitTests(unittest.TestCase):
         self.f.unit['outputs']=['analysis.json','link/escaped.py']
         with self.assertRaisesRegex(ValueError,'escape'): self.api.prepare_packet(self.load())
 
+    def test_gitlink_is_refused_before_unmeasured_child_content(self):
+        git(self.f.work,'-c','protocol.file.allow=always','submodule','add','-q',str(self.f.primary),'nested')
+        git(self.f.work,'commit','-qm','fixture gitlink')
+        with self.assertRaisesRegex(ValueError,'gitlink|submodule'):self.api.prepare_packet(self.load())
+        (self.f.work/'nested'/'paper.txt').write_text('undeclared nested mutation')
+        with self.assertRaisesRegex(ValueError,'gitlink|submodule'):self.api.inventory(self.f.work)
+
 if __name__=='__main__': unittest.main()

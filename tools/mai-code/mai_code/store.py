@@ -80,12 +80,22 @@ def write_receipt(attempt,receipt):
     immutable(attempt/'receipt.json',dict(schema='mai-code-receipt-v1',**receipt))
 
 
-def lease_path(run): return run.parent/'workspace.lease.json'
+def lease_path(run):
+    load_state(run)
+    work=Path(read_json(run/'packet.json')['fingerprint']['real_path']).resolve()
+    identity=hashlib.sha256(os.path.normcase(str(work)).encode()).hexdigest()
+    return work.parent/'.mai-code-locks'/(identity+'.json')
 
 
 def acquire_lease(run,owner):
+    path=lease_path(run)
+    # Old-format locks remain a stop condition; migration never removes them.
+    if (run.parent/'workspace.lease.json').exists():raise ValueError('legacy workspace lease requires reconciliation')
+    path.parent.mkdir(exist_ok=True)
+    if path.parent.is_symlink() or (hasattr(path.parent,'is_junction') and path.parent.is_junction()) or path.parent.resolve()!=path.parent:
+        raise ValueError('workspace lease directory must not be a link')
     token=uuid.uuid4().hex
-    try: immutable(lease_path(run),dict(schema='mai-code-lease-v1',token=token,owner=owner,time_ns=time.time_ns()))
+    try: immutable(path,dict(schema='mai-code-lease-v1',token=token,owner=owner,time_ns=time.time_ns()))
     except FileExistsError as e: raise ValueError('workspace lease exists; liveness is unknown, no automatic removal') from e
     return token
 

@@ -112,6 +112,9 @@ def prepare_packet(unit):
 def inventory(work):
     """Includes ignored files: an ignored write is still a workspace change."""
     result={}
+    entries=subprocess.check_output(['git','-C',str(work),'ls-files','--stage','-z'])
+    if any(entry.startswith(b'160000 ') for entry in entries.split(b'\x00')):
+        raise ValueError('gitlink/submodule content is not supported; use a worktree without submodules')
     raw=subprocess.check_output(['git','-C',str(work),'ls-files','-z','--cached','--others'])
     for rel in set(raw.decode('utf-8').split('\x00'))- {''}:
         p=confined(Path(work),rel)

@@ -15,6 +15,7 @@ def parse_test(output):
 
 def verify_unit(run,test_argv,negative_control_argv):
     token=acquire_lease(run,{'pid':os.getpid(),'stage':'verify'})
+    child_unknown=False;a=None;state=None
     try:
         state,packet,work,parent,expected=context(run);u=packet['unit']
         if 'verify' in state['completed']:parent=state['completed']['implement']['sha256']
@@ -22,10 +23,19 @@ def verify_unit(run,test_argv,negative_control_argv):
         if test_argv!=u['test_argv'] or negative_control_argv!=u['negative_control_argv']:raise ValueError('verification argv differs from prepared unit')
         if inventory(work)!=expected:raise ValueError('workspace changed before verification')
         a=new_attempt(run,'verify');results={};hashes={}
+        state['completed'].pop('verify',None)
+        state['status']='running';state['current']={'attempt_id':a.name,'stage':'verify'}
+        save_state(run,state)
+        record_event(run,{'type':'verification-started','attempt_id':a.name})
         env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1')
         for name,args in [('positive',test_argv),('negative',negative_control_argv)]:
             with (a/(name+'.stdout')).open('xb') as out,(a/(name+'.stderr')).open('xb') as err:
-                child=subprocess.run(args,cwd=work,stdin=subprocess.DEVNULL,stdout=out,stderr=err,env=env,shell=False)
+                child_unknown=True
+                try:child=subprocess.run(args,cwd=work,stdin=subprocess.DEVNULL,stdout=out,stderr=err,env=env,shell=False)
+                except (FileNotFoundError,PermissionError):
+                    child_unknown=False
+                    raise
+                child_unknown=False
             text=(a/(name+'.stdout')).read_text(encoding='utf-8',errors='replace')+'\n'+(a/(name+'.stderr')).read_text(encoding='utf-8',errors='replace')
             results[name]={'exit_code':child.returncode,'count':parse_test(text),'text':text}
             for suffix in ('.stdout','.stderr'):hashes[name+suffix]=digest(a/(name+suffix))
@@ -39,16 +49,25 @@ def verify_unit(run,test_argv,negative_control_argv):
         report=dict(passed=passed,discovered_tests=pos['count'],exit_code=pos['exit_code'],negative_control_rejected=bool(negative),workspace_unchanged=unchanged,unit_passed=passed and all(s in state['completed'] for s in STAGES),evidence=str(a))
         receipt=dict(stage='verify',status='passed' if passed else 'failed',parent_sha256=parent,outputs={},evidence_hashes=hashes,report=report,commands={'positive':test_argv,'negative':negative_control_argv})
         write_receipt(a,receipt)
-        if all(s in state['completed'] for s in STAGES):
-            if passed:state['completed']['verify']={'attempt_id':a.name,'sha256':digest(a/'receipt.json')}
-            state['status']='passed' if passed else 'failed';save_state(run,state)
+        if report['unit_passed']:state['completed']['verify']={'attempt_id':a.name,'sha256':digest(a/'receipt.json')}
+        state['current']=None
+        state['status']='passed' if report['unit_passed'] else ('awaiting-verification' if passed else 'failed')
+        save_state(run,state)
         record_event(run,{'type':'verification','attempt_id':a.name,'receipt_sha256':digest(a/'receipt.json'),'passed':passed})
         return report
-    finally:release_lease(run,token)
+    except BaseException as e:
+        if a is not None:
+            state['status']='interrupted' if child_unknown else 'failed'
+            save_state(run,state)
+            record_event(run,{'type':'verification-incomplete','attempt_id':a.name,'error_type':type(e).__name__,'child_liveness_unknown':child_unknown})
+        raise
+    finally:
+        if not child_unknown:release_lease(run,token)
 
 
 def check_existing(run):
     state,packet,work,parent,expected=context(run)
+    if state['current']:raise ValueError('latest verification or model attempt is incomplete')
     if inventory(work)!=expected:raise ValueError('workspace differs from recorded verification')
     events=[__import__('json').loads(line) for line in (run/'events.jsonl').read_text().splitlines()]
     refs=[r['event'] for r in events if r['event'].get('type')=='verification']

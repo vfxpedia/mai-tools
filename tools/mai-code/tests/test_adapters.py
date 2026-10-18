@@ -71,7 +71,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_exact_write_grants_are_explicit_and_confined(self):
         rules=self.a.exact_write_rules(self.path,['affine.py'],['analysis.json','plan.json','affine.py'])
-        target=(self.path/'affine.py').as_posix()
+        target=(self.path.resolve()/'affine.py').as_posix()
         if sys.platform=='win32':target='/'+target[0].lower()+target[2:]
         self.assertEqual(rules,['Edit(/'+target+')'])
         for rel in ('../escape','affine*.py','analysis.json'):

@@ -53,4 +53,12 @@ class StoreTests(unittest.TestCase):
         with (self.run/'events.jsonl').open('ab') as f: f.write(b'{')
         with self.assertRaises(ValueError): self.s.load_state(self.run)
 
+    def test_different_data_roots_cannot_lease_same_workspace(self):
+        other=self.s.create_run(prepare_packet(self.f.unit),self.f.root/'other-data')
+        script='import sys;sys.path.insert(0,sys.argv[1]);from mai_code.store import acquire_lease;from pathlib import Path;acquire_lease(Path(sys.argv[2]),{"pid":0})'
+        children=[subprocess.Popen([sys.executable,'-I','-c',script,str(Path(__file__).resolve().parents[1]),str(run)],stdout=subprocess.PIPE,stderr=subprocess.PIPE) for run in (self.run,other)]
+        codes=[]
+        for child in children:child.communicate();codes.append(child.returncode)
+        self.assertEqual(sorted(codes),[0,1])
+
 if __name__=='__main__': unittest.main()

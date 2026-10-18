@@ -24,7 +24,7 @@ Optional isolated installation, using an existing build backend (no network depe
 
 ```text
 python -m venv --system-site-packages <new-venv>
-<venv-python> -m pip install --no-build-isolation --no-deps .
+<venv-python> -m pip install --no-index --disable-pip-version-check --no-build-isolation --no-deps .
 <venv-mai-code> --help
 ```
 
@@ -52,6 +52,10 @@ mai-code verify <reported-run-path> --existing
 Exit codes: 0 requested operation succeeded, 1 deterministic verification failed, 2 invalid/refused/incomplete operation. A prepared or analysis-only unit is **not** a passed implementation. A standalone verifier can pass its tests without marking incomplete stages as unit-passed.
 
 For an ordinary stopped boundary use `mai-code run` or `mai-code resume`. A failed closed attempt can use `resume` only with its exact recorded native UUID, unchanged inputs/workspace and known process exit. No global `--last`, `--continue`, engine switch or automatic retry. A missing receipt or unknown lease requires human reconciliation; the tool never deletes a stale lease by guessing a PID is dead. Do not remove a lease while a child could still run. Preserve the original run and create a newly approved unit for changed inputs or acceptance criteria.
+
+Workspace leases live in `.mai-code-locks` beside the physical worktree directory, keyed by its normalized absolute path. Different `--data-root` directories therefore share one lease. Its parent must be writable; a linked lock directory is refused. Old-format leases in an evidence root still block execution and are not migrated or removed automatically. Stop all old-version workers before using a new version on the same worktree. A failed attempt from an older version without a pinned receipt hash requires manual reconciliation.
+
+Starting verification again invalidates the previous success before launching any test. An interrupted or failed launch cannot reuse that success; its previous receipt remains on disk. Unknown child liveness retains the workspace lease. Inspect and reconcile the incomplete attempt explicitly. Worktrees containing Git submodules/gitlinks are currently refused because their nested files are not covered by this version's inventory.
 
 If Claude's native permission layer refuses an implementation write, the owner can explicitly grant only a declared file for that invocation: `mai-code resume <run-path> --allow-write module.py`. Repeat the flag for individually approved outputs. No wildcard, traversal, input, analysis/plan output or undeclared path is accepted. This creates a native `Edit(exact-path)` rule, which Claude uses for Write too, not a global setting or bypass mode. On Windows the rule's drive is normalized as `/c/...`, per the official permission contract. Existing deny/ask rules can still refuse it. Never substitute a shell write for a native refusal.
 

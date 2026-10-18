@@ -162,21 +162,21 @@
     return c;
   }
 
-  /* Pure: 'active' when a rate above 0.01 MiB/s was seen in the window, 'idle' when rates were read and all were at or below it,
-   * 'unknown' when no rate was read at all (first reading, counter reset). Unknown is never called idle (review R11). Exported for tests. */
+  /* Pure: 'unknown' when either current rate is unread (first reading, a counter reset, one side missing): an earlier zero never
+   * covers a current unknown. Only when both current rates are read: 'active' when a rate above 0.01 MiB/s was seen in the window,
+   * else 'idle'. Only idle rows are ever folded (review R11). Exported for tests. */
   function activity(list, key, field, name, a, b) {
-    var seen = false, moving = false;
+    var ok = function (v) { return v !== null && v !== undefined && isFinite(v); };
+    var current = null, moving = false;
     list.forEach(function (s) {
       (s[key] || []).forEach(function (x) {
         if (x[field] !== name) return;
-        [x[a], x[b]].forEach(function (v) {
-          if (v === null || v === undefined || !isFinite(v)) return;
-          seen = true;
-          if (v > 0.01) moving = true;
-        });
+        current = x;
+        if ((ok(x[a]) && x[a] > 0.01) || (ok(x[b]) && x[b] > 0.01)) moving = true;
       });
     });
-    return moving ? 'active' : seen ? 'idle' : 'unknown';
+    if (!current || !ok(current[a]) || !ok(current[b])) return 'unknown';
+    return moving ? 'active' : 'idle';
   }
   state.activity = activity;
 
@@ -313,6 +313,8 @@
     if (state.slow) box.appendChild(storage(state.slow));
     if (state.slow) box.appendChild(usageBlock(state.slow.usage));
   }
+
+  state.draw = function () { draw(); };      // lets a browser check redraw from samples it set itself (review R11 DOM regression)
 
   function poll() {
     var since = state.samples.length ? state.samples[state.samples.length - 1].t : '';

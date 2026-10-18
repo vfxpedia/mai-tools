@@ -161,15 +161,19 @@ class NicKinds(unittest.TestCase):
 class PageActivity(unittest.TestCase):
     def test_unknown_rates_are_not_idle(self):
         js = os.path.join(ROOT, 'mai_watch', 'viewer-live.js').replace(os.sep, '/')
-        rows = {'first': [[None, None]], 'reset': [[0.0, 0.0], [None, None]], 'zero': [[0.0, 0.0], [0.0, 0.0]], 'moving': [[0.0, 0.0], [0.5, 0.0]]}
+        rows = {'first': [[None, None]], 'reset': [[0.0, 0.0], [None, None]], 'one_missing': [[0.0, None]], 'other_missing': [[None, 0.0]],
+                'zero_then_missing': [[0.0, 0.0], [0.0, None]], 'first_then_zero': [[None, None], [0.0, 0.0]],
+                'zero': [[0.0, 0.0], [0.0, 0.0]], 'moving': [[0.0, 0.0], [0.5, 0.0]], 'moved_then_unknown': [[0.5, 0.0], [None, None]]}
         script = ("const m=require(%r); const rows=%s; const out={};"
                   "for (const k in rows) { const list=rows[k].map(r=>({disks:[{disk:'D',read_mib_s:r[0],write_mib_s:r[1]}]}));"
                   " out[k]=m.activity(list,'disks','disk','D','read_mib_s','write_mib_s'); }"
                   "console.log(JSON.stringify(out))") % (js, json.dumps(rows))
         p = subprocess.run(['node', '-e', script], capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(p.returncode, 0, p.stderr)
-        # review R11: a first reading alone is unknown, not idle; only rates that were read and stayed at zero are idle
-        self.assertEqual(json.loads(p.stdout), {'first': 'unknown', 'reset': 'idle', 'zero': 'idle', 'moving': 'active'})
+        # review R11 (recheck): any current unknown is unknown, whatever came before; the earlier expectation 'reset': 'idle' was wrong
+        self.assertEqual(json.loads(p.stdout), {'first': 'unknown', 'reset': 'unknown', 'one_missing': 'unknown', 'other_missing': 'unknown',
+                                                'zero_then_missing': 'unknown', 'first_then_zero': 'idle', 'zero': 'idle', 'moving': 'active',
+                                                'moved_then_unknown': 'unknown'})
 
 
 class StatusEndpoint(unittest.TestCase):

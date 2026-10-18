@@ -164,9 +164,34 @@ def write_demo(folder, now=None):
     return cfg
 
 
+def status_problems(doc):
+    """Why a status document cannot be trusted, or [] (review R16). Counts are recomputed from the checked judgments, never taken."""
+    if not isinstance(doc, dict):
+        return ['not a JSON object']
+    p = []
+    if doc.get('schema') != 'mai-watch-status-v1':
+        p.append('schema is not mai-watch-status-v1')
+    found = doc.get('judgments')
+    if not isinstance(found, list):
+        p.append('judgments is not a list')
+    else:
+        for i, f in enumerate(found):
+            if not isinstance(f, dict) or f.get('level') not in ('bad', 'warn', 'info') or not isinstance(f.get('text'), str):
+                p.append('judgment %d is malformed' % i)
+    if not isinstance(doc.get('fresh'), bool):
+        p.append('freshness is missing')
+    counts = doc.get('counts')
+    if isinstance(found, list) and not p:
+        mine = {k: sum(1 for f in found if f['level'] == k) for k in ('bad', 'warn', 'info')}
+        if not isinstance(counts, dict) or any(counts.get(k) != v for k, v in mine.items()):
+            p.append('counts do not match the judgments')
+    return p
+
+
 def run_status(a):
     """For people and AI agents: the judgment list of a running mai-watch, one line each with its level. Exit 0 when nothing is at
-    warn or bad, 1 when something is, 2 when mai-watch cannot be reached (that is not "all clear")."""
+    warn or bad, 1 when something is, 2 when no valid and fresh status could be had (unreachable, a malformed document, or samples
+    that stopped). Exit 2 is never "all clear"."""
     import urllib.request
     try:
         with urllib.request.urlopen(a.url, timeout=10) as r:
@@ -174,20 +199,30 @@ def run_status(a):
     except Exception as e:
         print('cannot read %s: %s (is mai-watch running?)' % (a.url, e), file=sys.stderr)
         return 2
-    if doc.get('schema') != 'mai-watch-status-v1':
-        print('%s is not a mai-watch status document' % a.url, file=sys.stderr)
+    try:
+        problems = status_problems(doc)
+        if problems:
+            print('%s is not a usable mai-watch status document: %s' % (a.url, '; '.join(problems)), file=sys.stderr)
+            return 2
+        if a.json:
+            print(json.dumps(doc, indent=2, ensure_ascii=False))
+        found = doc['judgments']
+        bad = sum(1 for f in found if f['level'] == 'bad')
+        warn = sum(1 for f in found if f['level'] == 'warn')
+        if not a.json:
+            print('mai-watch status at %s (last sample %s): %d act now, %d look soon, %d notes' % (
+                doc.get('generated_at'), doc.get('last_sample_at'), bad, warn, len(found) - bad - warn))
+            for f in found:
+                print('%-5s %s' % (f['level'], f['text']))
+            if not found:
+                print('nothing needs attention')
+        if not doc['fresh']:
+            print('samples are not fresh: %s; this is not a current reading' % (doc.get('stale_reason') or 'unknown'), file=sys.stderr)
+            return 2
+        return 1 if (bad or warn) else 0
+    except Exception as e:                         # anything unexpected in the document is "no valid status", not a traceback
+        print('%s could not be read as a status document: %s' % (a.url, type(e).__name__), file=sys.stderr)
         return 2
-    if a.json:
-        print(json.dumps(doc, indent=2, ensure_ascii=False))
-    else:
-        found = doc.get('judgments') or []
-        print('mai-watch status at %s (last sample %s): %d act now, %d look soon, %d notes' % (
-            doc.get('generated_at'), doc.get('last_sample_at'), doc['counts'].get('bad', 0), doc['counts'].get('warn', 0), doc['counts'].get('info', 0)))
-        for f in found:
-            print('%-5s %s' % (f['level'], f['text']))
-        if not found:
-            print('nothing needs attention')
-    return 1 if (doc['counts'].get('bad', 0) or doc['counts'].get('warn', 0)) else 0
 
 
 def run_demo(a):
@@ -211,6 +246,19 @@ def run_live(a):
         except (FileNotFoundError, KeyError, ValueError) as e:
             print('config problem in %s: %s' % (a.config, e), file=sys.stderr)
             return 2
+    cmd = a.notify_cmd or (cfg.notify_cmd if cfg else None)
+    notifier = None
+    if cmd:
+        from . import notify
+        try:                                       # review R17: a bad notify setting stops here, before any thread or server starts
+            cmd = notify.split_cmd(cmd) if isinstance(cmd, str) else [str(x) for x in cmd]
+            if not cmd:
+                raise ValueError('notify command is empty')
+            notifier = notify.Notifier(level=a.notify_level or (cfg.notify_level if cfg else 'warn'),
+                                       hold_s=a.notify_hold if a.notify_hold is not None else (cfg.notify_hold_s if cfg else 60))
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 2
     try:
         paths = [os.path.expanduser(p) for p in a.path] + (cfg.watch_paths if cfg else [])
         sampler = live.LiveSampler(nvidia_cmd=[a.nvidia_smi] if cfg is None else cfg.nvidia_smi, interval_s=a.interval, history_s=a.history,
@@ -225,17 +273,8 @@ def run_live(a):
         return 2
     stop = threading.Event()
     threading.Thread(target=sampler.run, args=(stop,), daemon=True).start()
-    cmd = a.notify_cmd or (cfg.notify_cmd if cfg else None)
-    if cmd:
-        from . import notify
-        try:
-            cmd = notify.split_cmd(cmd) if isinstance(cmd, str) else [str(x) for x in cmd]
-            notifier = notify.Notifier(level=a.notify_level or (cfg.notify_level if cfg else 'warn'),
-                                       hold_s=a.notify_hold if a.notify_hold is not None else (cfg.notify_hold_s if cfg else 60))
-        except ValueError as e:
-            print(str(e), file=sys.stderr)
-            return 2
-        nfile = a.notify_file or (cfg.notify_file if cfg else None)
+    if notifier is not None:
+        nfile = os.path.abspath(os.path.expanduser(a.notify_file)) if a.notify_file else (cfg.notify_file if cfg else None)
         threading.Thread(target=notify.loop, args=(sampler, notifier, cmd, stop), kwargs={'notify_file': nfile,
                          'log': lambda m: print(m, file=sys.stderr)}, daemon=True).start()
         print('notifications: %s (level %s and above)' % (' '.join(cmd), notifier.level))

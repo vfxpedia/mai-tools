@@ -1,4 +1,6 @@
-"""Known-answer tests for notifications and the status command (DESIGN.md section 9g). Run: python -I tests/test_notify.py"""
+"""Known-answer tests for notifications and the status command (DESIGN.md section 9g). Run: python -I tests/test_notify.py
+Each review finding R13 to R18 has its reproduction here as a regression test."""
+import http.server
 import json
 import os
 import shutil
@@ -10,55 +12,109 @@ import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, ROOT)
-from mai_watch import live, notify, server  # noqa: E402
+from mai_watch import collector, live, notify, server  # noqa: E402
 
 W = {'level': 'warn', 'kind': 'disk_space', 'subject': 'D:', 'text': 'D: has 37 GiB free'}
 B = {'level': 'bad', 'kind': 'disk_space', 'subject': 'D:', 'text': 'D: has 7 GiB free'}
 L = {'level': 'warn', 'kind': 'slow_link', 'subject': 'LAN', 'text': 'LAN (wired) is linked at 100 Mbps'}
 I = {'level': 'info', 'kind': 'source_problem', 'subject': 'sampler', 'text': 'psutil is not installed'}
+HOT = {'level': 'warn', 'kind': 'gpu_hot', 'subject': 'GPU 0', 'text': 'GPU 0 is at 90 C'}
 
 
-def subjects(r):
-    return [[f['subject'] for f in part] for part in r]
+def ev(events):
+    return [(e['event'], e['finding']['subject']) for e in events]
+
+
+def step(n, findings, t, blind=()):
+    """update and, as a working sender would, commit what it proposed."""
+    e = n.update(findings, t, blind)
+    n.commit(e)
+    return ev(e)
 
 
 class NotifierRules(unittest.TestCase):
     def test_hold_then_once_then_worse_then_cleared(self):
         n = notify.Notifier(hold_s=60)
-        self.assertEqual(subjects(n.update([W], 0)), [[], [], []])          # not yet: must last 60 s
-        self.assertEqual(subjects(n.update([W], 61)), [['D:'], [], []])     # announced
-        self.assertEqual(subjects(n.update([W], 200)), [[], [], []])        # staying is not news
-        self.assertEqual(subjects(n.update([B], 210)), [[], ['D:'], []])    # worse
-        self.assertEqual(subjects(n.update([], 220)), [[], [], []])         # gone, but not for 60 s yet
-        self.assertEqual(subjects(n.update([], 281)), [[], [], ['D:']])     # cleared
-        self.assertEqual(subjects(n.update([], 400)), [[], [], []])
+        self.assertEqual(step(n, [W], 0), [])
+        self.assertEqual(step(n, [W], 30), [])
+        self.assertEqual(step(n, [W], 61), [('new', 'D:')])
+        self.assertEqual(step(n, [W], 90), [])                       # staying is not news
+        self.assertEqual(step(n, [B], 120), [('worse', 'D:')])
+        self.assertEqual(step(n, [], 150), [])                       # gone, but not for 60 s yet
+        self.assertEqual(step(n, [], 180), [])
+        self.assertEqual(step(n, [], 210), [('cleared', 'D:')])
+        self.assertEqual(step(n, [], 240), [])
 
     def test_a_blip_is_never_announced_and_a_brief_gap_is_not_a_clear(self):
         n = notify.Notifier(hold_s=60)
-        n.update([W], 0)
-        self.assertEqual(subjects(n.update([], 30)), [[], [], []])          # gone before announcement: forgotten
-        self.assertEqual(subjects(n.update([W], 40)), [[], [], []])         # back: the hold starts again
-        self.assertEqual(subjects(n.update([W], 99)), [[], [], []])
-        self.assertEqual(subjects(n.update([W], 101)), [['D:'], [], []])
-        self.assertEqual(subjects(n.update([], 110)), [[], [], []])
-        self.assertEqual(subjects(n.update([W], 120)), [[], [], []])        # back within the hold: no clear, no repeat
-        self.assertEqual(subjects(n.update([], 130)), [[], [], []])
-        self.assertEqual(subjects(n.update([], 191)), [[], [], ['D:']])
+        step(n, [W], 0)
+        self.assertEqual(step(n, [], 30), [])                        # gone before announcement: forgotten
+        self.assertEqual(step(n, [W], 60), [])                       # back: the hold starts again
+        self.assertEqual(step(n, [W], 90), [])
+        self.assertEqual(step(n, [W], 120), [('new', 'D:')])
+        self.assertEqual(step(n, [], 150), [])
+        self.assertEqual(step(n, [W], 180), [])                      # back within the hold: no clear, no repeat
+        self.assertEqual(step(n, [], 210), [])
+        self.assertEqual(step(n, [], 240), [])
+        self.assertEqual(step(n, [], 270), [('cleared', 'D:')])
 
     def test_easing_is_quiet_and_level_filter(self):
         n = notify.Notifier(hold_s=0)
-        self.assertEqual(subjects(n.update([B, I], 0)), [['D:'], [], []])   # info is below the default level
-        self.assertEqual(subjects(n.update([W], 1)), [[], [], []])          # bad to warn: no message
-        self.assertEqual(subjects(n.update([B], 2)), [[], ['D:'], []])      # and warn to bad again is worse again
+        self.assertEqual(step(n, [B, I], 0), [('new', 'D:')])        # info is below the default level
+        self.assertEqual(step(n, [W], 1), [])                        # bad to warn: no message
+        self.assertEqual(step(n, [B], 2), [('worse', 'D:')])
         m = notify.Notifier(level='info', hold_s=0)
-        self.assertEqual(subjects(m.update([I], 0)), [['sampler'], [], []])
+        self.assertEqual(step(m, [I], 0), [('new', 'sampler')])
         with self.assertRaises(ValueError):
             notify.Notifier(level='loud')
 
+    def test_r13_nothing_is_delivered_until_commit(self):
+        n = notify.Notifier(hold_s=0)
+        self.assertEqual(ev(n.update([W], 0)), [('new', 'D:')])      # the send failed: no commit
+        self.assertEqual(ev(n.update([W], 30)), [('new', 'D:')])     # proposed again
+        both = n.update([W, L], 60)                                  # a newer finding does not hide the undelivered one
+        self.assertEqual(sorted(ev(both)), [('new', 'D:'), ('new', 'LAN')])
+        n.commit(both)
+        self.assertEqual(ev(n.update([W, L], 90)), [])
+        self.assertEqual(ev(n.update([], 120)), [('cleared', 'D:'), ('cleared', 'LAN')])   # hold 0
+        self.assertEqual(ev(n.update([], 150)), [('cleared', 'D:'), ('cleared', 'LAN')])   # clear not sent: still pending
+
+    def test_r14_a_finding_that_cannot_be_seen_is_not_cleared(self):
+        n = notify.Notifier(hold_s=60)
+        for t in (0, 30, 60):
+            step(n, [HOT], t)
+        self.assertIn('gpu_hot|GPU 0', n.announced)
+        for t in (90, 120, 150, 180, 400):                           # the GPU source broke: nothing about temperature is known
+            self.assertEqual(step(n, [], t, blind={'gpu'}), [])
+        self.assertEqual(step(n, [], 430), [])                       # readable again and absent: the clear timer starts now
+        self.assertEqual(step(n, [], 460), [])
+        self.assertEqual(step(n, [], 490), [('cleared', 'GPU 0')])
+        p = notify.Notifier(hold_s=0)
+        step(p, [W], 0)
+        self.assertEqual(step(p, [], 10, blind={'path:D:'}), [])     # one folder not checked: its finding waits
+        self.assertEqual(step(p, [], 20, blind={'path:E:'}), [('cleared', 'D:')])
+
+    def test_r15_unobserved_time_is_not_hold_time(self):
+        n = notify.Notifier(hold_s=60, max_gap_s=90)
+        self.assertEqual(step(n, [W], 0), [])
+        self.assertEqual(step(n, [W], 3600), [])                     # an hour without checks: the hold starts again
+        self.assertEqual(step(n, [W], 3630), [])
+        self.assertEqual(step(n, [W], 3660), [('new', 'D:')])
+        self.assertEqual(step(n, [], 3690), [])
+        self.assertEqual(step(n, [], 7290), [])                      # a gap restarts the clear timer too
+        self.assertEqual(step(n, [], 7350), [('cleared', 'D:')])
+
+    def test_r17_bad_hold_values_are_refused(self):
+        for v in (-1, float('nan'), float('inf'), True, '60'):
+            with self.assertRaises(ValueError, msg=repr(v)):
+                notify.Notifier(hold_s=v)
+        self.assertEqual(notify.Notifier(hold_s=0).hold_s, 0.0)      # 0 is a deliberate "announce at once"
+
     def test_one_message_per_check_most_severe_first(self):
-        text = notify.message([L, B], [], [dict(W, text='E: has 40 GiB free')], host='box')
-        self.assertEqual(text, 'mai-watch box: 2 new, 1 cleared\nACT NOW  D: has 7 GiB free\nLOOK SOON  LAN (wired) is linked at 100 Mbps\n'
-                               'cleared  E: has 40 GiB free\n')
+        events = [{'event': 'new', 'key': 'a', 'finding': L}, {'event': 'new', 'key': 'b', 'finding': B},
+                  {'event': 'cleared', 'key': 'c', 'finding': dict(W, text='E: has 40 GiB free')}]
+        self.assertEqual(notify.message(events, host='box'), 'mai-watch box: 2 new, 1 cleared\nACT NOW  D: has 7 GiB free\n'
+                                                              'LOOK SOON  LAN (wired) is linked at 100 Mbps\ncleared  E: has 40 GiB free\n')
 
 
 class Sending(unittest.TestCase):
@@ -74,10 +130,9 @@ class Sending(unittest.TestCase):
         self.addCleanup(os.environ.update, saved)
         ok, detail = notify.send(cmd, 'hello \uc548\ub155\n', box)
         self.assertEqual((ok, detail), (True, 'exit 0: sent ok'))
-        with open(got, encoding='utf-8') as f:
-            self.assertEqual(f.read(), 'hello \uc548\ub155\n')
-        with open(box, encoding='utf-8') as f:
-            self.assertEqual(f.read(), 'hello \uc548\ub155\n')
+        for p in (got, box):
+            with open(p, encoding='utf-8') as f:
+                self.assertEqual(f.read(), 'hello \uc548\ub155\n')
 
     def test_failures_are_reported_not_hidden(self):
         ok, detail = notify.send([sys.executable, '-c', 'import sys; print("boom"); sys.exit(3)'], 'x')
@@ -85,50 +140,113 @@ class Sending(unittest.TestCase):
         ok, detail = notify.send([os.path.join(self.d, 'no-such-program')], 'x')
         self.assertFalse(ok)
 
-    def test_split_cmd_keeps_backslashes_and_groups_quotes(self):
+    def test_split_cmd(self):
         self.assertEqual(notify.split_cmd('powershell -File "C:\\ssd logs\\tg-send.ps1"'), ['powershell', '-File', 'C:\\ssd logs\\tg-send.ps1'])
         self.assertEqual(notify.split_cmd("python 'a b.py' x"), ['python', 'a b.py', 'x'])
+        self.assertEqual(notify.split_cmd('python sender.py "" tail'), ['python', 'sender.py', '', 'tail'])
+        self.assertEqual(notify.split_cmd('echo a;b & c | d > e $(f)'), ['echo', 'a;b', '&', 'c', '|', 'd', '>', 'e', '$(f)'])
         with self.assertRaises(ValueError):
             notify.split_cmd('python "unclosed')
 
 
 class FakeSampler:
-    def __init__(self, found):
-        self.found, self.notify_state = found, None
+    def __init__(self, found, fresh=True, blind=()):
+        self.found, self.fresh, self.blind, self.notify_state = found, fresh, list(blind), None
 
     def status(self):
-        return {'judgments': self.found}
+        return {'judgments': self.found, 'fresh': self.fresh, 'stale_reason': None if self.fresh else 'stopped', 'blind': self.blind}
 
     def now_iso(self):
         return '2026-10-18T00:00:00Z'
 
 
+class Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
 class Loop(unittest.TestCase):
-    def test_loop_sends_news_and_records_the_result(self):
-        sent, stop = [], threading.Event()
-        s = FakeSampler([W])
+    def run_loop(self, sampler, sender, checks, every_s=30, c=None):
+        """Runs loop for a fixed number of checks with a fake clock advancing every_s per check."""
+        c, stop, n = c or Clock(), threading.Event(), [0]
+
+        class Stop:
+            def is_set(self_):
+                return n[0] >= checks
+
+            def wait(self_, s):
+                n[0] += 1
+                c.t += s
+        notify.loop(sampler, notify.Notifier(hold_s=0), ['x'], Stop(), every_s=every_s, clock=c, sender=sender)
+        return sampler.notify_state
+
+    def test_r13_failed_send_is_retried_with_backoff_and_counted_honestly(self):
+        calls, at, c = [], [], Clock()
 
         def sender(cmd, text, nfile):
-            sent.append(text)
-            stop.set()
-            return False, 'exit 1: no network'
-        t = threading.Thread(target=notify.loop, args=(s, notify.Notifier(hold_s=0), ['x'], stop), kwargs={'every_s': 0.05, 'sender': sender})
-        t.start()
-        t.join(5)
-        self.assertFalse(t.is_alive())
-        self.assertEqual(len(sent), 1)
-        self.assertIn('LOOK SOON  D: has 37 GiB free', sent[0])
-        self.assertEqual(s.notify_state['ok'], False)                     # a failing sender is visible in status.json
-        self.assertEqual(s.notify_state['detail'], 'exit 1: no network')
+            calls.append(text)
+            at.append(c.t)
+            return (len(calls) >= 3), 'exit %d' % (0 if len(calls) >= 3 else 1)
+        st = self.run_loop(FakeSampler([W]), sender, checks=8, c=c)
+        # tried at 0 s (fails, wait 60), 60 s (fails, wait 120), 180 s (succeeds); the checks in between do not send
+        self.assertEqual(at, [0.0, 60.0, 180.0])
+        self.assertTrue(all('D: has 37 GiB free' in t for t in calls))
+        self.assertEqual((st['ok'], st['delivered'], st['pending'], st['failures_in_row']), (True, 1, 0, 0))
+
+    def test_r13_a_later_success_carries_the_earlier_failure(self):
+        sampler, calls = FakeSampler([W]), []
+
+        def sender(cmd, text, nfile):
+            calls.append(text)
+            if len(calls) == 1:
+                sampler.found = [W, L]                     # a new finding appears after the first failure
+                return False, 'exit 1'
+            return True, 'exit 0'
+        st = self.run_loop(sampler, sender, checks=5)
+        self.assertIn('D: has 37 GiB free', calls[1])
+        self.assertIn('LAN (wired)', calls[1])
+        self.assertEqual(st['delivered'], 2)
+
+    def test_r15_stale_samples_are_not_judged(self):
+        calls = []
+        st = self.run_loop(FakeSampler([W], fresh=False), lambda c, t, f: calls.append(t) or (True, 'ok'), checks=4)
+        self.assertEqual(calls, [])
+        self.assertIn('stale', st['detail'])
+
+
+class StatusDocServer:
+    def __init__(self, body):
+        data = body if isinstance(body, bytes) else json.dumps(body).encode()
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+        self.srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), H)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.url = 'http://127.0.0.1:%d/status.json' % self.srv.server_address[1]
+
+    def close(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+
+def run_status(url, *extra):
+    # the OS error text can be in the system language (Korean on the reference machine); read it without assuming a code page
+    return subprocess.run([sys.executable, '-m', 'mai_watch', 'status', '--url', url] + list(extra), cwd=ROOT,
+                          capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
 
 
 class StatusCommand(unittest.TestCase):
-    def run_status(self, url, *extra):
-        # the OS error text can be in the system language (Korean on the reference machine); read it without assuming a code page
-        return subprocess.run([sys.executable, '-m', 'mai_watch', 'status', '--url', url] + list(extra), cwd=ROOT,
-                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
-
-    def test_exit_codes_and_lines(self):
+    def test_exit_codes_and_lines_from_a_real_sampler(self):
         s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: '', paths=['.'], usage_on=False, disk_reader=lambda: {}, nic_reader=lambda: {})
         s.sample_once()
         srv = server.make_server(None, 0, live=s)
@@ -136,22 +254,86 @@ class StatusCommand(unittest.TestCase):
         self.addCleanup(srv.server_close)
         self.addCleanup(srv.shutdown)
         url = 'http://127.0.0.1:%d/status.json' % srv.server_address[1]
-        p = self.run_status(url)
-        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)            # only info findings (no psutil, no GPU): nothing at warn
+        p = run_status(url)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn('0 act now, 0 look soon', p.stdout)
         self.assertIn('info  psutil is not installed', p.stdout)
-        doc = json.loads(self.run_status(url, '--json').stdout)
-        self.assertEqual(doc['schema'], 'mai-watch-status-v1')
-        s.check_paths()                                                    # the folder's free space must be read before it can be judged
-        s.thresholds = {'free_gib_warn': 10 ** 9}                          # every folder now counts as low on space
-        p = self.run_status(url)
+        doc = json.loads(run_status(url, '--json').stdout)
+        self.assertEqual((doc['schema'], doc['fresh']), ('mai-watch-status-v1', True))
+        self.assertIn('gpu', doc['blind'])                                 # no GPU reading: the GPU source is blind
+        s.check_paths()
+        s.thresholds = {'free_gib_warn': 10 ** 9}
+        p = run_status(url)
         self.assertEqual(p.returncode, 1)
         self.assertIn('warn  ', p.stdout)
 
+    def test_r15_samples_that_stopped_are_not_a_current_reading(self):
+        c = [1800000000.0]
+        s = live.LiveSampler(psutil_module=False, gpu_reader=lambda: '', paths=['.'], usage_on=False, disk_reader=lambda: {},
+                             nic_reader=lambda: {}, clock=lambda: c[0])
+        s.sample_once()
+        c[0] += 3450                                                       # sampling stopped almost an hour ago
+        doc = s.status()
+        self.assertEqual((doc['fresh'], doc['sample_age_s']), (False, 3450.0))
+        srv = server.make_server(None, 0, live=s)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close)
+        self.addCleanup(srv.shutdown)
+        p = run_status('http://127.0.0.1:%d/status.json' % srv.server_address[1])
+        self.assertEqual(p.returncode, 2)
+        self.assertIn('not fresh', p.stderr)
+
+    def test_r16_malformed_or_inconsistent_documents_exit_2(self):
+        good = {'schema': 'mai-watch-status-v1', 'fresh': True, 'counts': {'bad': 0, 'warn': 1, 'info': 0}, 'judgments': [W]}
+        cases = {
+            'no judgments': {'schema': 'mai-watch-status-v1', 'counts': {}, 'fresh': True},
+            'counts disagree': dict(good, counts={'bad': 0, 'warn': 0, 'info': 0}),
+            'a list': [],
+            'no counts': {'schema': 'mai-watch-status-v1', 'fresh': True, 'judgments': [W]},
+            'no freshness': {k: v for k, v in good.items() if k != 'fresh'},
+            'bad level': dict(good, judgments=[dict(W, level='loud')], counts={'bad': 0, 'warn': 0, 'info': 0}),
+            'not json': b'<html>',
+        }
+        why = {'no judgments': 'judgments is not a list', 'counts disagree': 'counts do not match', 'a list': 'not a JSON object',
+               'no counts': 'counts do not match', 'no freshness': 'freshness is missing', 'bad level': 'judgment 0 is malformed',
+               'not json': 'is mai-watch running'}
+        for name, body in cases.items():
+            d = StatusDocServer(body)
+            try:
+                p = run_status(d.url)
+            finally:
+                d.close()
+            self.assertEqual(p.returncode, 2, '%s: %s %s' % (name, p.stdout, p.stderr))
+            self.assertNotIn('Traceback', p.stderr, name)
+            self.assertIn(why[name], p.stderr, name)                       # the reason is named, not a generic failure
+        d = StatusDocServer(good)
+        try:
+            self.assertEqual(run_status(d.url).returncode, 1)
+        finally:
+            d.close()
+
     def test_unreachable_is_not_all_clear(self):
-        p = self.run_status('http://127.0.0.1:9/status.json')
+        p = run_status('http://127.0.0.1:9/status.json')
         self.assertEqual(p.returncode, 2)
         self.assertIn('is mai-watch running', p.stderr)
+
+
+class Settings(unittest.TestCase):
+    def test_r18_notify_file_in_a_config_is_relative_to_the_config(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        cfg = os.path.join(d, 'watch.toml')
+        with open(cfg, 'w', encoding='utf-8') as f:
+            f.write('status_dir = "s"\nout_dir = "o"\nnotify_file = "outbox.txt"\n')
+        c = collector.load_config(cfg)
+        self.assertEqual(os.path.normcase(c.notify_file), os.path.normcase(os.path.join(d, 'outbox.txt')))
+
+    def test_r17_bad_settings_stop_before_anything_starts(self):
+        p = subprocess.run([sys.executable, '-m', 'mai_watch', '--no-browser', '--port', '0', '--notify-cmd', 'x', '--notify-hold', '-1'],
+                           cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
+        self.assertEqual(p.returncode, 2)
+        self.assertIn('notify hold', p.stderr)
+        self.assertNotIn('mai-watch live:', p.stdout)                      # the server never started
 
 
 if __name__ == '__main__':

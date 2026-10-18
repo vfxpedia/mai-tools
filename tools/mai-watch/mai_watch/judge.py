@@ -154,6 +154,26 @@ def sources(last):
 ORDER = {'bad': 0, 'warn': 1, 'info': 2}
 
 
+def blind(samples, slow):
+    """Sources that cannot be read right now, so their findings can be neither confirmed nor declared gone (review R14). Names match
+    notify.SOURCE; a single folder is 'path:<label or path>'."""
+    out = set()
+    last = samples[-1] if samples else None
+    if not last or last.get('gpus') is None:
+        out.add('gpu')
+    if not last or last.get('nics') is None:
+        out.add('network')
+    if not last or last.get('ram_pct') is None:
+        out.add('host')
+    u = (slow or {}).get('usage') or {}
+    if not u.get('available') or u.get('limits') is None:
+        out.add('usage')
+    for p in (slow or {}).get('paths') or []:
+        if p.get('state') not in ('ok', 'unreachable', 'no answer'):
+            out.add('path:%s' % (p.get('label') or p.get('path')))
+    return sorted(out)
+
+
 def judge(samples, slow, thresholds=None, interval_s=1.0):
     t = dict(DEFAULTS, **(thresholds or {}))
     last = samples[-1] if samples else None

@@ -1,4 +1,4 @@
-Status: draft (M2, live view, wider resources). 142 tests pass on Windows (72 + 12 + 25 + 16 + 10 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
+Status: draft (M2, live view, wider resources). 152 tests pass on Windows (72 + 12 + 25 + 16 + 20 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
@@ -42,11 +42,11 @@ Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one 
 ## For AI agents and scripts
 
 ```
-mai-watch status          # what needs attention now, one line each; exit 0 nothing at warn, 1 something is, 2 mai-watch not reachable
+mai-watch status          # what needs attention now, one line each; exit 0 nothing at warn, 1 something is, 2 no valid current status
 mai-watch status --json   # the whole judgment list with the numbers behind each line
 ```
 
-An agent that checks a long run every so often can ask this instead of calling nvidia-smi, df and the rest itself, and gets the same judgment the page shows. Exit 2 means mai-watch is not running, which is not the same as all clear.
+An agent that checks a long run every so often can ask this instead of calling nvidia-smi, df and the rest itself, and gets the same judgment the page shows. Exit 2 means there is no valid current status: mai-watch is not reachable, its document is malformed, or its samples stopped. It is never all clear.
 
 ## Notifications
 
@@ -54,7 +54,7 @@ An agent that checks a long run every so often can ask this instead of calling n
 mai-watch --notify-cmd "python send.py" [--notify-file outbox.txt] [--notify-level warn] [--notify-hold 60]
 ```
 
-mai-watch never holds a messaging token. It hands each message to your command: the text arrives on standard input, and is also written to `--notify-file` first when you give one. A finding is announced once it has lasted `--notify-hold` seconds (60 by default, so a one-sample blip is not news), again if it gets worse, and as cleared once it has been gone that long. Changes from one check go out as one message; nothing repeats while a finding just stays. The result of the last send is in `/status.json` (`notify`), so a sender that keeps failing is visible. The same settings go in the configuration as `notify_cmd`, `notify_file`, `notify_level`, `notify_hold_s`.
+mai-watch never holds a messaging token. It hands each message to your command: the text arrives on standard input as UTF-8, and is also written to `--notify-file` first when you give one. A finding is announced once it has been seen for `--notify-hold` seconds (60 by default, so a one-sample blip is not news), again if it gets worse, and as cleared once it has been seen gone that long. A source that cannot be read (for example nvidia-smi failing) is not taken as good news: its findings are not cleared until it can be read again. A failed send is kept and tried again with a growing wait, together with anything newer; only a successful send counts as delivered. Changes from one check go out as one message; nothing repeats while a finding just stays. `/status.json` (`notify`) shows the last attempt, what was delivered and what is waiting. The same settings go in the configuration as `notify_cmd`, `notify_file` (relative to the configuration file), `notify_level`, `notify_hold_s`.
 
 Measured on the reference machine with its existing Telegram sender (`--notify-file` its outbox, `--notify-cmd` its PowerShell script): one message with the four current findings, sender result `exit 0: sent ok=True`.
 

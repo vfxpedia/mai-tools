@@ -65,6 +65,8 @@ def load_config(path):
     kw = {k: v for k, v in raw.items() if k not in ('status_dir', 'out_dir')}
     if 'watch_paths' in kw:
         kw['watch_paths'] = [resolve(os.path.expanduser(p)) for p in kw['watch_paths']]
+    if kw.get('notify_file'):
+        kw['notify_file'] = resolve(os.path.expanduser(kw['notify_file']))      # review R18: relative to this file, like the other paths
     return Config(resolve(raw['status_dir']), resolve(raw['out_dir']), **kw)
 
 

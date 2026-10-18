@@ -245,8 +245,16 @@ class LiveSampler:
         found = judge.judge(items, slow, self.thresholds, self.interval_s)
         counts = {k: sum(1 for f in found if f['level'] == k) for k in ('bad', 'warn', 'info')}
         last = items[-1]['t'] if items else None
-        return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'counts': counts, 'judgments': found,
-                'notify': self.notify_state}
+        # review R15: a served document is not proof of sampling; it says how old the last sample is and whether that is fresh
+        age = None
+        if last:
+            age = round(self.clock() - datetime.datetime.fromisoformat(last.replace('Z', '+00:00')).timestamp(), 1)
+        limit = max(3 * self.interval_s, 10)
+        fresh = age is not None and age <= limit
+        reason = None if fresh else ('no sample yet' if age is None else 'last sample %.0f s ago, more than %.0f s' % (age, limit))
+        return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'sample_age_s': age,
+                'max_sample_age_s': limit, 'fresh': fresh, 'stale_reason': reason, 'counts': counts, 'judgments': found,
+                'blind': judge.blind(items, slow), 'notify': self.notify_state}
 
     def payload(self, since=None):
         with self.lock:

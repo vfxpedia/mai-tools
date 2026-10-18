@@ -1,0 +1,39 @@
+{
+  "schema": "mai-approval-v1",
+  "scope": "lab",
+  "granted_at": "2026-10-18T02:00:00Z",
+  "valid_until": "2026-10-25T02:00:00Z",
+  "granted_by": {
+    "os_user": "owner",
+    "host": "example-host"
+  },
+  "method": "owner-run mai-approve",
+  "eula": {
+    "accepted": false,
+    "license": "x",
+    "subject": "x",
+    "consent_source": "x"
+  },
+  "execution_mode": "unattended",
+  "limits": {
+    "allowed_paths": [
+      "C:/lab/runs"
+    ],
+    "devices": [
+      "GPU-0"
+    ],
+    "max_runs_per_unit": 1,
+    "canary_retries": 1,
+    "count_per": "experiment_unit_id"
+  },
+  "exclusions": [
+    "paid_or_external_resource",
+    "data_deletion",
+    "kill_foreign_process",
+    "system_or_security_setting",
+    "external_send",
+    "out_of_scope_experiment"
+  ],
+  "note": "week of 10/18 nightly runs",
+  "sha256": "a5d69b7e85ed857563926c058e16b0cd1e8bf334f55cd5ce5678cc8090b5c57e"
+}

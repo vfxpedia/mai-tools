@@ -1,0 +1,137 @@
+{
+  "schema": "mai-tabs-rules-v1",
+  "default": "uncategorized",
+  "categories": [
+    {
+      "name": "code",
+      "match": [
+        {
+          "host": "github.com"
+        },
+        {
+          "host_suffix": ".github.io"
+        },
+        {
+          "host": "gitlab.com"
+        },
+        {
+          "host": "stackoverflow.com"
+        },
+        {
+          "host": "pypi.org"
+        },
+        {
+          "host": "npmjs.com"
+        }
+      ]
+    },
+    {
+      "name": "ai",
+      "match": [
+        {
+          "host": "claude.ai"
+        },
+        {
+          "host": "chatgpt.com"
+        },
+        {
+          "host": "openai.com"
+        },
+        {
+          "host_suffix": "huggingface.co"
+        },
+        {
+          "host": "gemini.google.com"
+        },
+        {
+          "host": "platform.openai.com"
+        }
+      ]
+    },
+    {
+      "name": "docs and notes",
+      "match": [
+        {
+          "host": "docs.google.com"
+        },
+        {
+          "host": "drive.google.com"
+        },
+        {
+          "host": "notion.so"
+        },
+        {
+          "host_suffix": ".notion.site"
+        }
+      ]
+    },
+    {
+      "name": "research",
+      "match": [
+        {
+          "host": "arxiv.org"
+        },
+        {
+          "host": "scholar.google.com"
+        },
+        {
+          "host": "openreview.net"
+        },
+        {
+          "host": "paperswithcode.com"
+        }
+      ]
+    },
+    {
+      "name": "video and music",
+      "match": [
+        {
+          "host_suffix": "youtube.com"
+        },
+        {
+          "host": "youtu.be"
+        },
+        {
+          "host_suffix": "twitch.tv"
+        },
+        {
+          "host": "open.spotify.com"
+        }
+      ]
+    },
+    {
+      "name": "chat and mail",
+      "match": [
+        {
+          "host": "mail.google.com"
+        },
+        {
+          "host_suffix": "discord.com"
+        },
+        {
+          "host_suffix": "slack.com"
+        },
+        {
+          "host": "web.telegram.org"
+        }
+      ]
+    },
+    {
+      "name": "browser internal",
+      "match": [
+        {
+          "url_prefix": "chrome://"
+        },
+        {
+          "url_prefix": "edge://"
+        },
+        {
+          "url_prefix": "chrome-extension://"
+        },
+        {
+          "url_prefix": "about:"
+        }
+      ]
+    }
+  ]
+}

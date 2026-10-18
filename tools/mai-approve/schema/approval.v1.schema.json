@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mai-approval-v1",
+  "title": "mai-approval-v1: owner-run standing approval with expiry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "granted_at",
+    "valid_until",
+    "granted_by",
+    "method",
+    "eula",
+    "execution_mode",
+    "limits",
+    "exclusions",
+    "sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mai-approval-v1"
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "granted_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "valid_until": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "granted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_user",
+        "host"
+      ],
+      "properties": {
+        "os_user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "method": {
+      "const": "owner-run mai-approve"
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_paths",
+        "max_runs_per_unit",
+        "count_per"
+      ],
+      "properties": {
+        "allowed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "max_runs_per_unit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "canary_retries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "count_per": {
+          "const": "experiment_unit_id"
+        }
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "paid_or_external_resource",
+          "data_deletion",
+          "kill_foreign_process",
+          "system_or_security_setting",
+          "external_send",
+          "out_of_scope_experiment"
+        ]
+      }
+    },
+    "note": {
+      "type": "string"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "eula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "license",
+        "subject",
+        "consent_source"
+      ],
+      "properties": {
+        "accepted": {
+          "const": true
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consent_source": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "execution_mode": {
+      "enum": [
+        "attended",
+        "unattended"
+      ]
+    }
+  }
+}

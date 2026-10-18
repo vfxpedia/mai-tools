@@ -1,0 +1,1 @@
+{"schema_version":1,"id":"train-a","kind":"job","state":"running","updated_at":"2026-99-99T00:00:00Z","heartbeat_interval_s":30,"device_uuids":["GPU-00000000-0000-0000-0000-000000000001"]}

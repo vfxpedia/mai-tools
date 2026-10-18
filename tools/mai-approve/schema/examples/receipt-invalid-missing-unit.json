@@ -1,0 +1,7 @@
+{
+  "schema": "mai-run-receipt-v1",
+  "run_id": "r-20261018-01",
+  "attempt_kind": "normal",
+  "approval_sha256": "dcb16b49fa813b5dfed4c8edb4f6d3dd05fab7bc0d6ed167b4ece7aec200b9ab",
+  "started_at": "2026-10-18T14:00:00Z"
+}

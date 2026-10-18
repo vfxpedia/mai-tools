@@ -1,0 +1,1 @@
+{"schema_version":1,"id":"train-s2-b","kind":"job","state":"waiting","updated_at":"2026-10-15T05:30:00Z","heartbeat_interval_s":30,"device_uuids":["GPU-00000000-0000-0000-0000-000000000002"],"hold_reason":"waiting for verification verdict"}

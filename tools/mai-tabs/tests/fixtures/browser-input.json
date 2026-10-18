@@ -1,0 +1,95 @@
+{
+  "browser": {
+    "name": "chrome",
+    "version": "130.0.1"
+  },
+  "nowIso": "2026-10-18T04:00:00Z",
+  "windows": [
+    {
+      "id": 1,
+      "focused": true,
+      "tabs": [
+        {
+          "id": 11,
+          "index": 0,
+          "title": "Pull request #5 · repo",
+          "url": "https://github.com/example/repo/pull/5?tab=files#diff-1",
+          "pinned": true,
+          "lastAccessed": 1792292400000,
+          "groupId": -1
+        },
+        {
+          "id": 12,
+          "index": 1,
+          "title": "Claude",
+          "url": "https://claude.ai/chat/0f3a9c1e-1111-2222-3333-444455556666?utm=x",
+          "lastAccessed": 1792295940000,
+          "groupId": 7
+        },
+        {
+          "id": 13,
+          "index": 2,
+          "title": "Dup page",
+          "url": "https://example.com/a?x=1",
+          "lastAccessed": 1790568000000,
+          "groupId": -1
+        },
+        {
+          "id": 14,
+          "index": 3,
+          "title": "Dup page again",
+          "url": "https://example.com/a?x=2#frag",
+          "lastAccessed": 1792209600000,
+          "groupId": -1
+        },
+        {
+          "id": 15,
+          "index": 4,
+          "title": "Dup page copy",
+          "url": "https://example.com/a?x=1",
+          "lastAccessed": 1792123200000,
+          "groupId": -1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "focused": false,
+      "tabs": [
+        {
+          "id": 21,
+          "index": 0,
+          "title": "Settings [x] | y",
+          "url": "chrome://settings/",
+          "lastAccessed": 1792295880000,
+          "groupId": -1
+        },
+        {
+          "id": 22,
+          "index": 1,
+          "title": "",
+          "url": "https://user:pw@intranet.local:8443/path/abcdefghijklmnopqrstuvwxyz0123456789?token=SECRET",
+          "lastAccessed": 1789704000000,
+          "groupId": -1
+        },
+        {
+          "id": 23,
+          "index": 2,
+          "title": "Music",
+          "url": "https://www.youtube.com/watch?v=abc",
+          "audible": true,
+          "lastAccessed": 1792295700000,
+          "groupId": 7
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": 7,
+      "title": "Work",
+      "color": "blue",
+      "collapsed": false
+    }
+  ]
+}

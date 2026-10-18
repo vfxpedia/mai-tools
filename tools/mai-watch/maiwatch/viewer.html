@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>maiwatch</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6;
+    --ok: #0b7a3b; --ok-bg: #d9f2e3; --warn: #8a5a00; --warn-bg: #fdecc8; --bad: #a3191f; --bad-bg: #fbdcdd;
+    --bar: #2b6fd6; --bar-idle: #6b7380;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101215; --panel: #1a1d22; --fg: #eceef1; --muted: #c3c8d0; --line: #3a4049;
+      --ok: #62d68c; --ok-bg: #12301f; --warn: #f2c14e; --warn-bg: #3a2c0a; --bad: #ff8b90; --bad-bg: #3d1618;
+      --bar: #6ea2f5; --bar-idle: #8b93a0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  main { padding: 16px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .mono, .state, .name { overflow-wrap: anywhere; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .warn { color: var(--warn); background: var(--warn-bg); }
+  .bad { color: var(--bad); background: var(--bad-bg); }
+  #error { display: none; padding: 10px 14px; border-radius: 6px; font-weight: 600; }
+  #alerts { display: none; padding: 10px 14px; border-radius: 6px; }
+  .device { display: grid; grid-template-columns: 11rem minmax(8rem, 1fr) 13rem; gap: 6px 18px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .device .name { font-weight: 600; }
+  .barwrap { height: 14px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .bar { height: 100%; background: var(--bar); }
+  .bar.idle { background: var(--bar-idle); }
+  .state { grid-column: 1 / -1; color: var(--muted); }
+  .procs { grid-column: 1 / -1; }
+  summary { cursor: pointer; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  @media (max-width: 640px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .device { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>maiwatch</h1>
+  <span id="collector" class="pill warn">reading...</span>
+  <span id="generated" class="mono"></span>
+</header>
+<main>
+  <div id="error" class="bad" role="alert"></div>
+  <div id="alerts" class="warn" role="status"></div>
+  <section><h2>Devices</h2><div id="devices"></div></section>
+  <section><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section>
+  <section><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section>
+</main>
+<script src="viewer-health.js"></script>
+<script>
+(function () {
+  'use strict';
+  var POLL_MS = 5000;
+
+  function age(s) {
+    if (s === null || s === undefined) return 'n/a';
+    s = Math.round(s);
+    if (s < 90) return s + ' s';
+    if (s < 5400) return Math.round(s / 60) + ' min';
+    return (s / 3600).toFixed(1) + ' h';
+  }
+  function secondsSince(iso) { return (Date.now() - Date.parse(iso)) / 1000; }
+  function el(tag, text, cls) { var e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function short(u) { return u ? u.replace(/^GPU-/, '').slice(0, 8) : ''; }
+  function get(url) {
+    return fetch(url + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error(url + ' returned ' + r.status);
+      return r;
+    });
+  }
+
+  function showCollector(hb, snap) {
+    var pill = document.getElementById('collector');
+    var problems = MaiWatchHealth.health(hb, snap, Date.now());
+    if (!problems.length) {
+      pill.className = 'pill ok';
+      pill.textContent = 'collector alive: last cycle ' + age(secondsSince(hb.last_cycle_at)) + ' ago (pid ' + hb.pid + ')';
+      return;
+    }
+    pill.className = 'pill bad';
+    pill.textContent = problems.map(function (p) { return p.type + ' (' + p.detail + ')'; }).join('; ');
+  }
+
+  function showAlerts(alerts) {
+    var box = document.getElementById('alerts');
+    if (!alerts || !alerts.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.textContent = alerts.length + ' alert' + (alerts.length > 1 ? 's' : '') + ': ' + alerts.map(function (a) {
+      return a.type + (a.id ? ' ' + a.id : a.uuid ? ' ' + short(a.uuid) : a.file ? ' ' + a.file : '');
+    }).join(', ');
+  }
+
+  function showDevices(snap) {
+    var root = document.getElementById('devices');
+    clear(root);
+    if (snap.source === 'unavailable') { root.appendChild(el('p', 'nvidia-smi is unavailable: no device data.', 'bad pill')); return; }
+    snap.devices.forEach(function (d) {
+      var row = el('div', undefined, 'device');
+      row.appendChild(el('div', d.index + '  ' + d.name + '  ' + short(d.uuid), 'name'));
+      var wrap = el('div', undefined, 'barwrap');
+      var bar = el('div', undefined, 'bar' + (d.idle ? ' idle' : ''));
+      bar.style.width = (d.utilization_pct === null ? 0 : Math.max(0, Math.min(100, d.utilization_pct))) + '%';
+      wrap.appendChild(bar);
+      row.appendChild(wrap);
+      var mem = d.memory_used_mib === null ? 'n/a' : Math.round(d.memory_used_mib) + ' / ' + Math.round(d.memory_total_mib) + ' MiB';
+      row.appendChild(el('div', (d.utilization_pct === null ? 'n/a' : d.utilization_pct + '%') + '  ' + mem + '  ' + (d.temperature_c === null ? '' : d.temperature_c + ' C') + (d.power_w === null ? '' : '  ' + d.power_w + ' W'), 'mono'));
+      var st;
+      if (d.idle) {
+        var why = d.idle_reason === 'unrecorded' ? 'reason unrecorded' : 'reason: ' + d.idle_reason.reason + ' (' + d.idle_reason.workload + ')';
+        st = 'Idle for ' + age(d.idle_for_s) + ' since ' + d.idle_since + ', ' + why;
+      } else if (d.running_workloads.length) {
+        st = 'Busy: ' + d.running_workloads.join(', ');
+      } else if (d.idle_candidate_since) {
+        st = 'Idle candidate since ' + d.idle_candidate_since + ' (not yet confirmed)';
+      } else {
+        st = 'Not idle';
+      }
+      row.appendChild(el('div', st, 'state'));
+      if (d.processes_known === false) {
+        row.appendChild(el('div', 'process list unavailable: the query failed, so zero processes is not known', 'state'));
+      } else if (d.user_processes.length || d.processes.length) {
+        var det = el('details', undefined, 'procs');
+        det.appendChild(el('summary', d.user_processes.length + ' user processes, ' + d.processes.length + ' total (display only, never used for idle)'));
+        var ul = el('div', undefined, 'mono');
+        d.processes.forEach(function (p) { ul.appendChild(el('div', p.pid + '  ' + p.name + (p.memory_mib === null ? '' : '  ' + p.memory_mib + ' MiB'))); });
+        det.appendChild(ul);
+        row.appendChild(det);
+      }
+      root.appendChild(row);
+    });
+  }
+
+  function fillTable(t, head, rows) {
+    clear(t);
+    var tr = el('tr');
+    head.forEach(function (h) { tr.appendChild(el('th', h)); });
+    t.appendChild(tr);
+    if (!rows.length) { var e = el('tr'); var td = el('td', 'none'); td.colSpan = head.length; e.appendChild(td); t.appendChild(e); return; }
+    rows.forEach(function (r) {
+      var row = el('tr');
+      r.forEach(function (c) { row.appendChild(el('td', c)); });
+      t.appendChild(row);
+    });
+  }
+
+  function showWorkloads(snap) {
+    var rows = snap.workloads.map(function (w) {
+      return [w.id, w.effective_state + (w.state !== w.effective_state ? ' (declared ' + w.state + ')' : ''), w.liveness, age(w.heartbeat_age_s),
+              age(w.artifact_age_s), w.first_progress_at || 'none yet', w.device_uuids.map(short).join(' '), w.hold_reason || ''];
+    });
+    snap.invalid.forEach(function (i) { rows.push([i.file, 'INVALID', '', '', '', '', '', i.problems.join('; ')]); });
+    fillTable(document.getElementById('workloads'), ['id', 'state', 'liveness', 'heartbeat age', 'artifact age', 'first progress', 'devices', 'reason / problem'], rows);
+  }
+
+  function showEvents(text) {
+    var lines = text.split('\n').filter(function (l) { return l.trim(); }).slice(-15).reverse();
+    var rows = lines.map(function (l) {
+      try { var e = JSON.parse(l); var rest = Object.keys(e).filter(function (k) { return k !== 'at' && k !== 'type'; }).map(function (k) { return k + '=' + (typeof e[k] === 'object' ? JSON.stringify(e[k]) : e[k]); }).join(' ');
+        return [e.at, e.type, rest]; } catch (x) { return ['', 'unreadable line', l]; }
+    });
+    fillTable(document.getElementById('events'), ['at', 'type', 'details'], rows);
+  }
+
+  function showFailure(msg) {
+    var err = document.getElementById('error');
+    err.style.display = 'block';
+    err.textContent = msg;
+  }
+
+  function tick() {
+    var err = document.getElementById('error');
+    var hbP = get('collector_heartbeat.json').then(function (r) { return r.json(); }).catch(function () { return null; });
+    var evP = get('events.jsonl').then(function (r) { return r.text(); }).catch(function () { return ''; });
+    // The snapshot has three separate ways to fail, and each one is named for what it is.
+    var snapP = get('snapshot.json').then(function (r) { return r.text(); }).then(function (t) {
+      try { return { snap: JSON.parse(t) }; } catch (x) { return { fail: 'snapshot.json is not valid JSON: ' + x.message }; }
+    }, function (e) {
+      return { fail: 'Cannot read snapshot.json: ' + e.message + '. Open this page through "python -m maiwatch serve" (a file:// page cannot read files).' };
+    });
+    Promise.all([hbP, snapP, evP]).then(function (v) {
+      var hb = v[0], got = v[1];
+      if (got.fail) { showFailure(got.fail); showCollector(hb, null); return; }
+      var snap = got.snap;
+      var shape = MaiWatchHealth.structureProblems(snap);
+      if (shape.length) {
+        // Keep the real heartbeat verdict, stop before drawing anything from a snapshot that is not the right shape.
+        showFailure('snapshot.json has the wrong structure: ' + shape.join('; '));
+        showCollector(hb, snap);
+        ['devices', 'workloads', 'events'].forEach(function (id) { clear(document.getElementById(id)); });
+        document.getElementById('alerts').style.display = 'none';
+        document.getElementById('generated').textContent = '';
+        return;
+      }
+      err.style.display = 'none';
+      showCollector(hb, snap);
+      document.getElementById('generated').textContent = 'snapshot ' + snap.generated_at + ' (' + age(secondsSince(snap.generated_at)) + ' ago)';
+      showAlerts(snap.alerts);
+      showDevices(snap);
+      showWorkloads(snap);
+      showEvents(v[2]);
+    }).catch(function (e) {
+      showFailure('The page could not draw snapshot.json: ' + e.message);
+    });
+  }
+  tick();
+  setInterval(tick, POLL_MS);
+})();
+</script>
+</body>
+</html>

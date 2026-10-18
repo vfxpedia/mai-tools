@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>mai-tabs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #ffffff; --fg: #1a1a1a; --accent: #1f5fbf; --muted: #4a4a4a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1b1f; --fg: #ececec; --accent: #7aa7ff; --muted: #c0c0c8; } }
+  body { margin: 0; padding: 14px 16px; width: 300px; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  p { margin: 0 0 10px; color: var(--muted); }
+  button { font: inherit; padding: 7px 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); border-radius: 6px; cursor: pointer; }
+  #status { margin-top: 10px; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<h1>mai-tabs</h1>
+<p>Saves every open tab to a JSON file. Query strings and fragments are removed from URLs. Nothing is sent anywhere and nothing is closed.</p>
+<button id="export">Export open tabs</button>
+<div id="status" role="status"></div>
+<script src="export.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

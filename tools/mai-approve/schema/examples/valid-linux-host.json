@@ -1,0 +1,35 @@
+{
+  "schema": "mai-approval-v1",
+  "scope": "lab",
+  "granted_at": "2026-10-18T02:00:00Z",
+  "valid_until": "2026-10-25T02:00:00Z",
+  "granted_by": {
+    "os_user": "user",
+    "host": "example-linux"
+  },
+  "method": "owner-run mai-approve",
+  "eula": {
+    "accepted": true,
+    "license": "NVIDIA Omniverse License",
+    "subject": "owner",
+    "consent_source": "owner typed at a terminal the owner operates"
+  },
+  "execution_mode": "unattended",
+  "limits": {
+    "allowed_paths": [
+      "/home/user/lab/runs"
+    ],
+    "max_runs_per_unit": 2,
+    "count_per": "experiment_unit_id"
+  },
+  "exclusions": [
+    "paid_or_external_resource",
+    "data_deletion",
+    "kill_foreign_process",
+    "system_or_security_setting",
+    "external_send",
+    "out_of_scope_experiment"
+  ],
+  "note": "week of 10/18 nightly runs",
+  "sha256": "01bc631a81b645ce93238b829f3e76b6dd423ebd5e3f96be9a33f6ee01b31144"
+}

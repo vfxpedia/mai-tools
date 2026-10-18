@@ -1,0 +1,16 @@
+{
+  "schema": "mai-tabs-export-v1",
+  "exported_at": "2026-10-18T04:00:00Z",
+  "browser": {
+    "name": "chrome",
+    "version": "130.0.1"
+  },
+  "urls_sanitized": true,
+  "counts": {
+    "windows": 0,
+    "tabs": 0,
+    "groups": 0
+  },
+  "windows": [],
+  "groups": []
+}

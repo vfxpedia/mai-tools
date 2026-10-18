@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vfxpedia/mai-tools/tools/mai-watch/schema/status.v1.schema.json",
+  "title": "maiwatch status document v1",
+  "description": "One JSON object that a workload writes about itself. Times are RFC 3339 in UTC (suffix Z). Unknown fields are ignored. See DESIGN.md section 4.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "kind",
+    "state",
+    "updated_at",
+    "heartbeat_interval_s",
+    "device_uuids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,128}$"
+    },
+    "kind": {
+      "enum": [
+        "job",
+        "service"
+      ]
+    },
+    "state": {
+      "enum": [
+        "running",
+        "waiting",
+        "blocked",
+        "done",
+        "failed"
+      ]
+    },
+    "updated_at": {
+      "$ref": "#/$defs/utc_time"
+    },
+    "heartbeat_interval_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "device_uuids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "started_at": {
+      "$ref": "#/$defs/utc_time"
+    },
+    "hold_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deadline": {
+      "$ref": "#/$defs/utc_time"
+    },
+    "progress": {
+      "type": "object",
+      "required": [
+        "done",
+        "total"
+      ],
+      "properties": {
+        "done": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Paths the workload writes as it progresses. The collector reads their modification time as evidence of progress (additive in v1)."
+    }
+  },
+  "if": {
+    "properties": {
+      "state": {
+        "enum": [
+          "waiting",
+          "blocked"
+        ]
+      }
+    },
+    "required": [
+      "state"
+    ]
+  },
+  "then": {
+    "required": [
+      "hold_reason"
+    ]
+  },
+  "$defs": {
+    "utc_time": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    }
+  }
+}

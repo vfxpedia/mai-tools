@@ -1,0 +1,44 @@
+{
+  "schema": "mai-tabs-export-v1",
+  "exported_at": "2026-10-18T04:00:00Z",
+  "browser": {
+    "name": "chrome",
+    "version": "130.0.1"
+  },
+  "urls_sanitized": true,
+  "counts": {
+    "windows": 1,
+    "tabs": 1,
+    "groups": 1
+  },
+  "windows": [
+    {
+      "id": 1,
+      "focused": true,
+      "tabs": [
+        {
+          "id": 1,
+          "index": 0,
+          "title": "Example",
+          "url": "https://example.com/",
+          "pinned": true,
+          "audible": false,
+          "discarded": false,
+          "group_id": 7,
+          "last_accessed_ms": 1792296000000
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": 7,
+      "title": "Work",
+      "color": "blue",
+      "collapsed": false
+    }
+  ],
+  "labels": {
+    "owner": "jay"
+  }
+}

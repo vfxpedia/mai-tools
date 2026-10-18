@@ -101,4 +101,14 @@ def prepare_packet(unit):
     for item in unit['inputs']:
         p=confined(work,item['path'])
         if not p.is_file() or digest(p)!=item['sha256']: raise ValueError('input hash mismatch')
-    return dict(schema='mai-code-packet-v1',unit=unit,fingerprint=validate_workspace(unit))
+    return dict(schema='mai-code-packet-v1',unit=unit,fingerprint=validate_workspace(unit),files=inventory(work))
+
+
+def inventory(work):
+    """Includes ignored files: an ignored write is still a workspace change."""
+    result={}
+    raw=subprocess.check_output(['git','-C',str(work),'ls-files','-z','--cached','--others'])
+    for rel in set(raw.decode('utf-8').split('\x00'))- {''}:
+        p=confined(Path(work),rel)
+        if p.is_file():result[rel]=digest(p)
+    return result

@@ -37,6 +37,9 @@ class Config:
         self.expected_device_uuids = list(kw.get('expected_device_uuids', []))
         self.future_tolerance_s = kw.get('future_tolerance_s', 60)
         self.missing_alert_s = kw.get('missing_alert_s', 86400)
+        # live view only: folders whose free space and answer time are shown (local drives, NAS shares); empty means every local drive
+        self.watch_paths = list(kw.get('watch_paths', []))
+        self.mai_home = kw.get('mai_home')
 
     def tracker_args(self):
         return dict(window_s=self.idle_window_s, threshold_pct=self.idle_utilization_pct, min_s=self.idle_min_s, resume_s=self.idle_resume_s, max_gap_s=self.max_gap_s)
@@ -54,6 +57,8 @@ def load_config(path):
     base = os.path.dirname(os.path.abspath(path))
     resolve = lambda p: p if os.path.isabs(p) else os.path.normpath(os.path.join(base, p))
     kw = {k: v for k, v in raw.items() if k not in ('status_dir', 'out_dir')}
+    if 'watch_paths' in kw:
+        kw['watch_paths'] = [resolve(os.path.expanduser(p)) for p in kw['watch_paths']]
     return Config(resolve(raw['status_dir']), resolve(raw['out_dir']), **kw)
 
 

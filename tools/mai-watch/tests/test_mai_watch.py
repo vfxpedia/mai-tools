@@ -394,7 +394,7 @@ class ViewerTests(unittest.TestCase):
     def test_serves_page_and_three_files(self):
         code, body = self.get('/')
         self.assertEqual(code, 200)
-        self.assertIn('<title>mai_watch</title>', body)
+        self.assertIn('<title>mai-watch</title>', body)
         self.assertEqual(self.get('/snapshot.json'), (200, '{"ok": 1}'))
         self.assertEqual(self.get('/snapshot.json?t=123')[0], 200)
         self.assertEqual(self.get('/events.jsonl')[0], 200)

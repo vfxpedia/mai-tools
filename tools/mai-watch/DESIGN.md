@@ -138,7 +138,24 @@ The owner's first use showed the gap: the page was a picture of one collection (
 - History is an in-memory ring of `history_s / interval_s` samples (default 600). It is not written to disk; the durable record stays in snapshot.json and events.jsonl. `/live.json?since=<t>` returns only newer samples, so a poll each second stays small.
 - The page adds a live panel (tiles with a number and a graph whose window grows with the data up to the history). Without a live sampler (`serve`) the panel stays hidden. Live without `--config` shows "workload recording off" instead of an error.
 - Measured: one nvidia-smi query about 0.08 s on the reference machine; page values matched nvidia-smi; tests with a fake psutil and fixed nvidia-smi text (12), graph point math checked in node, removing the first-reading rule fails a test.
-- Not done: GPU clocks, P state and throttle reasons; per-process GPU memory (not available under WDDM); a durable metric history; NVML source.
+- Not done in 9c (clocks and limit reasons came in 9d): P state; per-process GPU memory (not available under WDDM); a durable metric history; NVML source.
+
+## 9d. Wider resources and one command (owner decision 2026-10-18, direction B on vfxpedia/mai-os#43)
+
+Direction B: facts and judgments first (a judgment list with evidence, stage 2), and the page, agents and notifications all read the same list. Stage 1 widens what is measured and makes the start one command.
+
+- `mai-watch` with no command is `live`, opens the browser (`--no-browser` or `CI` set turns that off), and `pip install ./tools/mai-watch` installs the `mai-watch` command with psutil. `mai-watch demo [folder]` writes a configuration and a sample job (any OS, no hand-written JSON) and starts live with it; it refuses a folder that holds a real configuration.
+- GPU: the live query asks for SM clock and its maximum, memory clock, clock limit reasons, power limit, fan, memory activity and PCIe link in the same call. One unsupported field fails the whole nvidia-smi call, so on the first failure the core query is used from then on (asked once). Limit reasons decode the NVML bit mask; bits outside the table are kept as `bit_0x...`; unreadable is unknown. `gpu_idle` is shown as "clocks low: no work", not as a slowdown. `utilization.memory` is named memory activity: it is the share of time memory was read or written, not VRAM fill.
+- Watched paths: local drives by default (psutil partitions), plus `--path` and `watch_paths`. Each path is probed in its own thread with a 3 s limit; a path still probing is not probed again (no pile-up) and is shown as `no answer`. Measured: an unroutable share took Windows 21 s to fail; the page said `no answer` after 3 s. Free space is shown in GiB first.
+- Disk and network: per physical disk and per adapter that is up, rates from counter differences over monotonic time. First reading and a counter that went backwards are unknown. Loopback is left out; adapters are never summed (a VPN adapter repeats traffic of the physical one). Windows virtual adapters report 4294 Mbps (the largest 32-bit value): shown as unknown link speed. Physical disks are not mapped to drive letters (not guessed).
+- Graph lines break at gaps longer than max(3 intervals, 5 s).
+- Paths and usage are read every 30 s in their own thread, so a hanging share never delays the one-second samples; they travel in `slow` of live.json.
+
+## 9e. AI session usage as a resource
+
+The session gauges already record plan limits and spend under `~/.mai` (or `$MAI_HOME`). `usage.py` reads only `limits.json` (latest reading per account and window; after its reset time a reading is shown as unknown, not as current), `sessions/` (sessions updated in the last 24 h) and `costlog/<local date>/` (turns, cost and tokens per session, today). It never opens credential files and never passes prompt text on: only counts and sums leave the module (a test plants a prompt string and checks it never appears). Cost is the gauges' API price estimate. Without the folder the answer is "no usage source", never zero.
+
+Measured on the reference machine: Claude 5-hour and 7-day percent, Codex 7-day percent, per session turns and cost (Claude) or tokens (Codex). Not measured: where these files live on Linux and macOS, a Codex 5-hour reading (the gauge does not record one yet), usage without the gauges.
 
 ## 10. Security and safety
 

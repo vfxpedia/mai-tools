@@ -1,57 +1,59 @@
-Status: draft (M2 plus live view). 72 + 12 + 7 tests pass on Windows; earlier 72 + 7 also on on Windows, Linux (WSL and CI) and macOS (CI). Read real `nvidia-smi` on Windows and WSL. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU.
+Status: draft (M2, live view, wider resources). 105 tests pass on Windows (72 + 12 + 14 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
 # mai-watch
 
-A read-only monitor. It shows CPU, RAM, GPU and VRAM live in the browser, and it answers three questions about your jobs: how busy each GPU is, which jobs are alive, and since when a GPU has been idle.
+A read-only monitor for one machine. In the browser it shows, live:
 
-## Live view in one command
+- CPU (every core), RAM and swap
+- each GPU: use, VRAM, temperature, power against its limit, SM clock against its maximum, and whether the clock is being limited and why
+- watched folders: free space, how full, and whether they answer (local drives, NAS shares)
+- network adapters and disks: how fast data moves right now
+- AI coding sessions: Claude Code and Codex plan limits, and per session today's turns, cost and tokens
 
-```powershell
-python -m mai_watch live
+It also keeps a record of your jobs: which are alive, and since when a GPU has been idle. It never starts, stops or changes anything.
+
+## Start
+
+```
+pip install ./tools/mai-watch      # from the mai-tools folder; brings psutil
+mai-watch
 ```
 
-Open http://127.0.0.1:28765/ . CPU (with every core), RAM and swap, and for each GPU its use, VRAM, temperature and power, sampled every second, with graphs of the last 10 minutes. One process does the sampling and the page; Ctrl+C stops it. `--interval 2` samples every 2 s, `--history 1800` keeps 30 minutes, `--port` picks another port. Add `--config <mai-watch.toml>` to also record jobs and idle time below the live panel (the rest of this README). The live history lives in memory only; nothing is written for it. Values a source cannot give are shown as unknown, never as 0 (for example, the first CPU reading, which only opens the measurement window).
+The page opens in your browser at http://127.0.0.1:28765/ . Ctrl+C stops it. Without installing, `python -m mai_watch` from `tools/mai-watch` does the same (CPU, RAM, disks and network then need `pip install psutil`).
 
-Needs `psutil` for CPU and RAM and `nvidia-smi` for the GPUs. Measured on Windows 11 with two RTX 5080: one `nvidia-smi` query takes about 0.08 s, and the page values matched `nvidia-smi` (VRAM identical; GPU use moves from second to second).
+Useful options: `--path //nas/share` (watch a folder, repeatable), `--port 28766`, `--interval 2` (sample every 2 s), `--history 1800` (keep 30 minutes), `--no-browser`, `--no-usage`.
+
+How to read it:
+
+- A value the source could not give is shown as `unknown`, never as 0. The first rate after start is unknown because a rate needs two readings.
+- `clocks low: no work` means the GPU has nothing to do. `clock limited by sw_power_cap` (or a thermal reason) means the GPU is working but held back.
+- Free space is shown in GiB first. 99.9 % used can still be 7 GiB or 7 TiB.
+- Network adapters are shown one by one and never added up: a VPN adapter carries traffic that also crosses the physical one.
+- Graph lines break where samples are missing, so an unobserved stretch never looks like a steady value.
+
+Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one `nvidia-smi` query takes about 0.08 s; a NAS address that does not answer took Windows 21 s to fail, and the page marked it `no answer` after 3 s while the rest kept updating.
+
+## AI session usage
+
+Read from what the session gauges in this repository ([mai-gauge](../../mods/mai-gauge), [mai-codex-gauge](../../mods/mai-codex-gauge)) record in `~/.mai` (or `$MAI_HOME`, or `--mai-home`). The gauges take the plan limits from the CLIs you are already signed in to, so there is no key to set.
+
+mai-watch opens only `limits.json`, `sessions/` and `costlog/` in that folder. It never opens credential files such as `~/.codex/auth.json`, and it never shows prompt text from the cost log, only counts and sums. Cost is the API price estimate the gauges compute, not a bill. Without the gauges the page says there is no usage source.
 
 ## Job and idle record
 
-- Your jobs write a small status file (`status/*.json`) every so often. That is the only integration.
-- The collector reads `nvidia-smi` and those files, and writes `snapshot.json`, `events.jsonl` and a heartbeat.
-- `check` exits 1 when something needs attention (a job stopped updating, a source broke, the collector itself stopped). A local web page shows the same thing.
+Your jobs write a small status file (`status/*.json`) every so often. That is the only integration. The collector reads `nvidia-smi` and those files and writes `snapshot.json`, `events.jsonl` and a heartbeat. `check` exits 1 when something needs attention (a job stopped updating, a source broke, the collector itself stopped).
 
-It never starts, stops or changes anything.
+Try it:
 
-## Try it in five minutes
-
-From `tools/mai-watch`. PowerShell shown; on Linux or macOS the commands are the same with `/` paths.
-
-```powershell
-# 1. a folder with a config file
-python -m mai_watch init "$HOME\mai-watch-demo"
-
-# 2. a pretend job that reports "running" right now
-mkdir "$HOME\mai-watch-demo\status" -Force | Out-Null
-$now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$job = '{"schema_version":1,"id":"my-first-job","kind":"job","state":"running","updated_at":"' + $now + '","heartbeat_interval_s":60,"device_uuids":[]}'
-[IO.File]::WriteAllText("$HOME\mai-watch-demo\status\my-first-job.json", $job)
-
-# 3. one collection, then ask whether anything is wrong
-$cfg = "$HOME\mai-watch-demo\mai-watch.toml"
-python -m mai_watch collect --config $cfg --once
-python -m mai_watch check --config $cfg
-
-# 4. the page: open http://127.0.0.1:28765/ in a browser, Ctrl+C to stop
-python -m mai_watch serve --config $cfg
+```
+mai-watch demo
 ```
 
-What you should see (measured 2026-10-18 on Windows with two GPUs): `check` prints `"ok": true` and `"alerts": []` and exits 0. The page lists each GPU with use, memory, temperature and power, and the job `my-first-job` as `running`, `alive`.
+This makes `~/mai-watch-demo` with a configuration and one sample job that reports `running`, and opens the page with the job table under the live view. The sample job does not update itself, so after 3 missed heartbeats (3 minutes) it turns `stale`: that is the alarm working. `mai-watch check --config ~/mai-watch-demo/mai-watch.toml` prints the same and exits 1. Delete the folder when done.
 
-Known answer for the alarm: write the same file with an `updated_at` an hour ago, run `collect --once` again, and `check` prints `workload_stale` for `my-first-job` and exits 1.
-
-For real use run `collect` without `--once` (every `interval_s`, default 10 s) and keep `serve` open. Without an NVIDIA GPU the GPU list is reported as unavailable, not as zero. Delete `$HOME\mai-watch-demo` when done.
+For real use: `mai-watch init <folder>`, point your jobs at its `status` folder, and run `mai-watch live --config <folder>/mai-watch.toml`. In the configuration, `watch_paths = ["D:/runs", "//nas/share"]` sets the watched folders.
 
 ## Status file (what your job writes)
 
@@ -64,10 +66,10 @@ For real use run `collect` without `--once` (every `interval_s`, default 10 s) a
 | `device_uuids` | GPUs it uses (from `nvidia-smi -L`); empty is allowed |
 | optional | `started_at`, `progress {done, total}`, `deadline`, `artifacts` (files whose change time shows real progress), `labels` |
 
-Full contract: `schema/status.v1.schema.json`; `python -m mai_watch validate <files>` checks a file.
+Full contract: `schema/status.v1.schema.json`; `mai-watch validate <files>` checks a file.
 
 ## Commands
 
-`init <dir>` · `collect [--once]` · `check` (exit 1 on any alert) · `show` (prints the whole snapshot as JSON) · `serve` (page on 127.0.0.1:28765, local only) · `validate <files>`.
+`mai-watch` (same as `live`) · `demo [folder]` · `init <folder>` · `collect [--once]` · `check` (exit 1 on any alert) · `show` (the whole snapshot as JSON) · `serve` (page for a separate collector) · `validate <files>`. Everything listens on 127.0.0.1 only.
 
-Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py` and `tests/test_schema_contract.py` (need `jsonschema`; the page test needs Node.js).
+Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_schema_contract.py` (needs `jsonschema`; the page tests need Node.js).

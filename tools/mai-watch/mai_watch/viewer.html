@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mai_watch</title>
+<title>mai-watch</title>
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6;
@@ -54,6 +54,18 @@
   .spark polyline { fill: none; stroke: var(--bar); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
   .cores { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 6px; }
   .core { width: 9px; height: 9px; border-radius: 2px; background: var(--bar); }
+  .live-more { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; margin-top: 18px; }
+  .live-block h3 { font-size: 14px; margin: 14px 0 6px; }
+  .live-block h3:first-child { margin-top: 0; }
+  table.compact td, table.compact th { padding: 4px 12px 4px 0; white-space: nowrap; }
+  table.compact td:last-child { white-space: normal; }
+  table.compact .spark { width: 160px; height: 22px; margin: 0; }
+  .strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .meter-cell { display: inline-flex; align-items: center; gap: 8px; }
+  .meter { display: inline-block; width: 90px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; flex: none; }
+  .meter-fill { display: block; height: 100%; background: var(--bar); }
+  .meter.hot .meter-fill { background: var(--bad); }
+  .meter.off .meter-fill { background: var(--bar-idle); }
   .live-problems { margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
   #live-section { display: none; }
   .section-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 8px; }
@@ -66,14 +78,14 @@
 </head>
 <body>
 <header>
-  <h1>mai_watch</h1>
+  <h1>mai-watch</h1>
   <span id="collector" class="pill warn">reading...</span>
   <span id="generated" class="mono"></span>
 </header>
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
-  <section id="live-section"><div class="section-head"><h2>Live: CPU, RAM, GPU, VRAM</h2><span id="live-status" class="pill warn">reading...</span></div><div id="live"></div></section>
+  <section id="live-section"><div class="section-head"><h2>Live resources</h2><span id="live-status" class="pill warn">reading...</span></div><div id="live"></div></section>
   <section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section>
   <section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section>
   <section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section>

@@ -1,57 +1,59 @@
-상태: 초안 (M2 와 실시간 화면). Windows 에서 시험 72 + 12 + 7개 통과. 앞선 72 + 7개는 Windows, Linux (WSL과 CI), macOS (CI)에서 통과. Windows 와 WSL 에서 실제 `nvidia-smi` 를 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS.
+상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 105개 통과 (72 + 12 + 14 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
 
 [English](README.md)
 
 # mai-watch
 
-읽기 전용 감시 도구다. CPU · RAM · GPU · VRAM 을 브라우저에서 실시간으로 보여 주고, 작업에 대해 세 가지를 답한다: GPU 마다 얼마나 쓰고 있나, 살아 있는 작업은 무엇인가, GPU 가 언제부터 놀고 있나.
+기기 한 대를 보는 읽기 전용 감시 도구다. 브라우저에서 실시간으로 보여 준다.
 
-## 명령 하나로 실시간 화면
+- CPU (코어마다), RAM 과 스왑
+- GPU 마다: 사용률, VRAM, 온도, 전력과 한도, SM 클럭과 최대 클럭, 클럭이 제한되고 있는지와 그 이유
+- 지켜볼 폴더: 남은 공간, 찬 정도, 응답 여부 (로컬 드라이브, NAS 공유 폴더)
+- 네트워크 카드와 디스크: 지금 데이터가 얼마나 빨리 오가는지
+- AI 코딩 세션: Claude Code · Codex 요금제 한도, 세션마다 오늘의 턴 · 비용 · 토큰
 
-```powershell
-python -m mai_watch live
+작업 기록도 남긴다: 살아 있는 작업은 무엇이고, GPU 가 언제부터 놀고 있나. 아무것도 시작 · 중지 · 변경하지 않는다.
+
+## 시작
+
+```
+pip install ./tools/mai-watch      # mai-tools 폴더에서. psutil 도 함께 설치된다
+mai-watch
 ```
 
-http://127.0.0.1:28765/ 를 연다. CPU (코어마다), RAM 과 스왑, GPU 마다 사용률 · VRAM · 온도 · 전력을 1초마다 재고, 최근 10분 그래프를 그린다. 재는 일과 화면을 한 프로세스가 맡고, Ctrl+C 로 끈다. `--interval 2` 는 2초마다, `--history 1800` 은 30분 보관, `--port` 는 다른 포트. `--config <mai-watch.toml>` 을 더하면 실시간 칸 아래에 작업과 놀고 있음 기록도 함께 남긴다 (이 README 의 나머지). 실시간 이력은 메모리에만 있고 파일로 쓰지 않는다. 원천이 주지 못한 값은 0 이 아니라 「unknown」 으로 보인다 (예: 측정 창을 여는 첫 CPU 값).
+브라우저에 http://127.0.0.1:28765/ 가 열린다. Ctrl+C 로 끈다. 설치하지 않고 `tools/mai-watch` 에서 `python -m mai_watch` 로 실행해도 같다 (이때 CPU · RAM · 디스크 · 네트워크는 `pip install psutil` 이 필요하다).
 
-CPU · RAM 은 `psutil`, GPU 는 `nvidia-smi` 가 필요하다. RTX 5080 두 장의 Windows 11 에서 잰 값: `nvidia-smi` 한 번 약 0.08초, 화면 값은 `nvidia-smi` 와 맞았다 (VRAM 같음, GPU 사용률은 초마다 움직임).
+자주 쓰는 옵션: `--path //nas/share` (지켜볼 폴더, 여러 번 가능), `--port 28766`, `--interval 2` (2초마다), `--history 1800` (30분 보관), `--no-browser`, `--no-usage`.
+
+읽는 법:
+
+- 원천이 주지 못한 값은 0 이 아니라 `unknown` 이다. 속도는 두 번 재야 나오므로 켠 직후 첫 값은 unknown 이다.
+- `clocks low: no work` 는 할 일이 없어 클럭이 낮다는 뜻이다. `clock limited by sw_power_cap` (또는 온도 사유) 는 일하는 중인데 붙잡혀 있다는 뜻이다.
+- 남은 공간은 GiB 를 먼저 보여 준다. 99.9% 사용이어도 7 GiB 일 수도, 7 TiB 일 수도 있다.
+- 네트워크 카드는 하나씩 보여 주고 더하지 않는다. VPN 카드를 지나는 트래픽은 실제 카드도 지나므로 더하면 두 번 센다.
+- 표본이 빈 구간에서는 그래프 선을 끊는다. 재지 않은 시간이 일정한 값처럼 보이지 않게 하려는 것이다.
+
+RTX 5080 두 장의 Windows 11 에서 잰 것: 화면 값이 `nvidia-smi` 와 맞았다. `nvidia-smi` 한 번에 약 0.08초. 응답하지 않는 NAS 주소는 Windows 가 실패를 알리기까지 21초가 걸렸고, 화면은 3초 만에 `no answer` 로 표시하면서 나머지는 계속 갱신했다.
+
+## AI 세션 사용량
+
+이 저장소의 세션 계기판 ([mai-gauge](../../mods/mai-gauge), [mai-codex-gauge](../../mods/mai-codex-gauge)) 이 `~/.mai` (또는 `$MAI_HOME`, `--mai-home`) 에 기록하는 것을 읽는다. 계기판은 이미 로그인한 CLI 에서 한도 정보를 받으므로 따로 넣을 키가 없다.
+
+mai-watch 는 그 폴더의 `limits.json`, `sessions/`, `costlog/` 만 연다. `~/.codex/auth.json` 같은 인증 파일은 열지 않고, 비용 기록의 프롬프트 글은 보여 주지 않는다 (개수와 합계만). 비용은 계기판이 계산한 API 가격 추정이지 청구액이 아니다. 계기판이 없으면 화면에 「사용량 원천 없음」 으로 나온다.
 
 ## 작업과 놀고 있음 기록
 
-- 작업은 가끔 작은 상태 파일 (`status/*.json`) 을 쓴다. 연결은 이것 하나뿐이다.
-- 수집기가 `nvidia-smi` 와 그 파일들을 읽어 `snapshot.json`, `events.jsonl`, 심장박동 파일을 쓴다.
-- `check` 는 손봐야 할 것이 있으면 종료 코드 1 을 낸다 (작업이 갱신을 멈춤, 원천이 깨짐, 수집기 자체가 멈춤). 로컬 웹 화면도 같은 것을 보여 준다.
+작업은 가끔 작은 상태 파일 (`status/*.json`) 을 쓴다. 연결은 이것 하나뿐이다. 수집기가 `nvidia-smi` 와 그 파일들을 읽어 `snapshot.json`, `events.jsonl`, 심장박동 파일을 쓴다. `check` 는 손봐야 할 것이 있으면 종료 코드 1 을 낸다 (작업이 갱신을 멈춤, 원천이 깨짐, 수집기 자체가 멈춤).
 
-아무것도 시작 · 중지 · 변경하지 않는다.
+해 보기:
 
-## 5분 실습
-
-`tools/mai-watch` 에서 실행한다. 아래는 PowerShell 이고, Linux · macOS 에서는 `/` 경로로 같은 명령을 쓴다.
-
-```powershell
-# 1. 설정 파일이 든 폴더
-python -m mai_watch init "$HOME\mai-watch-demo"
-
-# 2. 지금 "running" 이라고 보고하는 가짜 작업
-mkdir "$HOME\mai-watch-demo\status" -Force | Out-Null
-$now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$job = '{"schema_version":1,"id":"my-first-job","kind":"job","state":"running","updated_at":"' + $now + '","heartbeat_interval_s":60,"device_uuids":[]}'
-[IO.File]::WriteAllText("$HOME\mai-watch-demo\status\my-first-job.json", $job)
-
-# 3. 한 번 수집하고, 잘못된 것이 있는지 묻는다
-$cfg = "$HOME\mai-watch-demo\mai-watch.toml"
-python -m mai_watch collect --config $cfg --once
-python -m mai_watch check --config $cfg
-
-# 4. 화면: 브라우저로 http://127.0.0.1:28765/ 를 연다. 끝낼 때는 Ctrl+C
-python -m mai_watch serve --config $cfg
+```
+mai-watch demo
 ```
 
-보여야 하는 것 (2026-10-18 GPU 두 장인 Windows 에서 위 명령을 그대로 실행해 확인): `check` 가 `"ok": true`, `"alerts": []` 를 찍고 종료 코드 0. 화면에는 GPU 마다 사용률 · 메모리 · 온도 · 전력, 그리고 작업 `my-first-job` 이 `running`, `alive` 로 나온다.
+`~/mai-watch-demo` 에 설정과 `running` 이라고 보고하는 예시 작업 하나를 만들고, 실시간 화면 아래에 작업 표가 붙은 화면을 연다. 예시 작업은 스스로 갱신하지 않으므로 심장박동을 세 번 놓치면 (3분) `stale` 로 바뀐다. 경보가 동작하는 모습이다. `mai-watch check --config ~/mai-watch-demo/mai-watch.toml` 도 같은 것을 찍고 종료 코드 1 을 낸다. 끝나면 폴더를 지운다.
 
-경보가 실제로 울리는지 보는 법: 같은 파일의 `updated_at` 을 한 시간 전으로 써서 `collect --once` 를 다시 돌리면, `check` 가 `my-first-job` 의 `workload_stale` 을 찍고 종료 코드 1 을 낸다.
-
-실제로 쓸 때는 `collect` 를 `--once` 없이 돌리고 (기본 10초마다) `serve` 를 켜 둔다. NVIDIA GPU 가 없으면 GPU 목록은 0 이 아니라 「읽을 수 없음」 으로 보고된다. 끝나면 `$HOME\mai-watch-demo` 를 지운다.
+실제로 쓸 때: `mai-watch init <폴더>` 로 만들고, 작업이 그 `status` 폴더에 쓰게 한 뒤 `mai-watch live --config <폴더>/mai-watch.toml` 로 띄운다. 설정의 `watch_paths = ["D:/runs", "//nas/share"]` 로 지켜볼 폴더를 정한다.
 
 ## 상태 파일 (작업이 쓰는 것)
 
@@ -64,10 +66,10 @@ python -m mai_watch serve --config $cfg
 | `device_uuids` | 쓰는 GPU (`nvidia-smi -L` 에서). 비워도 된다 |
 | 선택 | `started_at`, `progress {done, total}`, `deadline`, `artifacts` (바뀐 시각이 실제 진척을 보여 주는 파일), `labels` |
 
-전체 계약: `schema/status.v1.schema.json`. 파일 하나 검사: `python -m mai_watch validate <파일>`.
+전체 계약: `schema/status.v1.schema.json`. 파일 검사: `mai-watch validate <파일>`.
 
 ## 명령
 
-`init <폴더>` · `collect [--once]` · `check` (경보가 있으면 종료 코드 1) · `show` (스냅샷 전체를 JSON 으로) · `serve` (127.0.0.1:28765, 이 PC 에서만) · `validate <파일>`.
+`mai-watch` (`live` 와 같음) · `demo [폴더]` · `init <폴더>` · `collect [--once]` · `check` (경보가 있으면 종료 코드 1) · `show` (스냅샷 전체를 JSON 으로) · `serve` (따로 도는 수집기용 화면) · `validate <파일>`. 모두 127.0.0.1 에서만 연다.
 
-설계 · 놀고 있음 판정 규칙 · 검토 기록: [DESIGN.md](DESIGN.md). 시험: `python -I tests/test_mai_watch.py`, `tests/test_schema_contract.py` (`jsonschema` 필요, 화면 시험은 Node.js 필요).
+설계 · 놀고 있음 판정 규칙 · 검토 기록: [DESIGN.md](DESIGN.md). 시험: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_schema_contract.py` (`jsonschema` 필요, 화면 시험은 Node.js 필요).

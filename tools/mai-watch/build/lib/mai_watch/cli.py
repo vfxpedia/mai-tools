@@ -1,0 +1,197 @@
+"""Command line: mai-watch [live|demo|collect|check|show|serve|validate|init]. With no command it starts the live view.
+Read-only toward workloads: no stop, kill or launch."""
+import argparse
+import datetime
+import json
+import os
+import sys
+
+from . import collector, status
+
+DEFAULT_TOML = """# mai_watch configuration. Paths are relative to this file.
+status_dir = "status"
+out_dir = "out"
+interval_s = 10
+idle_window_s = 600
+idle_utilization_pct = 5
+idle_min_s = 600
+idle_resume_s = 60
+stale_factor = 3
+# nvidia_smi = ["nvidia-smi"]
+# folders shown in the live view with free space and answer time; empty means every local drive
+# watch_paths = ["D:/runs", "//nas/share"]
+# ignore_processes = ["explorer.exe", "chatgpt.exe"]
+# [baseline_memory_mib]
+# "GPU-00000000-0000-0000-0000-000000000000" = 5645
+"""
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog='mai-watch', description='Resource and workload status monitor (read-only).')
+    sub = ap.add_subparsers(dest='cmd')
+    for name in ('collect', 'check', 'show', 'serve'):
+        p = sub.add_parser(name)
+        p.add_argument('--config', default='mai-watch.toml')
+    sub.choices['collect'].add_argument('--once', action='store_true')
+    sub.choices['serve'].add_argument('--port', type=int, default=28765)
+    sub.choices['check'].add_argument('--ignore', action='append', default=[], help='alert type to ignore, e.g. device_idle')
+    lv = sub.add_parser('live', help='the default: live resources in the browser; with --config also records workloads and idle state')
+    dm = sub.add_parser('demo', help='live view plus a sample job, in a new folder (default: ~/mai-watch-demo)')
+    dm.add_argument('dir', nargs='?', default=os.path.join(os.path.expanduser('~'), 'mai-watch-demo'))
+    for p in (lv, dm):
+        p.add_argument('--port', type=int, default=28765)
+        p.add_argument('--interval', type=float, default=1.0, help='seconds between live samples (0.2 to 60)')
+        p.add_argument('--history', type=float, default=600, help='seconds of live history kept in memory')
+        p.add_argument('--nvidia-smi', default='nvidia-smi')
+        p.add_argument('--path', action='append', default=[], help='folder to watch for free space and answer time, e.g. a NAS share; repeatable')
+        p.add_argument('--mai-home', default=None, help='where the session gauges write usage (default ~/.mai or $MAI_HOME)')
+        p.add_argument('--no-usage', action='store_true', help='do not show Claude and Codex usage')
+        p.add_argument('--no-browser', action='store_true', help='do not open the page in a browser')
+    lv.add_argument('--config', default=None, help='optional: also run the workload collector of this configuration')
+    v = sub.add_parser('validate'); v.add_argument('files', nargs='+')
+    i = sub.add_parser('init'); i.add_argument('dir')
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv or (argv[0].startswith('-') and argv[0] not in ('-h', '--help')):
+        argv = ['live'] + argv               # no command: the live view, which is what most people want first
+    a = ap.parse_args(argv)
+
+    if a.cmd == 'init':
+        os.makedirs(a.dir, exist_ok=True)
+        p = os.path.join(a.dir, 'mai-watch.toml')
+        if os.path.exists(p):
+            print('refusing to overwrite %s' % p, file=sys.stderr)
+            return 2
+        open(p, 'w', encoding='utf-8', newline='\n').write(DEFAULT_TOML)
+        print('wrote', p)
+        return 0
+    if a.cmd == 'validate':
+        bad = 0
+        for f in a.files:
+            try:
+                doc = json.load(open(f, encoding='utf-8'))
+            except Exception as e:
+                print('%s: not readable as JSON: %s' % (f, e)); bad += 1; continue
+            problems = status.validate(doc)
+            for w in status.secret_like_fields(doc) if isinstance(doc, dict) else []:
+                print('%s: warning: field name looks like a secret: %s' % (f, w))
+            print('%s: %s' % (f, 'valid' if not problems else 'INVALID: ' + '; '.join(problems)))
+            bad += bool(problems)
+        return 1 if bad else 0
+    if a.cmd == 'live':
+        return run_live(a)
+    if a.cmd == 'demo':
+        return run_demo(a)
+    try:
+        cfg = collector.load_config(a.config)
+    except FileNotFoundError:
+        print('config not found: %s (create one with: python -m mai_watch init <dir>)' % a.config, file=sys.stderr)
+        return 2
+    except (KeyError, ValueError) as e:
+        print('config problem in %s: %s' % (a.config, e), file=sys.stderr)
+        return 2
+    if a.cmd == 'collect':
+        try:
+            collector.collect(cfg, once=a.once)
+        except collector.LockHeld as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        return 0
+    if a.cmd == 'serve':
+        from . import server
+        try:
+            srv = server.make_server(cfg.out_dir, a.port)
+        except OSError as e:
+            print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port; on Windows some ranges are reserved (netsh int ipv4 show excludedportrange protocol=tcp).' % (a.port, e.strerror or e), file=sys.stderr)
+            return 2
+        print('mai_watch viewer: http://127.0.0.1:%d/ (Ctrl+C to stop)' % a.port)
+        try:
+            srv.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        return 0
+    if a.cmd == 'show':
+        print(open(os.path.join(cfg.out_dir, 'snapshot.json'), encoding='utf-8').read())
+        return 0
+    alerts = collector.check(cfg.out_dir, ignore=a.ignore)
+    print(json.dumps({'ok': not alerts, 'alerts': alerts}, indent=2))
+    return 1 if alerts else 0
+
+
+def write_demo(folder, now=None):
+    """A folder with a configuration and one sample job that reports running now. Returns the configuration path. Refuses to touch an
+    existing configuration so a real one is never overwritten; the sample job file is rewritten each time so its time is fresh."""
+    os.makedirs(os.path.join(folder, 'status'), exist_ok=True)
+    cfg = os.path.join(folder, 'mai-watch.toml')
+    if not os.path.exists(cfg):
+        with open(cfg, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(DEFAULT_TOML)
+    elif not os.path.exists(os.path.join(folder, 'status', 'my-first-job.json')):
+        raise FileExistsError('%s already has a configuration that is not a demo; use: mai-watch live --config %s' % (folder, cfg))
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    job = {'schema_version': 1, 'id': 'my-first-job', 'kind': 'job', 'state': 'running', 'updated_at': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+           'heartbeat_interval_s': 60, 'device_uuids': []}
+    with open(os.path.join(folder, 'status', 'my-first-job.json'), 'w', encoding='utf-8', newline='\n') as f:
+        json.dump(job, f, indent=2)
+    return cfg
+
+
+def run_demo(a):
+    try:
+        a.config = write_demo(a.dir)
+    except (OSError, FileExistsError) as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    print('demo folder: %s (the sample job stops updating, so after 3 minutes it turns stale: that is the alarm working)' % a.dir)
+    return run_live(a)
+
+
+def run_live(a):
+    """One process: live sampler, optional workload collector, local server. Ctrl+C stops all of them."""
+    import threading
+    from . import live, server
+    cfg = None
+    if a.config:
+        try:
+            cfg = collector.load_config(a.config)
+        except (FileNotFoundError, KeyError, ValueError) as e:
+            print('config problem in %s: %s' % (a.config, e), file=sys.stderr)
+            return 2
+    try:
+        paths = list(a.path) + (cfg.watch_paths if cfg else [])
+        sampler = live.LiveSampler(nvidia_cmd=[a.nvidia_smi] if cfg is None else cfg.nvidia_smi, interval_s=a.interval, history_s=a.history,
+                                   paths=paths or None, mai_home=a.mai_home or (cfg.mai_home if cfg else None), usage_on=not a.no_usage)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    try:
+        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler)
+    except OSError as e:
+        print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port.' % (a.port, e.strerror or e), file=sys.stderr)
+        return 2
+    stop = threading.Event()
+    threading.Thread(target=sampler.run, args=(stop,), daemon=True).start()
+    if cfg is not None:
+        def record():
+            try:
+                collector.collect(cfg)
+            except collector.LockHeld as e:
+                print('workload collector not started: %s (another collector already writes this folder; the live view still runs)' % e, file=sys.stderr)
+        threading.Thread(target=record, daemon=True).start()
+    url = 'http://127.0.0.1:%d/' % srv.server_address[1]
+    print('mai-watch live: %s  every %gs, %gs of history%s (Ctrl+C to stop)' % (
+        url, a.interval, a.history, ', workloads from ' + a.config if cfg else ''))
+    if not a.no_browser and not os.environ.get('CI'):
+        import webbrowser
+        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop.set()
+        srv.server_close()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

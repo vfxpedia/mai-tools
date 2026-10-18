@@ -70,3 +70,16 @@ test('provider writes preserve units, refuse foreign account and never regress t
  assert.equal(saveProvider(b,'self','codex:test',{...value,at:3000,usdMicros:0,sessionUsd:999}).value.codex.provider.sessionUsd,0);
  assert.throws(()=>saveUnits(b,'self',{account:'codex:other'}));
 });
+
+test('store below a linked system folder works; a link at or inside the store is still refused',()=>{
+ const real=fs.mkdtempSync(path.join(os.tmpdir(),'gauge-link-real-')),above=path.join(os.tmpdir(),'gauge-link-above-'+process.pid+'-'+Date.now());
+ fs.symlinkSync(real,above,process.platform==='win32'?'junction':'dir');
+ const store=path.join(above,'store');fs.mkdirSync(store);
+ assert.equal(safePath(store,'sessions','a.json'),path.resolve(store,'sessions','a.json'));
+ const outside=fs.mkdtempSync(path.join(os.tmpdir(),'gauge-link-out-'));
+ fs.symlinkSync(outside,path.join(store,'sessions'),process.platform==='win32'?'junction':'dir');
+ assert.throws(()=>safePath(store,'sessions','a.json'),/symlink\/junction refused/);
+ const linkedStore=path.join(os.tmpdir(),'gauge-link-store-'+process.pid+'-'+Date.now());
+ fs.symlinkSync(real,linkedStore,process.platform==='win32'?'junction':'dir');
+ assert.throws(()=>safePath(linkedStore,'sessions','a.json'),/symlink\/junction refused/);
+});

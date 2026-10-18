@@ -27,7 +27,7 @@ function allowedTarget(home, file) {
 function ownPath(home, relative) {
   if (relative.split(/[\\/]/).some(x => !x || x === '..') || path.isAbsolute(relative)) throw Error('invalid install target');
   const target = path.resolve(home, relative);
-  safePath(path.dirname(target), path.basename(target));
+  safePath(home, ...relative.split(/[\\/]/));   // every folder from the Codex home down to the target, so a link inside the home is refused
   return target;
 }
 

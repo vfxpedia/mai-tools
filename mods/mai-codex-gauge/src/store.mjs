@@ -3,8 +3,10 @@ const idPattern=/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
 export function validateId(id){if(typeof id!=='string'||!idPattern.test(id))throw Error('invalid session id');return id;}
 export function safePath(base,...parts){
  if(parts.some(p=>typeof p!=='string'||p==='..'||p.includes('..')||/[\\/]/.test(p)))throw Error('unsafe path component');
- const target=path.resolve(base,...parts);let p=target;
- while(true){try{if(fs.lstatSync(p).isSymbolicLink())throw Error('symlink/junction refused');}catch(e){if(e.code!=='ENOENT')throw e;}const up=path.dirname(p);if(up===p)break;p=up;}
+ const target=path.resolve(base,...parts),root=path.resolve(base);let p=target;
+ // A link planted at or inside the store is refused. The folders above the store belong to the system or the user and are not checked:
+ // on macOS /var and /tmp are themselves links, so checking up to the disk root refused every store below them.
+ while(true){try{if(fs.lstatSync(p).isSymbolicLink())throw Error('symlink/junction refused');}catch(e){if(e.code!=='ENOENT')throw e;}if(p===root)break;const up=path.dirname(p);if(up===p)break;p=up;}
  return target;
 }
 const digest=x=>crypto.createHash('sha256').update(x).digest('hex');

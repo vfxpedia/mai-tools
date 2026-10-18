@@ -1,4 +1,4 @@
-Status: draft (M2, live view, wider resources). 132 tests pass on Windows (72 + 12 + 25 + 16 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
+Status: draft (M2, live view, wider resources). 142 tests pass on Windows (72 + 12 + 25 + 16 + 10 + 7). The earlier 72 + 7 also pass on Linux (WSL and CI) and macOS (CI). Real `nvidia-smi`, disks, network and usage were read on one Windows 11 machine. Not measured: a long run during real training or rendering (M3), notifier, macOS with a GPU, Linux and macOS paths for the session usage files.
 
 [한국어](README.ko.md)
 
@@ -39,6 +39,25 @@ How to read it:
 
 Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one `nvidia-smi` query takes about 0.08 s; a NAS address that does not answer took Windows 21 s to fail, and the page marked it `no answer` after 3 s while the rest kept updating.
 
+## For AI agents and scripts
+
+```
+mai-watch status          # what needs attention now, one line each; exit 0 nothing at warn, 1 something is, 2 mai-watch not reachable
+mai-watch status --json   # the whole judgment list with the numbers behind each line
+```
+
+An agent that checks a long run every so often can ask this instead of calling nvidia-smi, df and the rest itself, and gets the same judgment the page shows. Exit 2 means mai-watch is not running, which is not the same as all clear.
+
+## Notifications
+
+```
+mai-watch --notify-cmd "python send.py" [--notify-file outbox.txt] [--notify-level warn] [--notify-hold 60]
+```
+
+mai-watch never holds a messaging token. It hands each message to your command: the text arrives on standard input, and is also written to `--notify-file` first when you give one. A finding is announced once it has lasted `--notify-hold` seconds (60 by default, so a one-sample blip is not news), again if it gets worse, and as cleared once it has been gone that long. Changes from one check go out as one message; nothing repeats while a finding just stays. The result of the last send is in `/status.json` (`notify`), so a sender that keeps failing is visible. The same settings go in the configuration as `notify_cmd`, `notify_file`, `notify_level`, `notify_hold_s`.
+
+Measured on the reference machine with its existing Telegram sender (`--notify-file` its outbox, `--notify-cmd` its PowerShell script): one message with the four current findings, sender result `exit 0: sent ok=True`.
+
 ## AI session usage
 
 Read from what the session gauges in this repository ([mai-gauge](../../mods/mai-gauge), [mai-codex-gauge](../../mods/mai-codex-gauge)) record in `~/.mai` (or `$MAI_HOME`, or `--mai-home`). The gauges take the plan limits from the CLIs you are already signed in to, so there is no key to set.
@@ -74,6 +93,6 @@ Full contract: `schema/status.v1.schema.json`; `mai-watch validate <files>` chec
 
 ## Commands
 
-`mai-watch` (same as `live`) · `demo [folder]` · `init <folder>` · `collect [--once]` · `check` (exit 1 on any alert) · `show` (the whole snapshot as JSON) · `serve` (page for a separate collector) · `validate <files>`. Everything listens on 127.0.0.1 only.
+`mai-watch` (same as `live`) · `demo [folder]` · `status [--json]` · `init <folder>` · `collect [--once]` · `check` (exit 1 on any alert) · `show` (the whole snapshot as JSON) · `serve` (page for a separate collector) · `validate <files>`. Everything listens on 127.0.0.1 only.
 
-Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_schema_contract.py` (needs `jsonschema`; the page tests need Node.js).
+Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_notify.py`, `tests/test_schema_contract.py` (needs `jsonschema`; the page tests need Node.js).

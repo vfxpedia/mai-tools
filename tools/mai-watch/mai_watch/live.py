@@ -84,6 +84,7 @@ class LiveSampler:
         self._nic_reader = nic_reader or nics.read
         self.nic_kinds = {}             # adapter name -> wired, wireless, virtual or unknown, also read once at start
         self.thresholds = thresholds or {}
+        self.notify_state = None        # last notification attempt, shown in status.json (None: notifications off or nothing sent yet)
         self.slow = {'paths': self.paths.snapshot(), 'usage': None if usage_on else {'available': False, 'reason': 'usage view turned off (--no-usage)'},
                      'updated_at': None}
 
@@ -232,6 +233,9 @@ class LiveSampler:
             out.append(r)
         return out
 
+    def now_iso(self):
+        return _z(self.clock())
+
     def status(self):
         """The judgment list with its evidence (/status.json): what agents and notifiers read instead of the page."""
         with self.lock:
@@ -241,7 +245,8 @@ class LiveSampler:
         found = judge.judge(items, slow, self.thresholds, self.interval_s)
         counts = {k: sum(1 for f in found if f['level'] == k) for k in ('bad', 'warn', 'info')}
         last = items[-1]['t'] if items else None
-        return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'counts': counts, 'judgments': found}
+        return {'schema': STATUS_SCHEMA, 'generated_at': _z(self.clock()), 'last_sample_at': last, 'counts': counts, 'judgments': found,
+                'notify': self.notify_state}
 
     def payload(self, since=None):
         with self.lock:

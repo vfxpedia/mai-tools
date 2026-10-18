@@ -1,4 +1,4 @@
-상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 132개 통과 (72 + 12 + 25 + 16 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
+상태: 초안 (M2 · 실시간 화면 · 자원 확장). Windows 에서 시험 142개 통과 (72 + 12 + 25 + 16 + 10 + 7). 앞선 72 + 7개는 Linux (WSL 과 CI), macOS (CI) 에서도 통과. 실제 `nvidia-smi` · 디스크 · 네트워크 · 사용량은 Windows 11 한 대에서 읽었다. 재지 않은 것: 실제 학습 · 렌더 중 장시간 운영 (M3), 알림, GPU 있는 macOS, Linux · macOS 에서 세션 사용량 파일의 경로.
 
 [English](README.md)
 
@@ -39,6 +39,25 @@ mai-watch
 
 RTX 5080 두 장의 Windows 11 에서 잰 것: 화면 값이 `nvidia-smi` 와 맞았다. `nvidia-smi` 한 번에 약 0.08초. 응답하지 않는 NAS 주소는 Windows 가 실패를 알리기까지 21초가 걸렸고, 화면은 3초 만에 `no answer` 로 표시하면서 나머지는 계속 갱신했다.
 
+## AI 에이전트와 스크립트용
+
+```
+mai-watch status          # 지금 확인할 것을 한 줄씩. 종료 코드 0 경고 없음, 1 경고 있음, 2 mai-watch 에 닿지 못함
+mai-watch status --json   # 줄마다 판정 근거 숫자가 붙은 전체 목록
+```
+
+긴 작업을 주기적으로 점검하는 에이전트는 nvidia-smi · df 등을 따로 부르는 대신 이것 하나를 묻고, 화면과 같은 판정을 받는다. 종료 코드 2 는 mai-watch 가 꺼져 있다는 뜻이지 「모두 정상」 이 아니다.
+
+## 알림
+
+```
+mai-watch --notify-cmd "python send.py" [--notify-file outbox.txt] [--notify-level warn] [--notify-hold 60]
+```
+
+mai-watch 는 메시지용 토큰을 갖지 않는다. 메시지를 지정한 명령에 넘길 뿐이다: 표준 입력으로 주고, `--notify-file` 을 주면 먼저 그 파일에도 쓴다. 판정은 `--notify-hold` 초(기본 60) 동안 이어져야 알린다 (한 번 튄 값은 소식이 아니다). 더 나빠지면 다시 알리고, 그만큼 사라져 있으면 「풀림」 으로 알린다. 한 번 점검에서 바뀐 것은 메시지 하나로 묶고, 그대로 머무는 동안은 되풀이하지 않는다. 마지막 발송 결과는 `/status.json` 의 `notify` 에 남아, 발송이 계속 실패하면 보인다. 설정 파일에서는 `notify_cmd` · `notify_file` · `notify_level` · `notify_hold_s` 로 같은 것을 정한다.
+
+기준 기기에서 기존 텔레그램 발송기로 잰 것 (`--notify-file` 은 그 발송기의 outbox, `--notify-cmd` 는 그 PowerShell 스크립트): 지금 판정 넷을 담은 메시지 하나, 발송기 결과 `exit 0: sent ok=True`.
+
 ## AI 세션 사용량
 
 이 저장소의 세션 계기판 ([mai-gauge](../../mods/mai-gauge), [mai-codex-gauge](../../mods/mai-codex-gauge)) 이 `~/.mai` (또는 `$MAI_HOME`, `--mai-home`) 에 기록하는 것을 읽는다. 계기판은 이미 로그인한 CLI 에서 한도 정보를 받으므로 따로 넣을 키가 없다.
@@ -74,6 +93,6 @@ mai-watch demo
 
 ## 명령
 
-`mai-watch` (`live` 와 같음) · `demo [폴더]` · `init <폴더>` · `collect [--once]` · `check` (경보가 있으면 종료 코드 1) · `show` (스냅샷 전체를 JSON 으로) · `serve` (따로 도는 수집기용 화면) · `validate <파일>`. 모두 127.0.0.1 에서만 연다.
+`mai-watch` (`live` 와 같음) · `demo [폴더]` · `status [--json]` · `init <폴더>` · `collect [--once]` · `check` (경보가 있으면 종료 코드 1) · `show` (스냅샷 전체를 JSON 으로) · `serve` (따로 도는 수집기용 화면) · `validate <파일>`. 모두 127.0.0.1 에서만 연다.
 
-설계 · 놀고 있음 판정 규칙 · 검토 기록: [DESIGN.md](DESIGN.md). 시험: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_schema_contract.py` (`jsonschema` 필요, 화면 시험은 Node.js 필요).
+설계 · 놀고 있음 판정 규칙 · 검토 기록: [DESIGN.md](DESIGN.md). 시험: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_notify.py`, `tests/test_schema_contract.py` (`jsonschema` 필요, 화면 시험은 Node.js 필요).

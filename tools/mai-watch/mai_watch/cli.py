@@ -1,4 +1,4 @@
-"""Command line: mai-watch [live|demo|collect|check|show|serve|validate|init]. With no command it starts the live view.
+"""Command line: mai-watch [live|demo|status|collect|check|show|serve|validate|init]. With no command it starts the live view.
 Read-only toward workloads: no stop, kill or launch."""
 import argparse
 import datetime
@@ -20,6 +20,11 @@ stale_factor = 3
 # nvidia_smi = ["nvidia-smi"]
 # folders shown in the live view with free space and answer time; empty means every local drive
 # watch_paths = ["D:/runs", "//nas/share"]
+# notifications: the command gets each message on stdin (and in notify_file when set); mai-watch never holds a token
+# notify_cmd = ["powershell", "-File", "C:/path/send.ps1"]
+# notify_file = "C:/path/outbox.txt"
+# notify_level = "warn"        # bad, warn or info
+# notify_hold_s = 60           # a finding must last this long before it is announced, and be gone this long before it is cleared
 # ignore_processes = ["explorer.exe", "chatgpt.exe"]
 # [baseline_memory_mib]
 # "GPU-00000000-0000-0000-0000-000000000000" = 5645
@@ -47,6 +52,13 @@ def main(argv=None):
         p.add_argument('--mai-home', default=None, help='where the session gauges write usage (default ~/.mai or $MAI_HOME)')
         p.add_argument('--no-usage', action='store_true', help='do not show Claude and Codex usage')
         p.add_argument('--no-browser', action='store_true', help='do not open the page in a browser')
+        p.add_argument('--notify-cmd', default=None, help='command that receives each notification on stdin, e.g. "python send.py"')
+        p.add_argument('--notify-file', default=None, help='also write each notification to this file before running the command')
+        p.add_argument('--notify-level', default=None, choices=('bad', 'warn', 'info'), help='lowest level announced (default warn)')
+        p.add_argument('--notify-hold', type=float, default=None, help='seconds a finding must last before it is announced (default 60)')
+    st = sub.add_parser('status', help='print what needs attention now, from a running mai-watch; exit 1 when anything is at warn or bad')
+    st.add_argument('--url', default='http://127.0.0.1:28765/status.json')
+    st.add_argument('--json', action='store_true', help='print the whole status document')
     lv.add_argument('--config', default=None, help='optional: also run the workload collector of this configuration')
     v = sub.add_parser('validate'); v.add_argument('files', nargs='+')
     i = sub.add_parser('init'); i.add_argument('dir')
@@ -81,6 +93,8 @@ def main(argv=None):
         return run_live(a)
     if a.cmd == 'demo':
         return run_demo(a)
+    if a.cmd == 'status':
+        return run_status(a)
     try:
         cfg = collector.load_config(a.config)
     except FileNotFoundError:
@@ -145,6 +159,32 @@ def write_demo(folder, now=None):
     return cfg
 
 
+def run_status(a):
+    """For people and AI agents: the judgment list of a running mai-watch, one line each with its level. Exit 0 when nothing is at
+    warn or bad, 1 when something is, 2 when mai-watch cannot be reached (that is not "all clear")."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(a.url, timeout=10) as r:
+            doc = json.loads(r.read().decode('utf-8'))
+    except Exception as e:
+        print('cannot read %s: %s (is mai-watch running?)' % (a.url, e), file=sys.stderr)
+        return 2
+    if doc.get('schema') != 'mai-watch-status-v1':
+        print('%s is not a mai-watch status document' % a.url, file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps(doc, indent=2, ensure_ascii=False))
+    else:
+        found = doc.get('judgments') or []
+        print('mai-watch status at %s (last sample %s): %d act now, %d look soon, %d notes' % (
+            doc.get('generated_at'), doc.get('last_sample_at'), doc['counts'].get('bad', 0), doc['counts'].get('warn', 0), doc['counts'].get('info', 0)))
+        for f in found:
+            print('%-5s %s' % (f['level'], f['text']))
+        if not found:
+            print('nothing needs attention')
+    return 1 if (doc['counts'].get('bad', 0) or doc['counts'].get('warn', 0)) else 0
+
+
 def run_demo(a):
     try:
         a.config = write_demo(a.dir)
@@ -180,6 +220,20 @@ def run_live(a):
         return 2
     stop = threading.Event()
     threading.Thread(target=sampler.run, args=(stop,), daemon=True).start()
+    cmd = a.notify_cmd or (cfg.notify_cmd if cfg else None)
+    if cmd:
+        from . import notify
+        try:
+            cmd = notify.split_cmd(cmd) if isinstance(cmd, str) else [str(x) for x in cmd]
+            notifier = notify.Notifier(level=a.notify_level or (cfg.notify_level if cfg else 'warn'),
+                                       hold_s=a.notify_hold if a.notify_hold is not None else (cfg.notify_hold_s if cfg else 60))
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        nfile = a.notify_file or (cfg.notify_file if cfg else None)
+        threading.Thread(target=notify.loop, args=(sampler, notifier, cmd, stop), kwargs={'notify_file': nfile,
+                         'log': lambda m: print(m, file=sys.stderr)}, daemon=True).start()
+        print('notifications: %s (level %s and above)' % (' '.join(cmd), notifier.level))
     if cfg is not None:
         def record():
             try:

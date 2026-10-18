@@ -40,6 +40,11 @@ class Config:
         # live view only: folders whose free space and answer time are shown (local drives, NAS shares); empty means every local drive
         self.watch_paths = list(kw.get('watch_paths', []))
         self.mai_home = kw.get('mai_home')
+        # live view only: a command that receives each notification (text on stdin, and in notify_file when set); see notify.py
+        self.notify_cmd = kw.get('notify_cmd')
+        self.notify_file = kw.get('notify_file')
+        self.notify_level = kw.get('notify_level', 'warn')
+        self.notify_hold_s = kw.get('notify_hold_s', 60)
 
     def tracker_args(self):
         return dict(window_s=self.idle_window_s, threshold_pct=self.idle_utilization_pct, min_s=self.idle_min_s, resume_s=self.idle_resume_s, max_gap_s=self.max_gap_s)

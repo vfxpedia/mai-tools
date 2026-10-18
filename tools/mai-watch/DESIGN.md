@@ -170,6 +170,14 @@ Independent review R9 to R12 (pipeline, vfxpedia/mai-os#43), fixed: the idle-VRA
 
 Measured on the reference machine: the list gave H: 7.4 GiB free (bad), D: and I: nearly full, and the 100 Mbps link, the same as measured by hand; disk names matched Get-Disk; the page was checked in a browser. Removing each of 11 rules makes a test fail. Not measured: the idle-VRAM rule against a real held-but-idle job, Linux disk names on a real machine.
 
+## 9g. Agents and notifications (stage 4 of direction B)
+
+`mai-watch status` reads `/status.json` of a running mai-watch and prints one line per finding; exit 0 nothing at warn or bad, 1 something is, 2 not reachable or not a status document (never read as all clear). This is the interface for agents: a session checking a long run asks it instead of running its own nvidia-smi, df and so on, and gets the judgment the page shows.
+
+Notifications (`notify.py`): mai-watch holds no messaging token. A command chosen by the owner receives each message on standard input, and in `notify_file` first when set. `Notifier.update` is a pure function: a finding (identified by kind and subject, so a changing number is the same finding) is announced after it has lasted `hold_s`, again when it rises from warn to bad, quietly remembered when it eases, and announced as cleared after it has been gone `hold_s`; a finding gone before its announcement is forgotten (a blip), and one back within `hold_s` of leaving is neither cleared nor repeated. Changes of one check form one message, most severe first. The loop checks every 30 s, records the last send (time, ok, detail, count) in `/status.json` `notify`, and survives a failing sender. Commands are split without a shell, keeping backslashes (Windows paths).
+
+Measured on the reference machine: with the existing Telegram sender as the command and its outbox as the file, one message with the four current findings, sender result `exit 0: sent ok=True`; arrival on the phone is confirmed by the owner, not by the sender's word. Removing each of 8 notifier and status rules makes a test fail. Not done: a mai-gauge MCP tool over the same status (agents use the CLI now), notifications from the workload record (stale job) through the same path.
+
 ## 10. Security and safety
 
 - Read-only. v1 contains no stop, kill, or launch capability.

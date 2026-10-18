@@ -61,7 +61,7 @@ class UnitTests(unittest.TestCase):
             if sys.platform!='win32': raise
             import subprocess
             subprocess.run(['cmd','/c','mklink','/J',str(link),str(outside)],check=True,capture_output=True)
-        self.f.unit['outputs']=['link/escaped.py']
+        self.f.unit['outputs']=['analysis.json','link/escaped.py']
         with self.assertRaisesRegex(ValueError,'escape'): self.api.prepare_packet(self.load())
 
 if __name__=='__main__': unittest.main()

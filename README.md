@@ -26,6 +26,6 @@ python common/run_all_tests.py        # every test file, each in an isolated int
 
 ## Status of this repository
 
-Early. The first three tools are checked on Windows 11 and Ubuntu 24.04 (WSL). macOS is measured only by the CI job once it has run. Interfaces are versioned in their schemas (`mai-approval-v1`, `maiwatch-snapshot-v1`, `mai-tabs-export-v1`) and may still change before 1.0.
+Early. The first three tools are checked on Windows 11 and Ubuntu 24.04 (WSL). Linux and macOS runner results are in docs/PLATFORMS.md (mocked input only: no GPU or Chrome on a runner). Interfaces are versioned in their schemas (`mai-approval-v1`, `maiwatch-snapshot-v1`, `mai-tabs-export-v1`) and may still change before 1.0.
 
 License: see [LICENSE](LICENSE).

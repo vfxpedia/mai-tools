@@ -82,7 +82,10 @@ def main(argv=None):
         except (OSError, UnicodeDecodeError):
             continue
         read += 1
-        rel = os.path.relpath(f, ROOT).replace(os.sep, '/')
+        try:
+            rel = os.path.relpath(f, ROOT).replace(os.sep, '/')
+        except ValueError:          # a file on another drive (Windows): show it as given
+            rel = f.replace(os.sep, '/')
         if rel == SELF and not a.paths:
             continue
         found += scan_text(rel, text, a.deny_host)

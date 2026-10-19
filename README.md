@@ -12,6 +12,7 @@ Each tool started as something its author needed, was checked against real measu
 | [mai-approve](tools/mai-approve/) | Owner-run standing approval with an expiry for unattended runs: a hashed approval file, per-run receipts, counts that cannot be reset by a new run id, a tamper-evident audit log | M1, reviewed | `python -m mai_approve --help` (inside `tools/mai-approve`) |
 | [mai-watch](tools/mai-watch/) | Read-only monitor for GPU use and workload status: collector, idle detection with explicit unknowns, liveness, event log, local viewer | M2, reviewed | `python -m mai_watch --help` (inside `tools/mai-watch`) |
 | [mai-tabs](tools/mai-tabs/) | Saves open browser tabs as categorized Markdown before a cleanup, proposes what could be closed, never closes anything | M1, exercised once in an isolated profile | `python -m mai_tabs --help` (inside `tools/mai-tabs`) |
+| [mai-resume](tools/mai-resume/) | Warns AI coding sessions in Orca before a plan limit runs out, wakes them after it resets, and keeps idle sessions' prompt cache alive; one instance, never types into a prompt that holds text | M1, checked on one Windows machine with a real pane |
 
 Session mods live in [mods/](mods/): **mai-gauge** for Claude Code (install with `/plugin marketplace add vfxpedia/mai-tools` then `/plugin install mai-gauge@mai-mods`) and **mai-codex-gauge** for Codex.
 

@@ -1,0 +1,193 @@
+"""Tests for mai_resume.runner with a fake Orca: retry after a failed send, one instance only, restart alert, status."""
+import datetime as dt
+import io
+import json
+import os
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from mai_resume import core, runner  # noqa: E402
+
+UTC = dt.timezone.utc
+T0 = dt.datetime(2026, 10, 20, 0, 0, tzinfo=UTC)
+
+
+class FakeOrca:
+    exe = 'fake'
+
+    def __init__(self, terms, screens, fail_sends=0, list_error=False):
+        self.terms, self.screens, self.fail_sends, self.list_error = terms, screens, fail_sends, list_error
+        self.sent = []
+
+    def terminals(self):
+        if self.list_error:
+            raise RuntimeError('orca down')
+        return self.terms
+
+    def screen(self, handle):
+        if handle not in self.screens:
+            raise RuntimeError('cannot read')
+        return self.screens[handle]
+
+    def send(self, handle, text):
+        if self.fail_sends > 0:
+            self.fail_sends -= 1
+            return False
+        self.sent.append((handle, text))
+        return True
+
+
+def limits_file(d, pct):
+    p = os.path.join(d, 'limits.json')
+    reset = (T0 + dt.timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump({'default': {'five_hour': [{'at': int(T0.timestamp() * 1000), 'pct': pct, 'reset': reset}]}}, f)
+    return p
+
+
+def wj(path, doc):
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(doc, f)
+
+
+def rj(path):
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def rt(path):
+    with open(path, encoding='utf-8') as f:
+        return f.read()
+
+
+NOSLEEP = lambda s: None  # noqa: E731
+
+
+TERMS = [{'handle': 'a', 'agentIdentity': 'claude', 'connected': True, 'writable': True}]
+IDLE = {'a': '❯ \n'}
+
+
+class Runner(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.lim = limits_file(self.d, 94)
+        self.log = runner.Log(os.path.join(self.d, 'resume.log'))
+
+    def test_failed_send_is_retried_next_round_and_sent_once(self):
+        orca = FakeOrca(TERMS, IDLE, fail_sends=1)
+        st = runner.round_once(orca, {}, core.merged({}), self.lim, T0, self.log)
+        self.assertEqual(orca.sent, [])
+        self.assertEqual(len(st['pending']), 1)
+        self.assertEqual(st['sent'], {})
+        st = runner.round_once(orca, st, core.merged({}), self.lim, T0 + dt.timedelta(minutes=1), self.log)
+        self.assertEqual([h for h, _ in orca.sent], ['a'])
+        st = runner.round_once(orca, st, core.merged({}), self.lim, T0 + dt.timedelta(minutes=2), self.log)
+        self.assertEqual(len(orca.sent), 1, 'no duplicate after the retry')
+
+    def test_typing_that_starts_right_before_sending_defers(self):
+        class LateTyper(FakeOrca):
+            reads = 0
+
+            def screen(self, handle):
+                self.reads += 1
+                return {'text': '❯', 'prompt_trailing': 1 if self.reads == 1 else 0}
+        orca = LateTyper(TERMS, IDLE)
+        st = runner.round_once(orca, {}, core.merged({}), self.lim, T0, self.log)
+        self.assertEqual(orca.sent, [], 'second look found typed text, nothing typed in')
+        self.assertEqual(len(st['pending']), 1)
+        self.assertEqual(st['sent'], {})
+        self.assertIn('DEFER', rt(os.path.join(self.d, 'resume.log')))
+
+    def test_dry_run_sends_nothing(self):
+        orca = FakeOrca(TERMS, IDLE)
+        runner.round_once(orca, {}, core.merged({}), self.lim, T0, self.log, dry=True)
+        self.assertEqual(orca.sent, [])
+        self.assertIn('DRY send a', rt(os.path.join(self.d, 'resume.log')))
+
+    def test_run_once_writes_state_and_survives_a_bad_round(self):
+        home = os.path.join(self.d, 'home')
+        rc = runner.run(home=home, limits_path=self.lim, once=True, orca=FakeOrca(TERMS, IDLE, list_error=True),
+                        clock=lambda: T0)
+        self.assertEqual(rc, 0)
+        st = rj(os.path.join(home, 'state.json'))
+        self.assertEqual(st['heartbeat'], '2026-10-20T00:00:00Z')
+        self.assertIn('ROUND error', rt(os.path.join(home, 'resume.log')))
+
+    def test_only_one_instance_can_hold_the_lock(self):
+        port = 28799
+        first = runner.take_lock(port)
+        self.assertIsNotNone(first)
+        try:
+            self.assertIsNone(runner.take_lock(port))
+        finally:
+            first.close()
+        again = runner.take_lock(port)
+        self.assertIsNotNone(again, 'the lock is free again once the holder is gone')
+        again.close()
+
+    def test_second_run_exits_when_the_lock_is_held(self):
+        home = os.path.join(self.d, 'home2')
+        os.makedirs(home)
+        wj(os.path.join(home, 'config.json'), {'lock_port': 28798})
+        held = runner.take_lock(28798)
+        try:
+            self.assertEqual(runner.run(home=home, limits_path=self.lim, orca=FakeOrca(TERMS, IDLE), clock=lambda: T0), 3)
+        finally:
+            held.close()
+
+    def test_restart_after_a_crash_sends_an_alert(self):
+        home = os.path.join(self.d, 'home3')
+        os.makedirs(home)
+        marker = os.path.join(self.d, 'alert.txt')
+        cfg = {'lock_port': 28797, 'poll_s': 60,
+               'notify_cmd': [sys.executable, '-c', 'import sys; open(sys.argv[1], "w", encoding="utf-8").write(sys.stdin.read())', marker]}
+        wj(os.path.join(home, 'config.json'), cfg)
+        wj(os.path.join(home, 'state.json'), {'heartbeat': '2026-10-19T23:40:00Z', 'clean_exit': False})
+
+        class Stop(Exception):
+            pass
+
+        def clock_then_stop(calls=[0]):
+            calls[0] += 1
+            if calls[0] > 2:
+                raise KeyboardInterrupt
+            return T0
+
+        rc = runner.run(home=home, limits_path=self.lim, orca=FakeOrca(TERMS, IDLE), clock=clock_then_stop, sleep=NOSLEEP)
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.exists(marker), 'restart alert must be sent')
+        self.assertIn('no watch for 20 min', rt(marker))
+        st = rj(os.path.join(home, 'state.json'))
+        self.assertTrue(st['clean_exit'], 'an interrupted stop is a clean exit')
+
+    def test_clean_previous_exit_sends_no_alert(self):
+        home = os.path.join(self.d, 'home4')
+        os.makedirs(home)
+        marker = os.path.join(self.d, 'alert4.txt')
+        cfg = {'lock_port': 28796, 'notify_cmd': [sys.executable, '-c', 'open(r"%s", "w").write("x")' % marker]}
+        wj(os.path.join(home, 'config.json'), cfg)
+        wj(os.path.join(home, 'state.json'), {'heartbeat': '2026-10-19T20:00:00Z', 'clean_exit': True})
+
+        def clock_then_stop(calls=[0]):
+            calls[0] += 1
+            if calls[0] > 1:
+                raise KeyboardInterrupt
+            return T0
+        runner.run(home=home, limits_path=self.lim, orca=FakeOrca(TERMS, IDLE), clock=clock_then_stop, sleep=NOSLEEP)
+        self.assertFalse(os.path.exists(marker))
+
+    def test_status_exit_codes(self):
+        home = os.path.join(self.d, 'home5')
+        os.makedirs(home)
+        wj(os.path.join(home, 'state.json'), {'heartbeat': '2026-10-20T00:00:00Z', 'pid': 1})
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.status(home=home, clock=lambda: T0 + dt.timedelta(seconds=90)), 0)
+            self.assertEqual(runner.status(home=home, clock=lambda: T0 + dt.timedelta(seconds=181)), 1)
+            self.assertEqual(runner.status(home=os.path.join(self.d, 'nothing'), clock=lambda: T0), 1)
+
+
+if __name__ == '__main__':
+    unittest.main()

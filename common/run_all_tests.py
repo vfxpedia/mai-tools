@@ -14,6 +14,7 @@ SUITES = {
     'mai-approve': ['tests/test_schema_contract.py', 'tests/test_cli.py', 'tests/test_hardening.py'],
     'mai-watch': ['tests/test_mai_watch.py', 'tests/test_live.py', 'tests/test_resources.py', 'tests/test_judge.py', 'tests/test_notify.py', 'tests/test_schema_contract.py'],
     'mai-tabs': ['tests/test_mai_tabs.py'],
+    'mai-resume': ['tests/test_core.py', 'tests/test_runner.py'],
     'common': ['tests/test_hygiene.py'],
 }
 # suites that are not Python: (folder, command, how to read the count)

@@ -23,6 +23,7 @@ DEFAULTS = {
     'resume_grace_s': 180,
     'poll_s': 60,
     'defer_give_up_s': 1800,       # a message that could not be delivered for this long is dropped (and logged)
+    'keepalive_s': 3300,           # nudge an idle Claude session this often so its prompt cache (1 h) survives; 0 = off
     'engines': {'claude': {'account': 'default'}, 'codex': {'account_prefix': 'codex:'}},
     'messages': {
         'warn': '[mai-resume {now}] {engine} {window} limit at {pct}% (resets {reset}). Do not start new large work. '
@@ -31,6 +32,8 @@ DEFAULTS = {
                 'mai-resume will send a resume message after the reset.',
         'resume': '[mai-resume {now}] The {engine} {window} limit has reset. Re-read your HANDOFF and the last '
                   'instruction, then continue the stopped work. If it was finished, go on with the next task.',
+        'keepalive': '[mai-resume {now}] Cache keep-alive. If you have work in progress, continue it; otherwise reply '
+                     'with the single word idle.',
     },
 }
 
@@ -38,8 +41,11 @@ HIT = re.compile(r"You['’]ve hit your (?P<what>.+?) limit\s*[·.]\s*resets\s+(
 WHEN = re.compile(r'^(?:(?P<mon>[A-Z][a-z]{2})\s+(?P<day>\d{1,2}),\s*)?(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>am|pm)$', re.I)
 MONTHS = {m: i for i, m in enumerate(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], 1)}
 FIXED_TZ = {'Asia/Seoul': 9, 'Asia/Tokyo': 9, 'UTC': 0, 'Etc/UTC': 0}   # used when the zoneinfo database is missing (Windows)
+# the line Claude Code leaves when a turn ends: "* Brewed for 2s . done 오전 12:42" (Korean locale, seen 10/20) or "done 12:42 am"
+DONE_KO = re.compile('·\\s*done\\s+(오전|오후)\\s*(\\d{1,2}):(\\d{2})')
+DONE_EN = re.compile(r'·\s*done\s+(\d{1,2}):(\d{2})\s*(am|pm)', re.I)
 CLAUDE_PLACEHOLDER = re.compile(r'^Try "[^"]*"$')
-SPINNER = re.compile(r'…\s*\(\d+(?:m \d+)?s|esc to interrupt', re.I)
+SPINNER = re.compile(r'…\s*\(\d+(?:m \d+)?s|esc to interrupt|Compacting', re.I)
 CODEX_PLACEHOLDERS = ('ask codex to do anything', 'find and fix a bug', 'explain this codebase', 'summarize recent commits',
                       'implement {feature}', 'write tests for', 'improve documentation', 'run /review')
 
@@ -149,7 +155,25 @@ def parse_reset(when, tz, now):
     return cand
 
 
-def screen_state(engine, screen, now):
+def _done_at(text, now, local_tz):
+    """Time of the last 'done hh:mm' line on the screen (local wall clock), as an aware datetime, or None."""
+    last = None
+    for m in DONE_KO.finditer(text):
+        h, mi = int(m.group(2)) % 12 + (12 if m.group(1) == '오후' else 0), int(m.group(3))
+        last = (h, mi)
+    for m in DONE_EN.finditer(text):
+        h, mi = int(m.group(1)) % 12 + (12 if m.group(3).lower() == 'pm' else 0), int(m.group(2))
+        last = (h, mi)
+    if last is None:
+        return None
+    loc = now.astimezone(local_tz) if local_tz else now.astimezone()
+    t = loc.replace(hour=last[0], minute=last[1], second=0, microsecond=0)
+    if t > loc + dt.timedelta(minutes=1):
+        t -= dt.timedelta(days=1)
+    return t
+
+
+def screen_state(engine, screen, now, local_tz=None):
     """{'hit': (what, reset) or None, 'typing': bool, 'busy': bool} read from the visible screen of a pane.
     `screen` is the screen text, or a dict {'text': ..., 'prompt_trailing': n} where n is the trailing-space count of the
     last prompt row. Orca's screen read does not show text typed but not yet submitted into a Claude prompt (measured
@@ -175,7 +199,8 @@ def screen_state(engine, screen, now):
         typed = ''
     if engine == 'claude' and prompts and not typed and trailing == 0:
         typed = '(hidden typed text)'
-    return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(text))}
+    tail = '\n'.join(lines[-14:])
+    return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(tail)), 'done_at': _done_at(tail, now, local_tz)}
 
 
 def _fmt(cfg, kind, engine, window, pct, reset, now_local):
@@ -190,7 +215,7 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
     `screens` maps handle -> screen text (missing = could not read; such a pane is not typed into)."""
     cfg = merged(cfg)
     st = {'sent': dict(state.get('sent') or {}), 'windows': dict(state.get('windows') or {}),
-          'pending': list(state.get('pending') or [])}
+          'pending': list(state.get('pending') or []), 'keepalive': dict(state.get('keepalive') or {})}
     logs = []
     now_local = now.astimezone(local_tz) if local_tz else now.astimezone()
     sessions = discover(terminals, cfg.get('only_handles'), cfg.get('exclude_handles'))
@@ -248,6 +273,36 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         w['resumed'] = True
         logs.append('RESUME %s to %d' % (key, len([h for h in w['handles'] if h in live])))
 
+    # 3b. cache keep-alive (owner 10/20): an idle Claude session is nudged once per keepalive_s so its prompt cache lives.
+    #     Not while a limit window of the engine is held (warned, before its resume) or the pane shows the limit line:
+    #     requests are refused then, so a nudge keeps no cache and only spends the limit. A working pane keeps its own
+    #     cache, so its clock just restarts. A first-seen pane only starts its clock. Unknown state: nothing is sent.
+    period = cfg.get('keepalive_s') or 0
+    held = {k.split('|', 1)[0] for k, w in st['windows'].items() if not w['resumed'] and now < _parse_iso(w['resume_at'])}
+    ka = st['keepalive']
+    for s in sessions:
+        if not period or s['engine'] != 'claude':
+            continue
+        h = s['handle']
+        if h not in ka:
+            ka[h] = _iso(now)
+            continue
+        ss = screen_state('claude', screens.get(h), now, local_tz) if h in screens else None
+        if ss is None:
+            continue
+        clock = _parse_iso(ka[h])
+        if ss['busy']:
+            ka[h] = _iso(now)
+            continue
+        if ss['done_at'] and ss['done_at'] > clock:
+            clock = ss['done_at']
+            ka[h] = _iso(clock)
+        if (now - clock).total_seconds() < period or 'claude' in held or ss['hit'] or not ss['done_at']:
+            continue
+        queue(h, _fmt(cfg, 'keepalive', 'claude', '', None, now, now_local), 'keep|%s|%s' % (h, ka[h]))
+        ka[h] = _iso(now)
+        logs.append('KEEPALIVE %s' % h)
+
     # 4. deliver what is pending, never into a prompt that holds text
     sends, keep = [], []
     for p in st['pending']:
@@ -265,7 +320,9 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
             continue
         sends.append((p['handle'], one_line(p['text']), p['id']))
         st['sent'][p['id']] = _iso(now)
+        st['keepalive'][p['handle']] = _iso(now)          # any message delivered also renews that pane's cache
     st['pending'] = keep
+    st['keepalive'] = {h: v for h, v in st['keepalive'].items() if h in live}
 
     # forget windows and sent ids older than 8 days so the state file stays small
     cutoff = now - dt.timedelta(days=8)

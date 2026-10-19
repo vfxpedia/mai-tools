@@ -174,6 +174,87 @@ class Parse(unittest.TestCase):
         self.assertTrue(core.screen_state('codex', '› fix the failing test', T0)['typing'])
 
 
+def done_screen(t_local):
+    """An idle Claude pane whose last turn ended at t_local (KST wall clock), as Claude Code shows it in Korean."""
+    ap = '오전' if t_local.hour < 12 else '오후'
+    h12 = t_local.hour % 12 or 12
+    return '● idle\n✻ Brewed for 2s · done %s %d:%02d\n❯ \n' % (ap, h12, t_local.minute)
+
+
+class Keepalive(unittest.TestCase):
+    LOW = limits(10)
+
+    def k(self, state, now, screens, terms=None):
+        terms = terms or [term('a')]
+        return core.tick(state, now, self.LOW, terms, screens, {}, local_tz=KST)
+
+    def test_first_seen_starts_the_clock_only(self):
+        st, sends, _ = self.k({}, T0, {'a': done_screen(T0.astimezone(KST))})
+        self.assertEqual(sends, [])
+        self.assertEqual(st['keepalive']['a'], '2026-10-20T00:00:00Z')
+
+    def test_idle_pane_is_nudged_at_55_minutes_once(self):
+        scr = {'a': done_screen((T0 - dt.timedelta(minutes=1)).astimezone(KST))}
+        st, _, _ = self.k({}, T0, scr)
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=54), scr)
+        self.assertEqual(sends, [])
+        st, sends, logs = self.k(st, T0 + dt.timedelta(minutes=55), scr)
+        self.assertEqual([(h, i.split('|')[0]) for h, _, i in sends], [('a', 'keep')])
+        self.assertIn('KEEPALIVE a', logs)
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=56), scr)
+        self.assertEqual(sends, [], 'one nudge per period')
+
+    def test_working_pane_only_restarts_its_clock(self):
+        busy = {'a': '✳ Working… (40s · esc to interrupt)\n❯ \n'}
+        st, _, _ = self.k({}, T0, busy)
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=55), busy)
+        self.assertEqual(sends, [])
+        self.assertEqual(st['keepalive']['a'], '2026-10-20T00:55:00Z')
+
+    def test_a_newer_turn_end_counts_as_activity(self):
+        st, _, _ = self.k({}, T0, {'a': done_screen((T0 - dt.timedelta(minutes=1)).astimezone(KST))})
+        later = {'a': done_screen((T0 + dt.timedelta(minutes=30)).astimezone(KST))}
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=55), later)
+        self.assertEqual(sends, [], 'the pane worked at +30 min, so its cache is fresh')
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=85), later)
+        self.assertEqual([h for h, _, _ in sends], ['a'])
+
+    def test_no_nudge_while_a_limit_window_is_held(self):
+        scr = {'a': done_screen((T0 - dt.timedelta(minutes=1)).astimezone(KST))}
+        st, sends, _ = core.tick({}, T0, limits(94), [term('a')], scr, {}, local_tz=KST)   # warned, reset at T0 + 2 h
+        st, sends, _ = core.tick(st, T0 + dt.timedelta(minutes=70), limits(97), [term('a')], scr, {}, local_tz=KST)
+        self.assertEqual([i for _, _, i in sends if i.startswith('keep')], [])
+
+    def test_delivered_warning_renews_the_clock(self):
+        scr = {'a': done_screen((T0 - dt.timedelta(minutes=1)).astimezone(KST))}
+        st, _, _ = self.k({}, T0, scr)
+        st, sends, _ = core.tick(st, T0 + dt.timedelta(minutes=30), limits(94), [term('a')], scr, {}, local_tz=KST)
+        self.assertEqual(st['keepalive']['a'], '2026-10-20T00:30:00Z')
+
+    def test_unknown_state_or_codex_gets_nothing(self):
+        st, _, _ = self.k({}, T0, {'a': 'no done line here\n❯ \n', 'x': IDLE_CODEX}, [term('a'), term('x', 'codex')])
+        st, sends, _ = self.k(st, T0 + dt.timedelta(hours=2), {'a': 'no done line here\n❯ \n', 'x': IDLE_CODEX},
+                              [term('a'), term('x', 'codex')])
+        self.assertEqual(sends, [])
+
+    def test_typing_defers_the_nudge(self):
+        idle = {'a': done_screen((T0 - dt.timedelta(minutes=1)).astimezone(KST))}
+        st, _, _ = self.k({}, T0, idle)
+        typing = {'a': {'text': idle['a'], 'prompt_trailing': 0}}
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=55), typing)
+        self.assertEqual(sends, [])
+        self.assertEqual([p['id'].split('|')[0] for p in st['pending']], ['keep'])
+
+    def test_done_line_parsing(self):
+        now = dt.datetime(2026, 10, 20, 3, 0, tzinfo=UTC)      # 12:00 KST
+        self.assertEqual(core.screen_state('claude', '· done 오전 11:42', now, KST)['done_at'],
+                         dt.datetime(2026, 10, 20, 11, 42, tzinfo=KST))
+        self.assertEqual(core.screen_state('claude', '· done 오후 11:42', now, KST)['done_at'],
+                         dt.datetime(2026, 10, 19, 23, 42, tzinfo=KST), 'a later wall time means yesterday')
+        self.assertEqual(core.screen_state('claude', '· done 12:05 am', now, KST)['done_at'],
+                         dt.datetime(2026, 10, 20, 0, 5, tzinfo=KST))
+
+
 class Codex(unittest.TestCase):
     def test_codex_window_warns_codex_sessions_only(self):
         lim = limits(96, window='seven_day', account='codex:ai-ws01-orca')

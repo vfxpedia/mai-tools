@@ -22,6 +22,12 @@ Every minute (`poll_s`) it:
 4. books a **resume** for any pane whose screen already says `You've hit your ... limit . resets <time>`, even when the
    limits file never showed the window filling up.
 5. **resumes** every warned or stopped session once, `resume_grace_s` after the reset: re-read the HANDOFF and continue.
+6. **keeps the prompt cache alive**: a Claude session that has been idle for `keepalive_s` (55 minutes, inside the
+   one-hour cache lifetime) gets one short nudge. Idle means the end of its screen shows the `done hh:mm` line Claude Code
+   leaves after a turn and no progress mark. A working session keeps its own cache, so its clock just restarts; any
+   warning or resume message also counts as a nudge. No nudge while a limit window is held (warned, before the resume)
+   or the pane shows the limit line: requests are refused then, so a nudge keeps no cache and only spends the limit.
+   A pane seen for the first time only starts its clock.
 
 ## Delivery rules
 
@@ -63,7 +69,8 @@ Everything lives in `~/.mai/resume/`: `config.json` (optional), `state.json`, `r
 | `resume_grace_s` | 180 | resume this long after the reset |
 | `poll_s` | 60 | seconds between rounds |
 | `defer_give_up_s` | 1800 | drop a message that could not be delivered for this long |
-| `messages` | English text | `warn` and `resume` templates; `{now} {engine} {window} {pct} {reset}` |
+| `keepalive_s` | 3300 | nudge an idle Claude session after this long; 0 turns it off |
+| `messages` | English text | `warn`, `resume` and `keepalive` templates; `{now} {engine} {window} {pct} {reset}` |
 | `only_handles` / `exclude_handles` | none | limit the guard to, or leave out, these Orca terminal handles |
 | `notify_cmd` / `notify_file` | none | alert sender (text on stdin; `notify_file` is written first) |
 | `orca` | found on PATH | the Orca CLI executable (`orca.exe` on Windows, `orca-ide` on Linux) |

@@ -4,11 +4,12 @@
 param([Parameter(Mandatory = $true)][string]$Pythonw, [string]$TaskName = 'mai-resume')
 if (-not (Test-Path -LiteralPath $Pythonw)) { Write-Error "pythonw not found: $Pythonw"; exit 1 }
 $action = New-ScheduledTaskAction -Execute $Pythonw -Argument '-m mai_resume run'
-$logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$me = [Security.Principal.WindowsIdentity]::GetCurrent().Name     # DOMAIN\user; a bare user name is refused (seen 10/20)
+$logon = New-ScheduledTaskTrigger -AtLogOn -User $me
 $repeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+$principal = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($logon, $repeat) -Settings $settings -Principal $principal `
     -Description 'mai-resume: warns AI coding sessions before a plan limit and wakes them after the reset' -Force | Out-Null
 $t = Get-ScheduledTask -TaskName $TaskName

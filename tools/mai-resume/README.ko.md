@@ -1,0 +1,42 @@
+# mai-resume
+
+[English](README.md)
+
+AI 코딩 세션의 사용 한도가 차기 직전에 세션들에 마무리를 알리고, 한도가 풀리면 다시 깨워 이어 가게 한다.
+
+한도에 걸린 세션은 일하던 중에 멈추고, 세션 안의 예약 알림도 한도 중에는 돌지 않아 아무도 깨우지 못한다. mai-resume 는 세션 밖에서 돌아서 세션들이 멈춰도 살아 있다.
+
+## 하는 일
+
+1 분 (`poll_s`) 마다:
+
+1. [Orca](https://www.onorca.dev) 의 살아 있는 에이전트 창을 센다 (`orca terminal list`). 새 세션은 손으로 목록에 넣지 않아도 잡힌다. Claude 창과 Codex 창은 Orca 의 에이전트 표식으로 가르고, 엔진마다 자기 한도를 따른다
+2. 한도 파일 (`~/.mai/limits.json`, mai-gauge 상태 표시줄이 쓴다) 과 창마다의 화면을 읽는다
+3. 한 엔진의 한도 구간이 `warn_pct` (5 시간 93 %, 주간 95 %) 를 넘으면 그 엔진의 세션마다 그 구간에 **한 번 경고**한다: 안전한 지점까지만 마무리 · HANDOFF 적기 · 멈추기 · GPU 작업은 건드리지 않기. 같은 구간에 나중에 생긴 세션도 받는다. 한도 파일이 `limits_stale_s` 보다 낡았으면 더 낮은 `stale_warn_pct` 를 써서, 파일이 늦어도 경고는 늦지 않게 한다
+4. 화면에 `You've hit your ... limit · resets <시각>` 이 뜬 창은 이미 멈춘 것이므로, 한도 파일에 안 나타났어도 그 시각에 **재개를 예약**한다
+5. 풀림 시각 + `resume_grace_s` 뒤에, 경고했거나 멈춘 세션마다 **한 번 재개**를 보낸다: HANDOFF 를 다시 읽고 이어 가기
+
+## 보내는 규칙
+
+- 글이 들어 있는 입력창에는 아무것도 치지 않는다. Orca 의 화면 읽기는 Claude 입력창에 쳤지만 아직 안 보낸 글을 보여 주지 않는데, 그 동안 입력 줄 끝의 빈칸이 1 에서 0 으로 바뀐다 (10/20 실측). 이것을 읽고, 보내기 바로 직전에 한 번 더 본다. `defer_give_up_s` 넘게 못 보낸 문구는 버리고 기록한다
+- 일하는 중인 창에는 대기열의 다음 지시로 들어간다 (Claude 가 지금 일을 끝낸 뒤 처리, 실제 창 시험으로 확인)
+- 같은 문구 (창 · 종류 · 구간) 는 두 번 보내지 않는다. 문구는 한 줄이고, Orca 실행 파일을 인자 목록으로 직접 부른다. 셸을 거치지 않는다 (cmd 를 거치면 여러 줄 문구가 첫 줄에서 잘렸다)
+- 한 기기에 하나만 돈다 (localhost 포트 잠금). 매 회차 맥박을 남기고, 비정상으로 멈췄다가 다시 뜨면 `notify_cmd` 로 알린다
+
+## 설치
+
+Python 3.9 이상, 다른 패키지 없음.
+
+```
+pip install -e tools/mai-resume
+mai-resume run --once --dry-run      # 한 회차만, 보낼 것을 기록만 하고 보내지 않음
+mai-resume status                    # 맥박 확인, 낡았으면 종료값 1
+```
+
+로그온 때 창 없이 자동 시작:
+
+- **Windows**: `powershell -ExecutionPolicy Bypass -File tools/mai-resume/autostart/register-windows.ps1 -Pythonw <pythonw.exe>` 가 예약 작업 `mai-resume` 를 등록한다 (로그온 시작 + 안 돌고 있으면 다시 띄우는 5 분 반복)
+- **Linux**: `tools/mai-resume/autostart/mai-resume.service` (systemd 사용자 단위, 설치 순서는 파일 머리에)
+- **macOS**: LaunchAgent 로 `mai-resume run` (아직 묶지 않음)
+
+설정 · 파일 · 시험 · 한계는 [README.md](README.md) 의 표와 같다.

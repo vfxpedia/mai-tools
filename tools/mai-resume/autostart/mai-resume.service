@@ -1,0 +1,17 @@
+# systemd user unit for Linux. Install:
+#   python3 -m venv ~/.venvs/mai-resume && ~/.venvs/mai-resume/bin/pip install -e <mai-tools>/tools/mai-resume
+#   mkdir -p ~/.config/systemd/user && cp mai-resume.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now mai-resume
+#   loginctl enable-linger "$USER"          # keeps it running without a login session
+# Check: systemctl --user status mai-resume ; ~/.venvs/mai-resume/bin/mai-resume status
+[Unit]
+Description=mai-resume: warn AI coding sessions before a plan limit, wake them after the reset
+After=default.target
+
+[Service]
+ExecStart=%h/.venvs/mai-resume/bin/mai-resume run
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

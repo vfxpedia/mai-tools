@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mai-resume"
+version = "0.1.0"
+description = "Warn AI coding sessions before a plan limit runs out, and wake them after it resets."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+mai-resume = "mai_resume.cli:main"
+
+[tool.setuptools]
+packages = ["mai_resume"]

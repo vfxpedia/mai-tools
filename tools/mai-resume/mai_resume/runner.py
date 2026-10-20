@@ -198,6 +198,43 @@ def round_once(orca, state, cfg, limits_path, now, log, dry=False):
     return new
 
 
+def safe_send(orca, handle, text, wait_s=600, step_s=5, sleep=time.sleep, log=print):
+    """Send one line into another session only when nobody is typing there (10/20: a report pasted into the lead pane
+    while the owner was typing in it). The prompt must read empty twice, step_s apart, with the same screen both times,
+    and once more right before the send. Waits up to wait_s. Returns 0 sent, 4 still busy, 2 pane not found or error."""
+    eng = next((t.get('agentIdentity') for t in orca.terminals() if t.get('handle') == handle), None)
+    if eng not in ('claude', 'codex'):
+        log('no claude or codex pane %s' % handle)
+        return 2
+    waited = 0.0
+    while True:
+        try:
+            a = orca.screen(handle)
+            sleep(step_s)
+            b = orca.screen(handle)
+        except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+            log('read failed: %s' % e)
+            return 2
+        now = dt.datetime.now(dt.timezone.utc)
+        quiet = a == b and not core.screen_state(eng, a, now)['typing'] and not core.screen_state(eng, b, now)['typing']
+        if quiet:
+            try:
+                last = orca.screen(handle)
+            except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+                log('read failed: %s' % e)
+                return 2
+            if last == b:
+                ok = orca.send(handle, core.one_line(text))
+                log('sent' if ok else 'send refused')
+                return 0 if ok else 2
+        waited += step_s
+        if waited >= wait_s:
+            log('not quiet for %d s (someone typing or output still moving), nothing sent' % waited)
+            return 4
+        sleep(step_s)
+        waited += step_s
+
+
 def run(home=None, limits_path=None, once=False, dry=False, clock=None, orca=None, sleep=time.sleep):
     home = home_dir(home)
     os.makedirs(home, exist_ok=True)

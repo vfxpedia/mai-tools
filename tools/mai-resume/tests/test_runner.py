@@ -233,5 +233,49 @@ class Runner(unittest.TestCase):
             self.assertEqual(runner.status(home=os.path.join(self.d, 'nothing'), clock=lambda: T0), 1)
 
 
+EMPTY = {'text': 'out\n❯ \n', 'prompt_trailing': 1}
+
+
+class ScreenSeq(FakeOrca):
+    """Each read of the pane returns the next screen; the last one repeats."""
+    def __init__(self, seq):
+        super().__init__([{'handle': 'L', 'agentIdentity': 'claude', 'connected': True, 'writable': True}], {})
+        self.seq = list(seq)
+
+    def screen(self, handle):
+        return self.seq.pop(0) if len(self.seq) > 1 else self.seq[0]
+
+
+class SafeSend(unittest.TestCase):
+    """10/20 17:0x: a report was sent into the lead pane while the owner was typing there."""
+    def send(self, seq, wait_s=30):
+        orca = ScreenSeq(seq)
+        rc = runner.safe_send(orca, 'L', 'report', wait_s=wait_s, step_s=5, sleep=NOSLEEP, log=lambda *_: None)
+        return rc, orca.sent
+
+    def test_owner_typing_in_the_lead_pane_gets_nothing(self):
+        typing = [{'text': 'out\n❯ 지금 ' + 'x' * n + '\n', 'prompt_trailing': 0} for n in range(40)]
+        self.assertEqual(self.send(typing), (4, []))
+
+    def test_hidden_typed_text_is_not_overwritten(self):
+        self.assertEqual(self.send([{'text': 'out\n❯\n', 'prompt_trailing': 0}]), (4, []))
+
+    def test_screen_still_changing_is_not_quiet(self):
+        moving = [{'text': 'out %d\n❯ \n' % n, 'prompt_trailing': 1} for n in range(40)]
+        self.assertEqual(self.send(moving), (4, []))
+
+    def test_quiet_empty_prompt_is_sent_once(self):
+        self.assertEqual(self.send([EMPTY]), (0, [('L', 'report')]))
+
+    def test_sent_after_the_owner_stops_and_submits(self):
+        typed = {'text': 'out\n❯ 안녕\n', 'prompt_trailing': 0}
+        self.assertEqual(self.send([typed, typed, typed, EMPTY]), (0, [('L', 'report')]))
+
+    def test_unknown_pane_is_an_error(self):
+        orca = ScreenSeq([EMPTY])
+        self.assertEqual(runner.safe_send(orca, 'nope', 'r', sleep=NOSLEEP, log=lambda *_: None), 2)
+        self.assertEqual(orca.sent, [])
+
+
 if __name__ == '__main__':
     unittest.main()

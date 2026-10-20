@@ -91,3 +91,7 @@ restart alert, status, re-check before sending, with a fake Orca). Both run in `
   layout can change it. Codex prompts are read by their visible text and known placeholders only.
 - Between the last look and the send there is still a moment (well under a second) in which a person could start typing.
 - It needs Orca: panes outside Orca are not seen.
+
+## Sending one line to another session
+
+`python -m mai_resume send --to <handle> --text <text> [--wait 600]` sends only when the prompt is empty and the screen reads the same twice 5 s apart, and checks once more right before sending. If the pane does not go quiet within `--wait` seconds nothing is sent and the exit code is 4. Added 10/20 after a session report was sent into a pane the owner was typing in.

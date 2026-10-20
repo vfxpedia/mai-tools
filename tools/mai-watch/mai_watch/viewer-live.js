@@ -15,6 +15,12 @@
   function fmt(v, digits, unit) { return known(v) ? v.toFixed(digits) + (unit || '') : 'unknown'; }
   function ms(iso) { return Date.parse(iso); }
   function sinceIso(iso) { var t = Date.parse(iso || ''); return isFinite(t) ? Math.max(0, (Date.now() - t) / 1000) : null; }
+  // plan limit text and meter class from the percent and the age of the reading in seconds (10/20)
+  function limitLabel(pct, age) {
+    if (!known(pct)) return { cls: '', text: 'unknown' };
+    if (!known(age) || age > 1800) return { cls: 'off', text: pct + '% · old reading (' + ago(age) + ' ago), may have reset' };
+    return { cls: pct >= 80 ? 'hot' : '', text: pct + '%' };
+  }
   function ago(sec) { return !known(sec) ? 'unknown' : sec < 90 ? Math.round(sec) + ' s' : sec < 5400 ? Math.round(sec / 60) + ' min' : sec < 172800 ? (sec / 3600).toFixed(1) + ' h' : (sec / 86400).toFixed(1) + ' days'; }
   function rate(v) { return !known(v) ? 'unknown' : (v >= 100 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2)) + ' MiB/s'; }
   function gib(mib) { return known(mib) ? (mib / 1024).toFixed(1) : 'unknown'; }
@@ -247,9 +253,12 @@
         var x = r[w[0]], c = el('div', undefined, 'limit');
         c.appendChild(el('div', r.engine + ' · ' + w[1], 'limit-name'));
         if (!x) { c.appendChild(el('div', 'not recorded by the gauge', 'quiet')); lim.appendChild(c); return; }
+        // a reading older than 30 min is shown as old, grey, never hot: codex records only when a codex turn runs, so after an
+        // early reset the page kept showing 86 % hot for 10 h (10/20)
+        var lab = limitLabel(x.pct, sinceIso(x.read_at));
         var line = el('div', undefined, 'meter-cell');
-        line.appendChild(meter(x.pct, known(x.pct) && x.pct >= 80 ? 'hot' : ''));
-        line.appendChild(el('span', known(x.pct) ? x.pct + '%' : 'unknown', 'strong'));
+        line.appendChild(meter(x.pct, lab.cls));
+        line.appendChild(el('span', lab.text, 'strong'));
         c.appendChild(line);
         // the gauge records the plan limit when a session takes a turn; this is the age of that reading, not a live measurement
         c.appendChild(el('div', (x.reset && isFinite(Date.parse(x.reset)) ? 'resets in ' + ago(Math.max(0, (Date.parse(x.reset) - Date.now()) / 1000)) : 'reset unknown') + ' · reading ' + ago(sinceIso(x.read_at)) + ' old' + (x.note ? ' · ' + x.note : ''), 'quiet'));
@@ -343,5 +352,5 @@
   }
 
   if (typeof document !== 'undefined' && document.getElementById && document.getElementById('live')) poll();
-  if (typeof module !== 'undefined') module.exports = { sparkPoints: sparkPoints, activity: activity };
+  if (typeof module !== 'undefined') module.exports = { sparkPoints: sparkPoints, activity: activity, limitLabel: limitLabel };
 })(typeof window !== 'undefined' ? window : this);

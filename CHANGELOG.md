@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- mai-watch viewer: a plan limit reading older than 30 minutes is shown grey with «old reading (N h ago), may have reset» instead of a hot meter. Codex records its limit only when a codex turn runs, so after an early reset the page kept showing 86 % hot for 10 hours.
+
 - mai-resume: `send` command for one line into another session, only when nobody is typing there (empty prompt, same screen twice 5 s apart, checked again right before sending; exit 4 when it never goes quiet).
 
 - mai-resume: an allow list file (`~/.mai/resume/targets.txt`, read every round) limits which panes get anything; the resume message asks to continue only work the limit stopped and otherwise reply idle, the keep-alive asks for the word idle and no work. A message given up after 30 min is not queued again, and a pane gets one resume per reset.

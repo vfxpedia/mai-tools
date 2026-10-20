@@ -93,6 +93,10 @@ class Orca:
                 break
         return {'text': '\n'.join(lines), 'prompt_trailing': trailing}
 
+    def split(self, handle, command):
+        r = self._run(['terminal', 'split', '--terminal', handle, '--direction', 'vertical', '--command', command])
+        return bool(r)
+
     def send(self, handle, text):
         r = self._run(['terminal', 'send', '--terminal', handle, '--text', core.one_line(text), '--enter'])
         s = r.get('send') or {}
@@ -198,7 +202,50 @@ def round_once(orca, state, cfg, limits_path, now, log, dry=False):
             new['sent'].pop(mid, None)
             new['pending'].append({'handle': handle, 'text': text, 'id': mid, 'since': core._iso(now)})
     new['sessions'] = len(sessions)
+    new['companions'] = dict(state.get('companions') or {})   # tick keeps only its own keys
+    attach_companions(orca, new, cfg, terminals, sessions, log, dry)
     return new
+
+
+def codex_ids_from_sessions(folder):
+    """handle -> codex session id, newest file per handle, from the session gauges' ~/.mai/sessions/*.json."""
+    best = {}
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return {}
+    for n in names:
+        if not n.endswith('.json'):
+            continue
+        d = load_json(os.path.join(folder, n), None)
+        if not isinstance(d, dict) or not d.get('handle') or not str(d.get('id', '')).startswith('01'):
+            continue          # codex thread ids start with 01 (UUID v7); Claude ids do not
+        at = d.get('updatedAt') or 0
+        if d['handle'] not in best or at > best[d['handle']][0]:
+            best[d['handle']] = (at, d['id'])
+    return {h: v[1] for h, v in best.items()}
+
+
+def attach_companions(orca, state, cfg, terminals, sessions, log, dry=False):
+    """Open the codex gauge next to codex panes that have none (lead · owner 10/20). Off when companion_cli is missing."""
+    cli = cfg.get('companion_cli') or os.path.join(os.path.expanduser('~'), '.codex', 'mai-codex-gauge', 'src', 'cli.mjs')
+    if cfg.get('companion') is False or not os.path.isfile(cli) or not hasattr(orca, 'split'):
+        return
+    done = state.setdefault('companions', {})
+    ids = codex_ids_from_sessions(cfg.get('sessions_dir') or os.path.join(os.path.expanduser('~'), '.mai', 'sessions'))
+    inc = {t.get('handle'): t.get('incarnationId', '') for t in terminals or [] if isinstance(t, dict)}
+    for handle, sid in core.need_companion(terminals, sessions, ids, done, cfg.get('only_handles')):
+        cmd = '%s "%s" watch --session %s' % (cfg.get('node') or 'node', cli, sid)
+        if dry:
+            log('DRY companion %s %s' % (handle, cmd))
+            continue
+        try:
+            ok = orca.split(handle, cmd)
+        except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+            ok = False
+            log('COMPANION error %s %s' % (handle, e))
+        log('COMPANION %s session=%s opened=%s' % (handle, sid, ok))
+        done[handle] = inc.get(handle, '')      # once per incarnation, even if it failed: no retry storm
 
 
 def safe_send(orca, handle, text, wait_s=600, step_s=5, sleep=time.sleep, log=print):

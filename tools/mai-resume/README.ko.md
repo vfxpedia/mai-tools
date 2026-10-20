@@ -49,3 +49,7 @@ mai-resume status                    # 맥박 확인, 낡았으면 종료값 1
 ## 다른 세션에 한 줄 보내기 (10/20)
 
 세션끼리 보고를 보낼 때는 `orca terminal send` 를 바로 쓰지 말고 `python -m mai_resume send --to <창> --text <글>` 을 쓴다. 입력 줄이 비어 있고 5 초 간격 두 번 화면이 같을 때만, 보내기 직전에 한 번 더 보고 보낸다. 10 분 (`--wait`) 안에 조용해지지 않으면 보내지 않고 종료값 4. 10/20 에 팀장이 lead 창에 치는 중에 super2 의 보고가 붙어 들어간 일 뒤에 생겼다.
+
+## Codex 계기판 자동으로 붙이기 (10/20)
+
+보낼 창 목록에 있는 Codex 창 옆에 계기판 창이 없으면, 지킴이가 그 창을 나눠 `mai-codex-gauge watch --session <ID>` 를 띄운다. ID 는 계기판이 쓰는 `~/.mai/sessions/*.json` 의 창 이름표로 찾는다. 같은 탭에 이미 계기판이 보이면 (제목에 Mods, 또는 미리보기에 계기판 줄) 열지 않는다. 창 하나에 한 번만 열고, 팀장이 닫으면 다시 열지 않는다 (그 창이 새로 뜨면 다시). 계기판이 깔려 있지 않으면 (`~/.codex/mai-codex-gauge/src/cli.mjs` 없음) 아무것도 안 한다. 끄려면 config.json 에 `"companion": false`.

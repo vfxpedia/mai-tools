@@ -252,6 +252,76 @@ class Runner(unittest.TestCase):
             self.assertEqual(runner.status(home=os.path.join(self.d, 'nothing'), clock=lambda: T0), 1)
 
 
+class Splitter(FakeOrca):
+    def __init__(self, terms):
+        super().__init__(terms, {t['handle']: 'out\n› Ask Codex to do anything\n' for t in terms})
+        self.splits = []
+
+    def split(self, handle, command):
+        self.splits.append((handle, command))
+        return True
+
+
+def cx(handle, tab, inc='i1', title=None):
+    return {'handle': handle, 'agentIdentity': 'codex', 'connected': True, 'writable': True, 'tabId': tab,
+            'incarnationId': inc, 'title': title or handle}
+
+
+class Companion(unittest.TestCase):
+    """Codex gauge pane opened by itself next to codex panes that have none (owner 10/20)."""
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.lim = limits_file(self.d, 10)
+        self.log = runner.Log(os.path.join(self.d, 'resume.log'))
+        self.ses = os.path.join(self.d, 'sessions')
+        os.makedirs(self.ses)
+        self.cli = os.path.join(self.d, 'cli.mjs')
+        open(self.cli, 'w').close()
+        for h, sid in (('term_aaa', '01a1-aaa'), ('term_bbb', '01a1-bbb')):
+            wj(os.path.join(self.ses, sid + '.json'), {'id': sid, 'handle': h, 'updatedAt': 1})
+        wj(os.path.join(self.ses, 'claude.json'), {'id': 'f4a0-claude', 'handle': 'term_ccc', 'updatedAt': 1})
+        self.cfg = dict(core.merged({}), companion_cli=self.cli, sessions_dir=self.ses, targets_file=None)
+
+    def test_opens_once_for_a_codex_pane_without_one(self):
+        orca = Splitter([cx('term_aaa', 'T1')])
+        st = runner.round_once(orca, {}, self.cfg, self.lim, T0, self.log)
+        self.assertEqual([h for h, _ in orca.splits], ['term_aaa'])
+        self.assertIn('watch --session 01a1-aaa', orca.splits[0][1])
+        runner.round_once(orca, st, self.cfg, self.lim, T0 + dt.timedelta(minutes=1), self.log)
+        self.assertEqual(len(orca.splits), 1, 'not again next round, and not again if the owner closes it')
+
+    def test_tab_that_already_has_a_mods_pane_gets_none(self):
+        orca = Splitter([cx('term_aaa', 'T1'), cx('term_m', 'T1', title='pipeline · Mods')])
+        orca.terms[1]['agentIdentity'] = None
+        runner.round_once(orca, {}, self.cfg, self.lim, T0, self.log)
+        self.assertEqual(orca.splits, [])
+
+    def test_tab_with_an_untitled_gauge_pane_gets_none(self):
+        g = cx('term_g', 'T1', title='node')
+        g['agentIdentity'] = None
+        g['preview'] = 'context  60%\n5 hours  -\n7 days   3%\nturn     T 4.9M'
+        orca = Splitter([cx('term_aaa', 'T1'), g])
+        runner.round_once(orca, {}, self.cfg, self.lim, T0, self.log)
+        self.assertEqual(orca.splits, [], 'a gauge pane opened earlier (title not Mods) must not get a twin')
+
+    def test_only_allow_listed_panes_and_known_ids(self):
+        orca = Splitter([cx('term_aaa', 'T1'), cx('term_bbb', 'T2'), cx('term_zzz', 'T3')])
+        runner.round_once(orca, {}, dict(self.cfg, only_handles=['term_bbb', 'term_zzz']), self.lim, T0, self.log)
+        self.assertEqual([h for h, _ in orca.splits], ['term_bbb'], 'aaa is not listed, zzz has no known session id')
+
+    def test_a_new_incarnation_of_the_pane_gets_one_again(self):
+        orca = Splitter([cx('term_aaa', 'T1', inc='i1')])
+        st = runner.round_once(orca, {}, self.cfg, self.lim, T0, self.log)
+        orca.terms[0]['incarnationId'] = 'i2'
+        runner.round_once(orca, st, self.cfg, self.lim, T0 + dt.timedelta(minutes=1), self.log)
+        self.assertEqual(len(orca.splits), 2)
+
+    def test_off_without_the_gauge_installed(self):
+        orca = Splitter([cx('term_aaa', 'T1')])
+        runner.round_once(orca, {}, dict(self.cfg, companion_cli=os.path.join(self.d, 'missing.mjs')), self.lim, T0, self.log)
+        self.assertEqual(orca.splits, [])
+
+
 EMPTY = {'text': 'out\n❯ \n', 'prompt_trailing': 1}
 
 

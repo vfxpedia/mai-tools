@@ -162,6 +162,22 @@ class SparkTests(unittest.TestCase):
         self.assertEqual(json.loads(p.stdout), ['0.0,48.0 75.0,24.0', '225.0,0.0 300.0,0.0'])
 
 
+class LimitLabelTests(unittest.TestCase):
+    def test_old_reading_is_grey_and_says_old_fresh_high_is_hot(self):
+        js = os.path.join(ROOT, 'mai_watch', 'viewer-live.js').replace(os.sep, '/')
+        script = ("const m=require(%r);"
+                  "console.log(JSON.stringify([m.limitLabel(86,36000),m.limitLabel(86,60),m.limitLabel(40,60),m.limitLabel(86,null),m.limitLabel(null,60)]))") % js
+        p = subprocess.run(['node', '-e', script], capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        old, hot, calm, noage, unknown = json.loads(p.stdout)
+        self.assertEqual(old['cls'], 'off')                   # 10/20: codex 86 % from 09:52 shown hot after an early reset
+        self.assertIn('old reading (10.0 h ago)', old['text'])
+        self.assertEqual((hot['cls'], hot['text']), ('hot', '86%'))
+        self.assertEqual((calm['cls'], calm['text']), ('', '40%'))
+        self.assertEqual(noage['cls'], 'off')
+        self.assertEqual(unknown['text'], 'unknown')
+
+
 class CliTests(unittest.TestCase):
     def test_live_command_exists_and_refuses_a_bad_interval(self):
         env = dict(os.environ)

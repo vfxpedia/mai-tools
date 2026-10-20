@@ -58,11 +58,75 @@ class Warn(unittest.TestCase):
         st, sends, _ = tick({}, RESET + dt.timedelta(minutes=1), limits(99), [term('a')])
         self.assertEqual(sends, [])
 
-    def test_stale_limits_warn_early_fresh_do_not(self):
+    def test_stale_limits_send_only_the_notice_never_the_stop(self):
         fresh = limits(88, at=T0)
-        stale = limits(88, at=T0 - dt.timedelta(minutes=20))
+        stale = limits(99, at=T0 - dt.timedelta(minutes=20))
         self.assertEqual(tick({}, T0, fresh, [term('a')])[1], [])
-        self.assertEqual([h for h, _, _ in tick({}, T0, stale, [term('a')])[1]], ['a'])
+        st, sends, _ = tick({}, T0, stale, [term('a')])
+        self.assertEqual([m for _, _, m in sends], ['notice|a|claude|five_hour|' + core._iso(RESET)])
+        self.assertIn('keep doing the current work', sends[0][1])
+        self.assertEqual(st['windows'], {}, 'a stale reading must not hold the window')
+
+
+WEEK_RESET = T0 + dt.timedelta(days=5)
+
+
+def week(pct, stale=False, now=T0):
+    at = now - dt.timedelta(minutes=20) if stale else now
+    return limits(pct, at=at, reset=WEEK_RESET, window='seven_day', account='codex:x')
+
+
+class Weekly(unittest.TestCase):
+    """seven_day (lead 10/20): stop only at 98 %; 85 to 97 % is a keep-working notice; a stale reading never stops."""
+    cx = [term('cx', 'codex')]
+
+    def kinds(self, lim):
+        st, sends, _ = tick({}, T0, lim, self.cx)
+        return [m.split('|', 1)[0] for _, _, m in sends], st, sends
+
+    def test_84_sends_nothing(self):
+        self.assertEqual(self.kinds(week(84))[0], [])
+
+    def test_85_is_a_notice_without_hold(self):
+        kinds, st, sends = self.kinds(week(85))
+        self.assertEqual(kinds, ['notice'])
+        self.assertIn('Do not stop', sends[0][1])
+        self.assertNotIn('lead', sends[0][1])
+        self.assertEqual(st['windows'], {})
+
+    def test_97_is_still_a_notice_and_only_once_per_window(self):
+        kinds, st, _ = self.kinds(week(97))
+        self.assertEqual(kinds, ['notice'])
+        _, sends, _ = tick(st, T0 + dt.timedelta(minutes=1), week(97), self.cx)
+        self.assertEqual(sends, [])
+
+    def test_98_is_the_stop_and_holds_until_reset(self):
+        kinds, st, sends = self.kinds(week(98))
+        self.assertEqual(kinds, ['warn'])
+        self.assertIn('and stop', sends[0][1])
+        self.assertEqual(list(st['windows']), ['codex|seven_day|' + core._iso(WEEK_RESET)])
+
+    def test_stale_98_is_only_a_notice_marked_old(self):
+        kinds, st, sends = self.kinds(week(98, stale=True))
+        self.assertEqual(kinds, ['notice'])
+        self.assertIn('reading is old', sends[0][1])
+        self.assertEqual(st['windows'], {})
+
+    def test_notice_then_fresh_98_still_stops(self):
+        _, st, _ = self.kinds(week(90))
+        later = T0 + dt.timedelta(hours=1)
+        _, sends, _ = tick(st, later, week(98, now=later), self.cx)
+        self.assertEqual([m.split('|', 1)[0] for _, _, m in sends], ['warn'])
+
+    def test_stopped_window_gets_no_notice_when_the_reading_goes_stale(self):
+        _, st, _ = self.kinds(week(98))
+        st['sent'] = {p['id']: p['since'] for p in st['pending']}
+        st['pending'] = []
+        _, sends, _ = tick(st, T0 + dt.timedelta(hours=1), week(98), self.cx)   # same reading, now 1 h old
+        self.assertEqual(sends, [])
+
+
+class WarnMore(unittest.TestCase):
 
     def test_only_and_exclude_filters(self):
         terms = [term('a'), term('b'), term('c')]

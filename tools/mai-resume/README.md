@@ -15,10 +15,13 @@ Every minute (`poll_s`) it:
    without a hand-kept list. Claude panes and Codex panes are told apart by Orca's agent identity; each engine follows its
    own plan limits.
 2. reads the plan limits file (`~/.mai/limits.json`, written by the mai-gauge status line) and each pane's screen.
-3. **warns** every session of an engine once per limit window when the window passes `warn_pct` (93 % for five_hour,
-   95 % for seven_day): finish up to a safe point, write a HANDOFF, stop, leave GPU jobs alone. A session that appears
-   later in the same window gets the warning too. If the limits file is older than `limits_stale_s`, the lower
-   `stale_warn_pct` is used, so a late file makes the warning early rather than late.
+3. **stops** every session of an engine once per limit window when a fresh reading passes `warn_pct` (93 % for
+   five_hour, 98 % for seven_day): finish up to a safe point, write a HANDOFF, stop, leave GPU jobs alone. A session that
+   appears later in the same window gets it too. Between `notice_pct` (85 % for seven_day) and the stop, it sends a
+   **notice** once instead: keep doing the current work (owner 10/20). A reading older than
+   `limits_stale_s` never stops anyone: at `stale_warn_pct` or above it sends only the notice, marked as old. A window
+   that was already stopped gets no later notice. (10/20: a stop at seven_day 85 % would have left codex idle for five
+   days with 14 % unused.)
 4. books a **resume** for any pane whose screen already says `You've hit your ... limit . resets <time>`, even when the
    limits file never showed the window filling up.
 5. **resumes** every warned or stopped session once, `resume_grace_s` after the reset: re-read the HANDOFF and continue.
@@ -63,8 +66,9 @@ Everything lives in `~/.mai/resume/`: `config.json` (optional), `state.json`, `r
 
 | key | default | meaning |
 |---|---|---|
-| `warn_pct` | `{"five_hour": 93, "seven_day": 95}` | warn when a window reaches this percent |
-| `stale_warn_pct` | 85 | used instead while the limits file is stale |
+| `warn_pct` | `{"five_hour": 93, "seven_day": 98}` | stop when a fresh reading reaches this percent |
+| `notice_pct` | `{"seven_day": 85}` | keep-working notice from this percent up to the stop |
+| `stale_warn_pct` | 85 | a stale reading at or above this sends only the notice |
 | `limits_stale_s` | 600 | limits older than this are stale |
 | `resume_grace_s` | 180 | resume this long after the reset |
 | `poll_s` | 60 | seconds between rounds |

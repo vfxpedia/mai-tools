@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Imported two things that lived only on AI-WS01 so the setup can be rebuilt elsewhere: `tools/mai-os-pulse` (the workstation panel app, source only, no build output) and `tools/tg-send` (the Telegram sender; the token stays in a local file it reads).
+
 - mai-resume: right before typing, the guard also compares the prompt row with this round's first read; if it moved, someone is typing and the message waits a round (same rule as `send`).
 - mai-watch viewer: a plan limit reading older than 30 minutes is shown grey with «old reading (N h ago), may have reset» instead of a hot meter. Codex records its limit only when a codex turn runs, so after an early reset the page kept showing 86 % hot for 10 hours.
 

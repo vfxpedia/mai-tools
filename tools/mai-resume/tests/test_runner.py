@@ -70,6 +70,50 @@ TERMS = [{'handle': 'a', 'agentIdentity': 'claude', 'connected': True, 'writable
 IDLE = {'a': '❯ \n'}
 
 
+TWO = [{'handle': 'term_2580fc05-aaaa', 'agentIdentity': 'claude', 'connected': True, 'writable': True},
+       {'handle': 'term_bdb042be-bbbb', 'agentIdentity': 'claude', 'connected': True, 'writable': True}]
+TWO_IDLE = {t['handle']: '❯ \n' for t in TWO}
+
+
+class Targets(unittest.TestCase):
+    """The allow list file (owner 10/20: old sessions got resume and keep-alive and restarted long-finished work)."""
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.lim = limits_file(self.d, 94)
+        self.log = runner.Log(os.path.join(self.d, 'resume.log'))
+        self.cfg = dict(core.merged({}), targets_file=os.path.join(self.d, 'targets.txt'))
+        runner._targets_seen.clear()
+
+    def sent_to(self, cfg=None):
+        orca = FakeOrca(TWO, TWO_IDLE)
+        runner.round_once(orca, {}, cfg or self.cfg, self.lim, T0, self.log)
+        return sorted(h for h, _ in orca.sent)
+
+    def test_only_listed_panes_get_anything(self):
+        with open(self.cfg['targets_file'], 'w', encoding='utf-8') as f:
+            f.write('# lead keeps this list\n2580fc05   # lead\n')
+        self.assertEqual(self.sent_to(), ['term_2580fc05-aaaa'])
+
+    def test_empty_list_sends_nothing(self):
+        with open(self.cfg['targets_file'], 'w', encoding='utf-8') as f:
+            f.write('# nobody for now\n')
+        self.assertEqual(self.sent_to(), [])
+
+    def test_list_is_read_again_every_round(self):
+        with open(self.cfg['targets_file'], 'w', encoding='utf-8') as f:
+            f.write('2580fc05\n')
+        orca = FakeOrca(TWO, TWO_IDLE)
+        st = runner.round_once(orca, {}, self.cfg, self.lim, T0, self.log)
+        with open(self.cfg['targets_file'], 'w', encoding='utf-8') as f:
+            f.write('2580fc05\nbdb042be\n')
+        runner.round_once(orca, st, self.cfg, self.lim, T0 + dt.timedelta(minutes=1), self.log)
+        self.assertEqual(sorted(h for h, _ in orca.sent), ['term_2580fc05-aaaa', 'term_bdb042be-bbbb'])
+
+    def test_missing_file_watches_every_pane_and_says_so(self):
+        self.assertEqual(self.sent_to(), ['term_2580fc05-aaaa', 'term_bdb042be-bbbb'])
+        self.assertIn('missing: every pane is watched', rt(os.path.join(self.d, 'resume.log')))
+
+
 class Runner(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()

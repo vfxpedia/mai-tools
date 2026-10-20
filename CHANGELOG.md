@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- mai-resume: an allow list file (`~/.mai/resume/targets.txt`, read every round) limits which panes get anything; the resume message asks to continue only work the limit stopped and otherwise reply idle, the keep-alive asks for the word idle and no work. A message given up after 30 min is not queued again, and a pane gets one resume per reset.
+
 - mai-resume: the seven-day window stops sessions only at 98 %; from 85 % it sends a keep-working notice. A stale limits reading never stops anyone and sends only the notice, marked as old. A window already stopped gets no later notice. Before, a stale codex reading at 85 % stopped four codex sessions for five days with 14 % of the week unused.
 
 - Added mai-resume: warns AI coding sessions in Orca before a plan limit runs out, wakes them after the reset and nudges idle Claude sessions every 55 minutes so their prompt cache survives (not while a limit holds). Finds sessions from Orca itself, follows each engine's own limits, reads the stopped-limit screen line, never types into a prompt that holds text (trailing-space check measured on a real pane, re-checked right before sending), one instance per machine, heartbeat and restart alert. Windows scheduled task and Linux systemd user unit under `tools/mai-resume/autostart`.

@@ -38,9 +38,9 @@ DEFAULTS = {
                   'the current work. A wrap-up message comes only just before the limit runs out.',
         'stale_note': ' (reading is old)',
         'resume': '[mai-resume {now}] The {engine} {window} limit has reset. Re-read your HANDOFF and the last '
-                  'instruction, then continue the stopped work. If it was finished, go on with the next task.',
-        'keepalive': '[mai-resume {now}] Cache keep-alive. If you have work in progress, continue it; otherwise reply '
-                     'with the single word idle.',
+                  'instruction and continue only work the limit stopped. If it was finished, start nothing and reply '
+                  'with the single word idle.',
+        'keepalive': '[mai-resume {now}] Cache keep-alive. Reply with the single word idle. Do not start any work.',
     },
 }
 
@@ -116,15 +116,32 @@ def windows_of(limits, engine, cfg, now):
     return out
 
 
+def picked(handle, ids):
+    """True if handle is one of ids, written whole or as its start with or without 'term_' (e.g. 2580fc05)."""
+    return any(i and (handle == i or handle.startswith(i) or handle.startswith('term_' + i)) for i in ids)
+
+
+def read_targets(text):
+    """The allow list file: one pane id per line (whole handle or its start), anything after # is a note."""
+    out = []
+    for line in (text or '').splitlines():
+        tok = line.split('#', 1)[0].split()
+        if tok:
+            out.append(tok[0])
+    return out
+
+
 def discover(terminals, only=None, exclude=None):
     """Live agent sessions from `orca terminal list --json`: claude and codex panes that are connected and writable.
-    `only` (a list of handles) limits the guard to those panes, used for a real-pane test; `exclude` leaves panes out."""
+    `only` (pane ids, see picked) limits the guard to those panes; an empty list means no pane at all (owner 10/20:
+    old sessions the owner no longer uses must get nothing). None means every pane. `exclude` leaves panes out."""
     found = []
     for t in terminals or []:
         if not isinstance(t, dict):
             continue
         eng = t.get('agentIdentity')
-        if only and t.get('handle') not in only or exclude and t.get('handle') in exclude:
+        h = t.get('handle') or ''
+        if only is not None and not picked(h, only) or exclude and picked(h, exclude):
             continue
         if eng in ('claude', 'codex') and t.get('connected') and t.get('writable') and t.get('handle'):
             found.append({'handle': t['handle'], 'engine': eng, 'title': t.get('title') or ''})
@@ -285,11 +302,11 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
     for key, w in st['windows'].items():
         if w['resumed'] or now < _parse_iso(w['resume_at']):
             continue
-        engine, window, _ = key.split('|', 2)
+        engine, window, reset = key.split('|', 2)
         text = _fmt(cfg, 'resume', engine, window.replace('hit:', ''), None, _parse_iso(w['resume_at']), now_local)
         for h in w['handles']:
-            if h in live:
-                queue(h, text, 'resume|%s|%s' % (h, key))
+            if h in live:   # one resume per pane per reset, even if both the limits file and the screen booked it
+                queue(h, text, 'resume|%s|%s|%s' % (h, engine, reset))
         w['resumed'] = True
         logs.append('RESUME %s to %d' % (key, len([h for h in w['handles'] if h in live])))
 
@@ -335,6 +352,7 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         if scr is None or screen_state(eng, scr, now)['typing']:
             if age > cfg['defer_give_up_s']:
                 logs.append('DROP %s (prompt busy with typed text for %d s)' % (p['id'], age))
+                st['sent'][p['id']] = _iso(now)   # given up for good: without this step 1 queued it again (10/20 12:27, 13:07)
             else:
                 keep.append(p)
             continue

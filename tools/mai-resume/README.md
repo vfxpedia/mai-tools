@@ -76,6 +76,7 @@ Everything lives in `~/.mai/resume/`: `config.json` (optional), `state.json`, `r
 | `keepalive_s` | 3300 | nudge an idle Claude session after this long; 0 turns it off |
 | `messages` | English text | `warn`, `resume` and `keepalive` templates; `{now} {engine} {window} {pct} {reset}` |
 | `only_handles` / `exclude_handles` | none | limit the guard to, or leave out, these Orca terminal handles |
+| `targets_file` | `~/.mai/resume/targets.txt` | allow list, read every round: one pane id per line (whole handle or its start, `#` starts a note). If the file exists only those panes get anything, an empty file means none; without the file every pane is watched and the log says so. Added 10/20 after resume and keep-alive restarted long-finished work in old sessions |
 | `notify_cmd` / `notify_file` | none | alert sender (text on stdin; `notify_file` is written first) |
 | `orca` | found on PATH | the Orca CLI executable (`orca.exe` on Windows, `orca-ide` on Linux) |
 

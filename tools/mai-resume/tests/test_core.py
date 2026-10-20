@@ -164,6 +164,15 @@ class Deliver(unittest.TestCase):
         self.assertEqual(st['pending'], [])
         self.assertTrue(any(l.startswith('DROP warn|a|') for l in logs))
 
+    def test_given_up_message_is_not_queued_again(self):
+        typing = {'a': '❯ still typing'}
+        st, _, _ = tick({}, T0, limits(94), [term('a')], typing)
+        st, _, _ = tick(st, T0 + dt.timedelta(seconds=1801), limits(94, at=T0 + dt.timedelta(seconds=1801)), [term('a')], typing)
+        later = T0 + dt.timedelta(seconds=1900)
+        st, sends, logs = tick(st, later, limits(95, at=later), [term('a')])        # prompt now empty, same window
+        self.assertEqual(sends, [], 'the warn given up at 30 min must not come back (10/20 12:27 then 13:07)')
+        self.assertEqual(st['pending'], [])
+
     def test_pane_gone_drops_its_message(self):
         st, _, _ = tick({}, T0, limits(94), [term('a')], {})
         st, sends, logs = tick(st, T0 + dt.timedelta(minutes=1), limits(94), [term('b')])
@@ -203,6 +212,20 @@ class Resume(unittest.TestCase):
         self.assertEqual(sends, [])
         st, sends, _ = tick(st, dt.datetime(2026, 10, 20, 10, 13, 0, tzinfo=UTC), {}, [term('a')])
         self.assertEqual([(h, i.split('|')[0]) for h, _, i in sends], [('a', 'resume')])
+
+
+    def test_pane_booked_by_limits_and_screen_gets_one_resume(self):
+        reset = dt.datetime(2026, 10, 20, 10, 10, tzinfo=UTC)          # 19:10 in Seoul
+        now = dt.datetime(2026, 10, 20, 9, 0, tzinfo=UTC)
+        hit = {'a': "x\n⎿  You've hit your session limit · resets 7:10pm (Asia/Seoul)\n❯ \n"}
+        st, _, _ = tick({}, now, limits(97, at=now, reset=reset), [term('a')])
+        st['sent'] = {p['id']: p['since'] for p in st['pending']}
+        st['pending'] = []
+        st, _, logs = tick(st, now + dt.timedelta(minutes=1), limits(97, at=now, reset=reset), [term('a')], hit)
+        self.assertTrue(any(l.startswith('HIT a ') for l in logs))
+        late = reset + dt.timedelta(minutes=3)
+        st, sends, _ = tick(st, late, limits(3, at=late, reset=reset + dt.timedelta(hours=5)), [term('a')])
+        self.assertEqual([h for h, _, i in sends if i.startswith('resume')], ['a'], 'one resume, not one per booking (10/20 rl)')
 
 
 class Parse(unittest.TestCase):

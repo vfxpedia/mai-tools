@@ -285,11 +285,11 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
     for key, w in st['windows'].items():
         if w['resumed'] or now < _parse_iso(w['resume_at']):
             continue
-        engine, window, _ = key.split('|', 2)
+        engine, window, reset = key.split('|', 2)
         text = _fmt(cfg, 'resume', engine, window.replace('hit:', ''), None, _parse_iso(w['resume_at']), now_local)
         for h in w['handles']:
-            if h in live:
-                queue(h, text, 'resume|%s|%s' % (h, key))
+            if h in live:   # one resume per pane per reset, even if both the limits file and the screen booked it
+                queue(h, text, 'resume|%s|%s|%s' % (h, engine, reset))
         w['resumed'] = True
         logs.append('RESUME %s to %d' % (key, len([h for h in w['handles'] if h in live])))
 
@@ -335,6 +335,7 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         if scr is None or screen_state(eng, scr, now)['typing']:
             if age > cfg['defer_give_up_s']:
                 logs.append('DROP %s (prompt busy with typed text for %d s)' % (p['id'], age))
+                st['sent'][p['id']] = _iso(now)   # given up for good: without this step 1 queued it again (10/20 12:27, 13:07)
             else:
                 keep.append(p)
             continue

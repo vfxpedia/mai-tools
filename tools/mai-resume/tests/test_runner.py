@@ -316,6 +316,13 @@ class Companion(unittest.TestCase):
         runner.round_once(orca, st, self.cfg, self.lim, T0 + dt.timedelta(minutes=1), self.log)
         self.assertEqual(len(orca.splits), 2)
 
+    def test_real_orca_wrapper_splits_below(self):
+        seen = []
+        o = runner.Orca('orca')
+        o._run = lambda args: seen.append(args) or {'split': {'handle': 'x'}}
+        self.assertTrue(o.split('term_aaa', 'cmd'))
+        self.assertEqual(seen[0][seen[0].index('--direction') + 1], 'horizontal', 'under the chat, not beside it')
+
     def test_off_without_the_gauge_installed(self):
         orca = Splitter([cx('term_aaa', 'T1')])
         runner.round_once(orca, {}, dict(self.cfg, companion_cli=os.path.join(self.d, 'missing.mjs')), self.lim, T0, self.log)

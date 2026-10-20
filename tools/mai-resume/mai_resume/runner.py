@@ -94,7 +94,9 @@ class Orca:
         return {'text': '\n'.join(lines), 'prompt_trailing': trailing}
 
     def split(self, handle, command):
-        r = self._run(['terminal', 'split', '--terminal', handle, '--direction', 'vertical', '--command', command])
+        # 'horizontal' puts the new pane UNDER the chat (checked on screen 10/20). The gauge goes below, never beside
+        # (owner raised it three times). Orca's CLI has no size option, so the new pane starts at half the height.
+        r = self._run(['terminal', 'split', '--terminal', handle, '--direction', 'horizontal', '--command', command])
         return bool(r)
 
     def send(self, handle, text):

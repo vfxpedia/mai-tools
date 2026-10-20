@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- mai-resume: right before typing, the guard also compares the prompt row with this round's first read; if it moved, someone is typing and the message waits a round (same rule as `send`).
+
 - mai-resume: `send` command for one line into another session, only when nobody is typing there (empty prompt, same screen twice 5 s apart, checked again right before sending; exit 4 when it never goes quiet).
 
 - mai-resume: an allow list file (`~/.mai/resume/targets.txt`, read every round) limits which panes get anything; the resume message asks to continue only work the limit stopped and otherwise reply idle, the keep-alive asks for the word idle and no work. A message given up after 30 min is not queued again, and a pane gets one resume per reset.

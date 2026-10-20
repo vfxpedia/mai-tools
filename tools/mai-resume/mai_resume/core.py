@@ -197,6 +197,18 @@ def _done_at(text, now, local_tz):
     return t
 
 
+def prompt_key(engine, screen):
+    """(last prompt row text, its trailing spaces): two reads of a pane whose keys differ mean someone is typing now."""
+    trailing = None
+    if isinstance(screen, dict):
+        trailing = screen.get('prompt_trailing')
+        screen = screen.get('text')
+    mark = '❯' if engine == 'claude' else '›'
+    rows = [ln.replace(' ', ' ').strip() for ln in (screen or '').splitlines()]
+    rows = [ln for ln in rows if ln.startswith(mark)]
+    return (rows[-1] if rows else None, trailing)
+
+
 def screen_state(engine, screen, now, local_tz=None):
     """{'hit': (what, reset) or None, 'typing': bool, 'busy': bool} read from the visible screen of a pane.
     `screen` is the screen text, or a dict {'text': ..., 'prompt_trailing': n} where n is the trailing-space count of the

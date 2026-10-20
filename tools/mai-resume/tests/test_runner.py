@@ -145,6 +145,25 @@ class Runner(unittest.TestCase):
         self.assertEqual(st['sent'], {})
         self.assertIn('DEFER', rt(os.path.join(self.d, 'resume.log')))
 
+    def test_prompt_row_that_changed_between_reads_waits_a_round(self):
+        # lead 10/20: the owner was typing in the lead pane. Each read alone looks empty, but the row moved between them
+        class Moving(FakeOrca):
+            reads = 0
+
+            def screen(self, handle):
+                self.reads += 1
+                if self.reads == 1:
+                    return {'text': 'out\n❯ \n', 'prompt_trailing': 1}
+                if self.reads == 2:
+                    return {'text': 'out\n❯ Try "fix lint"\n', 'prompt_trailing': 1}
+                return {'text': 'out\n❯ Try "fix lint"\n', 'prompt_trailing': 1}
+        orca = Moving(TERMS, IDLE)
+        st = runner.round_once(orca, {}, core.merged({}), self.lim, T0, self.log)
+        self.assertEqual(orca.sent, [])
+        self.assertIn('DEFER', rt(os.path.join(self.d, 'resume.log')))
+        runner.round_once(orca, st, core.merged({}), self.lim, T0 + dt.timedelta(minutes=1), self.log)
+        self.assertEqual(len(orca.sent), 1, 'sent once the row stopped moving')
+
     def test_dry_run_sends_nothing(self):
         orca = FakeOrca(TERMS, IDLE)
         runner.round_once(orca, {}, core.merged({}), self.lim, T0, self.log, dry=True)

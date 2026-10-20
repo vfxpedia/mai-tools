@@ -128,6 +128,20 @@ class Weekly(unittest.TestCase):
 
 class WarnMore(unittest.TestCase):
 
+    def test_pane_ids_match_whole_or_by_start(self):
+        self.assertTrue(core.picked('term_2580fc05-e7ff', ['2580fc05']))
+        self.assertTrue(core.picked('term_2580fc05-e7ff', ['term_2580fc05-e7ff']))
+        self.assertFalse(core.picked('term_bdb042be-187b', ['2580fc05']))
+        self.assertFalse(core.picked('term_x', ['']))
+        self.assertEqual(core.read_targets('# note\n 2580fc05  # lead\n\nbdb042be\n'), ['2580fc05', 'bdb042be'])
+        self.assertEqual(core.discover([term('a')], only=[]), [], 'an empty list is no pane, not every pane')
+
+    def test_resume_and_keepalive_never_ask_for_new_work(self):
+        m = core.DEFAULTS['messages']
+        self.assertNotIn('next task', m['resume'])
+        self.assertIn('start nothing', m['resume'])
+        self.assertIn('Do not start any work', m['keepalive'])
+
     def test_only_and_exclude_filters(self):
         terms = [term('a'), term('b'), term('c')]
         self.assertEqual([s['handle'] for s in core.discover(terms, only=['b'])], ['b'])

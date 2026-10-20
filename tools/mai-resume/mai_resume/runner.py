@@ -129,9 +129,36 @@ def take_lock(port=LOCK_PORT):
         return None
 
 
+_targets_seen = {}
+
+
+def with_targets(cfg, log):
+    """Read the allow list file every round (lead edits it without a restart). A file that exists, even empty, is the
+    whole list; without the file every pane is watched, and that is logged once."""
+    path = cfg.get('targets_file')
+    if not path:
+        return cfg
+    try:
+        with open(path, encoding='utf-8') as f:
+            ids = core.read_targets(f.read())
+    except FileNotFoundError:
+        if _targets_seen.get(path) != 'missing':
+            log('TARGETS %s missing: every pane is watched' % path)
+            _targets_seen[path] = 'missing'
+        return cfg
+    except OSError as e:
+        log('TARGETS %s unreadable (%s): nothing is sent this round' % (path, e))
+        return dict(cfg, only_handles=[])
+    if _targets_seen.get(path) != ids:
+        log('TARGETS %d: %s' % (len(ids), ' '.join(ids)))
+        _targets_seen[path] = ids
+    return dict(cfg, only_handles=ids)
+
+
 def round_once(orca, state, cfg, limits_path, now, log, dry=False):
     """One round: read Orca and limits, decide, deliver. Returns the new state."""
     terminals = orca.terminals()
+    cfg = with_targets(cfg, log)
     sessions = core.discover(terminals, cfg.get('only_handles'), cfg.get('exclude_handles'))
     screens = {}
     for s in sessions:
@@ -176,6 +203,7 @@ def run(home=None, limits_path=None, once=False, dry=False, clock=None, orca=Non
     os.makedirs(home, exist_ok=True)
     log = Log(os.path.join(home, 'resume.log'))
     cfg = core.merged(load_json(os.path.join(home, 'config.json'), {}))
+    cfg.setdefault('targets_file', os.path.join(home, 'targets.txt'))
     limits_path = limits_path or os.path.join(os.path.expanduser('~'), '.mai', 'limits.json')
     clock = clock or (lambda: dt.datetime.now(dt.timezone.utc))
     lock = None if once else take_lock(cfg.get('lock_port', LOCK_PORT))

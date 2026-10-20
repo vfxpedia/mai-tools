@@ -18,7 +18,7 @@ Every minute (`poll_s`) it:
 3. **stops** every session of an engine once per limit window when a fresh reading passes `warn_pct` (93 % for
    five_hour, 98 % for seven_day): finish up to a safe point, write a HANDOFF, stop, leave GPU jobs alone. A session that
    appears later in the same window gets it too. Between `notice_pct` (85 % for seven_day) and the stop, it sends a
-   **notice** once instead: keep doing the current work, check with lead before new large work. A reading older than
+   **notice** once instead: keep doing the current work (owner 10/20). A reading older than
    `limits_stale_s` never stops anyone: at `stale_warn_pct` or above it sends only the notice, marked as old. A window
    that was already stopped gets no later notice. (10/20: a stop at seven_day 85 % would have left codex idle for five
    days with 14 % unused.)

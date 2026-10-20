@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- mai-resume: the seven-day window stops sessions only at 98 %; from 85 % it sends a keep-working notice (check with lead before new large work). A stale limits reading never stops anyone and sends only the notice, marked as old. A window already stopped gets no later notice. Before, a stale codex reading at 85 % stopped four codex sessions for five days with 14 % of the week unused.
+- mai-resume: the seven-day window stops sessions only at 98 %; from 85 % it sends a keep-working notice. A stale limits reading never stops anyone and sends only the notice, marked as old. A window already stopped gets no later notice. Before, a stale codex reading at 85 % stopped four codex sessions for five days with 14 % of the week unused.
 
 - Added mai-resume: warns AI coding sessions in Orca before a plan limit runs out, wakes them after the reset and nudges idle Claude sessions every 55 minutes so their prompt cache survives (not while a limit holds). Finds sessions from Orca itself, follows each engine's own limits, reads the stopped-limit screen line, never types into a prompt that holds text (trailing-space check measured on a real pane, re-checked right before sending), one instance per machine, heartbeat and restart alert. Windows scheduled task and Linux systemd user unit under `tools/mai-resume/autostart`.
 

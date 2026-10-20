@@ -64,7 +64,7 @@ class Warn(unittest.TestCase):
         self.assertEqual(tick({}, T0, fresh, [term('a')])[1], [])
         st, sends, _ = tick({}, T0, stale, [term('a')])
         self.assertEqual([m for _, _, m in sends], ['notice|a|claude|five_hour|' + core._iso(RESET)])
-        self.assertIn('Keep doing', sends[0][1])
+        self.assertIn('keep doing the current work', sends[0][1])
         self.assertEqual(st['windows'], {}, 'a stale reading must not hold the window')
 
 
@@ -90,7 +90,8 @@ class Weekly(unittest.TestCase):
     def test_85_is_a_notice_without_hold(self):
         kinds, st, sends = self.kinds(week(85))
         self.assertEqual(kinds, ['notice'])
-        self.assertNotIn('stop', sends[0][1].lower())
+        self.assertIn('Do not stop', sends[0][1])
+        self.assertNotIn('lead', sends[0][1])
         self.assertEqual(st['windows'], {})
 
     def test_97_is_still_a_notice_and_only_once_per_window(self):

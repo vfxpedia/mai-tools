@@ -20,7 +20,7 @@ DEFAULTS = {
     # stop: wrap up, write the HANDOFF and stop until the resume message. Only on a fresh reading (owner 10/20: a stop at
     # seven_day 85 % left codex idle for five days with 14 % unused).
     'warn_pct': {'five_hour': 93, 'seven_day': 98},
-    # notice: keep working, ask lead before new large work. No stop, no hold, no resume. Sent once per window.
+    # notice: keep working (owner 10/20). No stop, no hold, no resume. Sent once per window.
     'notice_pct': {'seven_day': 85},
     'stale_warn_pct': 85,          # a stale reading at or above this sends only the notice, never the stop
     'limits_stale_s': 600,
@@ -34,8 +34,8 @@ DEFAULTS = {
                 'Finish only up to a safe point (saved files, a committable unit), write your HANDOFF (what you did, '
                 'where you stopped, the next step, uncommitted files) and stop. Do not touch running GPU jobs. '
                 'mai-resume will send a resume message after the reset.',
-        'notice': '[mai-resume {now}] {engine} {window} limit at {pct}%{note} (resets {reset}). Keep doing the current work. '
-                  'Before starting new large work, check with lead.',
+        'notice': '[mai-resume {now}] {engine} {window} limit at {pct}%{note} (resets {reset}). Do not stop; keep doing '
+                  'the current work. A wrap-up message comes only just before the limit runs out.',
         'stale_note': ' (reading is old)',
         'resume': '[mai-resume {now}] The {engine} {window} limit has reset. Re-read your HANDOFF and the last '
                   'instruction, then continue the stopped work. If it was finished, go on with the next task.',

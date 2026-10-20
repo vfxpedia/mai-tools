@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- mai-resume: right before typing, the guard also compares the prompt row with this round's first read; if it moved, someone is typing and the message waits a round (same rule as `send`).
 - mai-watch viewer: a plan limit reading older than 30 minutes is shown grey with «old reading (N h ago), may have reset» instead of a hot meter. Codex records its limit only when a codex turn runs, so after an early reset the page kept showing 86 % hot for 10 hours.
 
 - mai-resume: `send` command for one line into another session, only when nobody is typing there (empty prompt, same screen twice 5 s apart, checked again right before sending; exit 4 when it never goes quiet).

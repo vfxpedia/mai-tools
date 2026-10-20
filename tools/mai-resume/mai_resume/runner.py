@@ -174,7 +174,10 @@ def round_once(orca, state, cfg, limits_path, now, log, dry=False):
     for handle, text, mid in sends:
         try:                                                     # look again right before typing: someone may have started
             fresh = orca.screen(handle)
-            late = core.screen_state(engines.get(handle, 'claude'), fresh, now)['typing']
+            eng = engines.get(handle, 'claude')
+            # typing now: the prompt row changed since this round's first read (lead 10/20, same rule as `send`)
+            late = core.screen_state(eng, fresh, now)['typing'] or (
+                handle in screens and core.prompt_key(eng, screens[handle]) != core.prompt_key(eng, fresh))
         except (RuntimeError, OSError, subprocess.SubprocessError):
             late = True
         if late:

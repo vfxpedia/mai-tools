@@ -17,8 +17,12 @@ import datetime as dt
 import re
 
 DEFAULTS = {
-    'warn_pct': {'five_hour': 93, 'seven_day': 95},
-    'stale_warn_pct': 85,          # used instead of warn_pct while the limits file is stale
+    # stop: wrap up, write the HANDOFF and stop until the resume message. Only on a fresh reading (owner 10/20: a stop at
+    # seven_day 85 % left codex idle for five days with 14 % unused).
+    'warn_pct': {'five_hour': 93, 'seven_day': 98},
+    # notice: keep working, ask lead before new large work. No stop, no hold, no resume. Sent once per window.
+    'notice_pct': {'seven_day': 85},
+    'stale_warn_pct': 85,          # a stale reading at or above this sends only the notice, never the stop
     'limits_stale_s': 600,
     'resume_grace_s': 180,
     'poll_s': 60,
@@ -30,6 +34,9 @@ DEFAULTS = {
                 'Finish only up to a safe point (saved files, a committable unit), write your HANDOFF (what you did, '
                 'where you stopped, the next step, uncommitted files) and stop. Do not touch running GPU jobs. '
                 'mai-resume will send a resume message after the reset.',
+        'notice': '[mai-resume {now}] {engine} {window} limit at {pct}%{note} (resets {reset}). Keep doing the current work. '
+                  'Before starting new large work, check with lead.',
+        'stale_note': ' (reading is old)',
         'resume': '[mai-resume {now}] The {engine} {window} limit has reset. Re-read your HANDOFF and the last '
                   'instruction, then continue the stopped work. If it was finished, go on with the next task.',
         'keepalive': '[mai-resume {now}] Cache keep-alive. If you have work in progress, continue it; otherwise reply '
@@ -203,8 +210,8 @@ def screen_state(engine, screen, now, local_tz=None):
     return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(tail)), 'done_at': _done_at(tail, now, local_tz)}
 
 
-def _fmt(cfg, kind, engine, window, pct, reset, now_local):
-    t = cfg['messages'][kind].format(now=now_local.strftime('%m/%d %H:%M'), engine=engine, window=window,
+def _fmt(cfg, kind, engine, window, pct, reset, now_local, note=''):
+    t = cfg['messages'][kind].format(now=now_local.strftime('%m/%d %H:%M'), engine=engine, window=window, note=note,
                                      pct=int(round(pct)) if pct is not None else '?',
                                      reset=reset.astimezone(now_local.tzinfo).strftime('%m/%d %H:%M'))
     return one_line(t)
@@ -234,10 +241,23 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         for window, cur in windows_of(limits, engine, cfg, now).items():
             if now >= cur['reset']:
                 continue
-            limit_pct = cfg['stale_warn_pct'] if cur['stale'] else cfg['warn_pct'].get(window, 95)
-            if cur['pct'] < limit_pct:
-                continue
             key = '%s|%s|%s' % (engine, window, _iso(cur['reset']))
+            stop_pct = cfg['warn_pct'].get(window, 95)
+            notice_pct = (cfg.get('notice_pct') or {}).get(window)
+            if cur['stale']:   # an old reading never stops anyone; at most the notice
+                notice_pct = min(p for p in (notice_pct, cfg['stale_warn_pct']) if p is not None)
+            if cur['stale'] or cur['pct'] < stop_pct:
+                # a window already stopped keeps its stop: a later stale reading must not tell those panes to carry on
+                if key in st['windows'] or notice_pct is None or cur['pct'] < notice_pct:
+                    continue
+                note = cfg['messages'].get('stale_note', '') if cur['stale'] else ''
+                text = _fmt(cfg, 'notice', engine, window, cur['pct'], cur['reset'], now_local, note)
+                for s in group:
+                    mid = 'notice|%s|%s' % (s['handle'], key)
+                    if mid not in st['sent'] and not any(p['id'] == mid for p in st['pending']):
+                        logs.append('NOTICE %s %s pct=%s stale=%s' % (s['handle'], key, cur['pct'], cur['stale']))
+                    queue(s['handle'], text, mid)
+                continue
             w = st['windows'].setdefault(key, {'resume_at': _iso(cur['reset'] + dt.timedelta(seconds=cfg['resume_grace_s'])),
                                                'handles': [], 'resumed': False})
             if key not in state.get('windows', {}):

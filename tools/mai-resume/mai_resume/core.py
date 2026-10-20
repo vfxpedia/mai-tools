@@ -380,3 +380,37 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
     st['sent'] = {k: v for k, v in st['sent'].items() if _parse_iso(v) > cutoff}
     st['heartbeat'] = _iso(now)
     return st, sends, logs
+
+
+def is_gauge_pane(t):
+    """A pane that already shows the codex gauge: titled Mods, or its preview holds the gauge's own row names."""
+    pv = t.get('preview') or ''
+    return 'mods' in (t.get('title') or '').lower() or ('5 hours' in pv and '7 days' in pv and 'turn ' in pv)
+
+
+def need_companion(terminals, sessions, codex_ids, done, only=None):
+    """Codex panes that should get a gauge pane now: [(handle, codex session id)]. A pane needs one when it is a live
+    codex pane (and in `only`, the allow list), no other pane in its Orca tab is titled with Mods, its codex session id is
+    known (codex_ids: handle -> id, from the gauge's ~/.mai/sessions files) and no gauge pane was opened for this
+    incarnation yet (done: handle -> incarnationId). A gauge pane the owner closes is not opened again (owner 10/20: the
+    gauge must come by itself, not keep coming back)."""
+    live = {s['handle'] for s in sessions if s['engine'] == 'codex'}
+    tabs = {}
+    for t in terminals or []:
+        if isinstance(t, dict) and t.get('tabId'):
+            tabs.setdefault(t['tabId'], []).append(t)
+    out = []
+    for t in terminals or []:
+        if not isinstance(t, dict) or t.get('handle') not in live:
+            continue
+        h = t['handle']
+        if only is not None and not picked(h, only):
+            continue
+        if done.get(h) == t.get('incarnationId', ''):
+            continue
+        mates = [m for m in tabs.get(t.get('tabId'), []) if m.get('handle') != h]
+        if any(is_gauge_pane(m) for m in mates):
+            continue
+        if codex_ids.get(h):
+            out.append((h, codex_ids[h]))
+    return out

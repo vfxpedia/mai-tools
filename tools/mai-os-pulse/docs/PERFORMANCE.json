@@ -1,0 +1,16 @@
+{
+  "environment": "Linux headless test; NOT AI-WS01 Windows",
+  "duration_s": 11.695103944999573,
+  "samples": 6,
+  "max_sample_render_ms": 26.20952300094359,
+  "median_sample_render_ms": 3.5689449996425537,
+  "max_gui_heartbeat_gap_ms": 73.55534800080932,
+  "volume_probe_state": {
+    "state": "waiting",
+    "error": "",
+    "starts": 1,
+    "age": null
+  },
+  "peak_rss_mib": 74.3515625,
+  "process_cpu_seconds": 0.25454699999999997
+}

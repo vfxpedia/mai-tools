@@ -113,6 +113,8 @@
   .fold summary { font-size: 13px; padding: 4px 0; }
   .quiet { color: var(--muted); font-size: 13px; margin: 2px 0; }
   .live-block { margin-bottom: 18px; }
+  .session-cards { display: none; }
+  .session-list { min-width: 0; }
   .mobile-fold > summary { display: none; }
   .page-fold > summary { display: none; }
   .limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 8px 22px; margin-bottom: 10px; }
@@ -145,6 +147,15 @@
     .host-band { grid-template-columns: 1fr; }
     .usage-highlights { gap: 6px; }
     .usage-highlight { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 7px; }
+    .session-table-wrap { display: none; }
+    .session-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .session-card { min-width: 0; padding: 9px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+    .session-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 10px; margin-bottom: 5px; }
+    .session-card-name { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+    .session-engine { color: var(--muted); font-size: 12px; }
+    .session-card-field { display: grid; grid-template-columns: minmax(5.5rem, 40%) minmax(0, 1fr); gap: 8px; padding: 2px 0; border-top: 1px solid var(--line); }
+    .session-card-label { color: var(--muted); font-size: 12px; }
+    .session-card-value { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
   }
   .live-problems { margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
   #live-section { display: none; }

@@ -293,21 +293,44 @@
     box.appendChild(lim);
     function cover(known_, all) { return all && known_ < all ? ' (' + known_ + ' of ' + all + ' turns)' : ''; }
     var head = ['session', 'engine', 'context', 'turns today', 'cost today, API price', 'tokens today', 'last active', 'doing'];
-    var rows = function (list) {
+    var entries = function (list) {
       return list.map(function (r) {
-        return [r.name || r.id.slice(0, 8), r.engine || 'unknown', known(r.context_pct) ? r.context_pct + '%' : 'unknown',
-          known(r.turns_today) ? String(r.turns_today) : 'no record',
-          known(r.cost_usd_today) ? '$' + r.cost_usd_today.toFixed(2) + cover(r.cost_turns, r.turns_today) : 'unknown',
-          known(r.tokens_today) ? (r.tokens_today / 1e6).toFixed(1) + ' M' + cover(r.token_turns, r.turns_today) : 'unknown',
-          ago(r.last_active_s) + ' ago', r.doing || ''];
+        return { name: r.name || r.id.slice(0, 8), engine: r.engine || 'unknown', context: known(r.context_pct) ? r.context_pct + '%' : 'unknown',
+          turns: known(r.turns_today) ? String(r.turns_today) : 'no record',
+          cost: known(r.cost_usd_today) ? '$' + r.cost_usd_today.toFixed(2) + cover(r.cost_turns, r.turns_today) : 'unknown',
+          tokens: known(r.tokens_today) ? (r.tokens_today / 1e6).toFixed(1) + ' M' + cover(r.token_turns, r.turns_today) : 'unknown',
+          active: ago(r.last_active_s) + ' ago', doing: r.doing || '' };
       });
     };
+    function sessionViews(list) {
+      var items = entries(list), cards = el('div', undefined, 'session-cards');
+      items.forEach(function (item) {
+        var card = el('article', undefined, 'session-card');
+        var title = el('div', undefined, 'session-card-head');
+        title.appendChild(el('strong', item.name, 'session-card-name'));
+        title.appendChild(el('span', item.engine, 'session-engine'));
+        card.appendChild(title);
+        [['Context', item.context], ['Turns today', item.turns], ['Cost today', item.cost], ['Tokens today', item.tokens], ['Last active', item.active], ['Doing', item.doing || 'unknown']].forEach(function (field) {
+          var line = el('div', undefined, 'session-card-field');
+          line.appendChild(el('span', field[0], 'session-card-label'));
+          line.appendChild(el('span', field[1], 'session-card-value'));
+          card.appendChild(line);
+        });
+        cards.appendChild(card);
+      });
+      var rows = items.map(function (item) { return [item.name, item.engine, item.context, item.turns, item.cost, item.tokens, item.active, item.doing]; });
+      var desktop = table(head, rows, 'compact session-table');
+      desktop.className += ' session-table-wrap';
+      var group = el('div', undefined, 'session-list');
+      group.appendChild(desktop); group.appendChild(cards);
+      return group;
+    }
     var all = u.sessions || [];
     var busy = all.filter(function (r) { return r.last_active_s < 3600; });
     var quiet = all.filter(function (r) { return busy.indexOf(r) < 0; });
-    if (busy.length) box.appendChild(table(head, rows(busy), 'compact'));
+    if (busy.length) box.appendChild(sessionViews(busy));
     else box.appendChild(el('p', 'no session active in the last hour', 'quiet'));
-    if (quiet.length) box.appendChild(fold(quiet.length + ' sessions idle for over an hour', table(head, rows(quiet), 'compact'), 'sessions-quiet'));
+    if (quiet.length) box.appendChild(fold(quiet.length + ' sessions idle for over an hour', sessionViews(quiet), 'sessions-quiet'));
     if (u.problems && u.problems.length) box.appendChild(el('p', u.problems.join('; '), 'quiet'));
     return box;
   }

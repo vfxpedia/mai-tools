@@ -103,14 +103,29 @@
   function attention() {
     var box = el('div', undefined, 'attention');
     var list = state.judgments || [];
-    if (!list.length) { box.appendChild(el('div', 'Nothing needs attention right now.', 'att-row ok-row')); return box; }
+    var bad = list.filter(function (f) { return f.level === 'bad'; }).length;
+    var warn = list.filter(function (f) { return f.level === 'warn'; }).length;
+    var bar = el('div', undefined, 'attention-summary');
+    bar.appendChild(el('strong', 'Now ' + bad + ' · soon ' + warn));
+    if (!list.length) { bar.appendChild(el('span', ' · all clear', 'quiet')); box.appendChild(bar); return box; }
+    var rows = el('div', undefined, 'attention-rows');
     list.forEach(function (f) {
       var row = el('div', undefined, 'att-row lvl-' + f.level);
       row.appendChild(el('span', f.level === 'bad' ? 'act now' : f.level === 'warn' ? 'look soon' : 'note', 'att-level'));
       row.appendChild(el('span', f.text, 'att-text'));
-      box.appendChild(row);
+      rows.appendChild(row);
     });
+    box.appendChild(bar);
+    box.appendChild(fold('Show ' + list.length + ' details', rows, 'judgments'));
     return box;
+  }
+
+  function mobileFold(label, node, key) {
+    var d = el('details', undefined, 'mobile-fold');
+    var mobile = typeof root.innerWidth === 'number' && root.innerWidth <= 560;
+    d.open = state.open[key] === undefined ? !mobile : state.open[key];
+    d.addEventListener('toggle', function () { state.open[key] = d.open; });
+    d.appendChild(el('summary', label)); d.appendChild(node); return d;
   }
 
   /* ---------- 2. GPUs ---------- */
@@ -141,6 +156,16 @@
     facts.appendChild(el('div', known(g.sm_clock_mhz) ? 'SM ' + g.sm_clock_mhz + (g.sm_clock_max_mhz ? ' / ' + g.sm_clock_max_mhz : '') + ' MHz' : 'clock unknown'));
     facts.appendChild(el('div', limitText(g)));
     row.appendChild(facts);
+    var procs = g.processes;
+    var procBox = el('div', undefined, 'gpu-processes');
+    if (procs === null || procs === undefined) procBox.appendChild(el('span', 'Process list unknown', 'quiet'));
+    else if (!procs.length) procBox.appendChild(el('span', 'No compute process', 'quiet'));
+    else procs.forEach(function (p) {
+      var name = p.run_name ? p.process + ' · run ' + p.run_name : p.process + ' · run unknown';
+      var elapsed = known(p.elapsed_s) ? 'running ' + ago(p.elapsed_s) : 'elapsed unknown';
+      procBox.appendChild(el('div', name + ' · ' + elapsed + ' · ' + gib(p.vram_mib) + ' GiB VRAM', 'gpu-process'));
+    });
+    row.appendChild(procBox);
     return row;
   }
 
@@ -287,6 +312,22 @@
     return box;
   }
 
+  function usageHighlights(u) {
+    var box = el('div', undefined, 'usage-highlights');
+    ['claude', 'codex'].forEach(function (engine) {
+      var record = u && u.available && (u.limits || []).filter(function (r) { return r.engine === engine; })[0];
+      var card = el('div', undefined, 'usage-highlight');
+      card.appendChild(el('strong', engine === 'claude' ? 'Claude' : 'Codex'));
+      if (!record) card.appendChild(el('span', 'unknown', 'quiet'));
+      else [['five_hour', '5h'], ['seven_day', '7d']].forEach(function (w) {
+        var x = record[w[0]];
+        card.appendChild(el('span', w[1] + ' ' + (x ? x.pct + '%' : 'unknown')));
+      });
+      box.appendChild(card);
+    });
+    return box;
+  }
+
   function draw() {
     var box = $('live'), list = state.samples;
     clear(box);
@@ -312,15 +353,22 @@
     }
     box.appendChild(gpus);
 
+    if (state.slow) box.appendChild(usageHighlights(state.slow.usage));
+
     var band = el('section', undefined, 'host-band');
     var c = hostCard('CPU', fmt(last.cpu_pct, 0, '%'), state.host && state.host.logical_cpus ? state.host.logical_cpus + ' logical CPUs' : '', times, list.map(function (s) { return s.cpu_pct; }), last.cpu_per_core ? cores(last.cpu_per_core) : null);
     band.appendChild(c);
-    band.appendChild(hostCard('RAM', fmt(last.ram_pct, 0, '%'), fmt(last.ram_used_gib, 1) + ' / ' + fmt(last.ram_total_gib, 1) + ' GiB' + (last.swap_total_gib ? ' · swap ' + fmt(last.swap_used_gib, 1) + ' / ' + fmt(last.swap_total_gib, 1) : ''), times, list.map(function (s) { return s.ram_pct; })));
+    var ram = hostCard('RAM', fmt(last.ram_pct, 0, '%'), fmt(last.ram_used_gib, 1) + ' / ' + fmt(last.ram_total_gib, 1) + ' GiB' + (last.swap_total_gib ? ' · swap ' + fmt(last.swap_used_gib, 1) + ' / ' + fmt(last.swap_total_gib, 1) : ''), times, list.map(function (s) { return s.ram_pct; }));
+    var top = last.ram_processes;
+    if (top === null || top === undefined) ram.appendChild(el('p', 'Top RAM processes unknown', 'quiet'));
+    else ram.appendChild(table(['top RAM process', 'PID', 'RSS MiB'], top.map(function (p) { return [p.process, String(p.pid), p.rss_mib.toFixed(1)]; }), 'compact'));
+    ram.appendChild(el('p', 'RAM history: last 10 minutes', 'quiet'));
+    band.appendChild(ram);
     band.appendChild(ioBand(list));
-    box.appendChild(band);
+    box.appendChild(mobileFold('Host metrics', band, 'host-metrics'));
 
-    if (state.slow) box.appendChild(storage(state.slow));
-    if (state.slow) box.appendChild(usageBlock(state.slow.usage));
+    if (state.slow) box.appendChild(mobileFold('Storage', storage(state.slow), 'storage'));
+    if (state.slow) box.appendChild(mobileFold('AI sessions and recent activity', usageBlock(state.slow.usage), 'sessions'));
   }
 
   state.draw = function () { draw(); };      // lets a browser check redraw from samples it set itself (review R11 DOM regression)

@@ -749,8 +749,11 @@ class ViewerPageTests(unittest.TestCase):
         snap = dict(snap, generated_at=iso(-2), collector={'pid': 111, 'started_at': iso(-100)})
         no_devices = {k: v for k, v in snap.items() if k != 'devices'}
         base = {'hb': hb, 'now_ms': now_ms}
+        many_alerts = dict(snap, alerts=[{'type': 'device_missing', 'uuid': 'GPU-aaaaaaaa-0000-0000-0000-000000000001'},
+                                         {'type': 'workload_stale', 'id': 'job-one'}, {'type': 'device_idle', 'uuid': 'GPU-bbbbbbbb-0000-0000-0000-000000000002'}])
         return {
             'good': dict(base, snapshot=snap),
+            'many_alerts': dict(base, snapshot=many_alerts),
             'empty_object': dict(base, snapshot={}),
             'missing_devices': dict(base, snapshot=no_devices),
             'not_json': dict(base, snapshot='this is not json'),
@@ -781,6 +784,25 @@ class ViewerPageTests(unittest.TestCase):
         self.assertIn('500', got['http_500']['error'])
         self.assertIn('collector_missing', got['no_heartbeat_wrong_shape']['pill'])
         self.assertIn('wrong structure', got['no_heartbeat_wrong_shape']['error'])
+
+    def test_alerts_are_a_compact_summary_with_expandable_details(self):
+        got = self.run_cases([self.cases()['many_alerts']])[0]
+        self.assertIn('Now 2 · soon 1 · 3 alerts', got['alerts_text'])
+        self.assertIn('Show alert details', got['alerts_text'])
+        self.assertEqual(got['alert_parts'], 2)
+
+    def test_viewer_defaults_to_system_theme_with_manual_theme_control(self):
+        got = self.run_cases([self.cases()['good']])[0]
+        self.assertEqual(got['theme_label'], 'Theme: System')
+
+    def test_mobile_layout_puts_two_gpus_first_and_uses_os_theme_with_override(self):
+        with open(os.path.join(ROOT, 'mai_watch', 'viewer.html'), encoding='utf-8') as f:
+            html = f.read()
+        self.assertIn('@media (max-width: 560px)', html)
+        self.assertIn('.gpus { grid-template-columns: repeat(2, minmax(0, 1fr))', html)
+        self.assertIn('@media (prefers-color-scheme: dark)', html)
+        self.assertIn('Theme: ', html)
+        self.assertIn('mai-watch-theme', html)
 
 
 class RuntimeValidatorAgreement(unittest.TestCase):

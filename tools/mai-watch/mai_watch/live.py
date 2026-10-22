@@ -6,6 +6,8 @@ history is for watching; the workload and idle record stays in snapshot.json and
 """
 import collections
 import datetime
+import os
+import re
 import threading
 import time
 
@@ -70,6 +72,7 @@ class LiveSampler:
         self.lock = threading.Lock()
         self._psutil = psutil_module
         self._gpu_reader = gpu_reader or self._read_gpu
+        self._apps_reader = lambda: nvidia.run_csv(self.nvidia_cmd, 'query-compute-apps', nvidia.APPS_QUERY, timeout=5)
         self._extra_ok = None          # None: not tried yet; False: the driver refused the extra fields, so the core query only
         self._primed = False
         self._rates = host.Rates(clock=rate_clock)
@@ -121,7 +124,7 @@ class LiveSampler:
         """One sample. Every field the source cannot give is None, with the reason in problems."""
         now = self.clock()
         s = {'t': _z(now), 'cpu_pct': None, 'cpu_per_core': None, 'ram_used_gib': None, 'ram_total_gib': None, 'ram_pct': None,
-             'swap_used_gib': None, 'swap_total_gib': None, 'gpus': None, 'disks': None, 'nics': None, 'problems': []}
+             'swap_used_gib': None, 'swap_total_gib': None, 'ram_processes': None, 'gpus': None, 'disks': None, 'nics': None, 'problems': []}
         ps = self._ps()
         if ps:
             try:
@@ -134,6 +137,7 @@ class LiveSampler:
                 s.update(ram_used_gib=_gib(vm.total - vm.available), ram_total_gib=_gib(vm.total), ram_pct=round(vm.percent, 1))
                 sw = ps.swap_memory()
                 s.update(swap_used_gib=_gib(sw.used), swap_total_gib=_gib(sw.total))
+                s['ram_processes'] = self._ram_processes(ps)
             except Exception as e:
                 s['problems'].append('host metrics failed: %s' % type(e).__name__)
         else:
@@ -148,9 +152,68 @@ class LiveSampler:
             s['gpus'] = self._parse_gpus(text, s['problems'])
             if s['gpus'] is None:
                 s['problems'].append('nvidia-smi returned no valid device row: GPU and VRAM are unknown')
+        if s['gpus'] is not None:
+            try:
+                apps_text = self._apps_reader()
+            except Exception:
+                apps_text = None
+            if apps_text is None:
+                s['problems'].append('compute-apps query failed: per-process GPU use is unknown')
+                apps = None
+            else:
+                apps, bad_apps = nvidia.parse_apps(apps_text)
+                if bad_apps:
+                    s['problems'].append('%d malformed GPU process rows' % len(bad_apps))
+            by_uuid = {}
+            if apps is not None:
+                for app in apps:
+                    if app['pid'] is None:
+                        continue
+                    meta = self._process_meta(ps, int(app['pid'])) if ps else {}
+                    by_uuid.setdefault(app['gpu_uuid'], []).append({
+                        'pid': int(app['pid']), 'process': os.path.basename(app['name'].replace('\\', '/')) or 'unknown',
+                        'run_name': meta.get('run_name'), 'elapsed_s': meta.get('elapsed_s'), 'vram_mib': app['memory_mib']})
+            for gpu in s['gpus']:
+                gpu['processes'] = None if apps is None else by_uuid.get(gpu['uuid'], [])
         with self.lock:
             self.samples.append(s)
         return s
+
+    def _process_meta(self, ps, pid):
+        try:
+            p = ps.Process(pid)
+            born = p.create_time()
+            cmd = p.cmdline()
+            run_name = None
+            for i, value in enumerate(cmd):
+                m = re.fullmatch(r'--(?:run_name|run-name|experiment_name|experiment-name)=(.{1,120})', value)
+                if m:
+                    run_name = m.group(1)
+                    break
+                if value in ('--run_name', '--run-name', '--experiment_name', '--experiment-name') and i + 1 < len(cmd):
+                    run_name = cmd[i + 1]
+                    break
+            if run_name:
+                run_name = re.sub(r'[^A-Za-z0-9_.+-]', '_', os.path.basename(run_name.replace('\\', '/')))[:80]
+            return {'run_name': run_name, 'elapsed_s': max(0, int(self.clock() - born))}
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _ram_processes(ps):
+        rows = []
+        try:
+            for proc in ps.process_iter(['pid', 'name', 'memory_info']):
+                try:
+                    info = proc.info
+                    rss = info['memory_info'].rss
+                    rows.append({'pid': int(info['pid']), 'process': os.path.basename((info.get('name') or 'unknown').replace('\\', '/')),
+                                 'rss_mib': round(rss / 2 ** 20, 1)})
+                except Exception:
+                    continue
+        except Exception:
+            return None
+        return sorted(rows, key=lambda x: x['rss_mib'], reverse=True)[:5]
 
     @staticmethod
     def _parse_gpus(text, problems):

@@ -19,4 +19,4 @@ mai-watch = "mai_watch.cli:main"
 packages = ["mai_watch"]
 
 [tool.setuptools.package-data]
-mai_watch = ["viewer.html", "viewer-health.js", "viewer-live.js"]
+mai_watch = ["viewer.html", "viewer-health.js", "viewer-live.js", "manifest.webmanifest", "viewer-icon.svg"]

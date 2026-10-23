@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mai-watch</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f6f7f9">
+<link rel="icon" href="viewer-icon.svg" type="image/svg+xml">
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6;
@@ -18,8 +21,11 @@
     }
   }
   * { box-sizing: border-box; }
+  body[data-theme="light"] { --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6; --ok: #0b7a3b; --ok-bg: #d9f2e3; --warn: #8a5a00; --warn-bg: #fdecc8; --bad: #a3191f; --bad-bg: #fbdcdd; --bar: #2b6fd6; --bar-idle: #6b7380; --vram: #b0570a; color-scheme: light; }
+  body[data-theme="dark"] { --bg: #101215; --panel: #1a1d22; --fg: #eceef1; --muted: #c3c8d0; --line: #3a4049; --ok: #62d68c; --ok-bg: #12301f; --warn: #f2c14e; --warn-bg: #3a2c0a; --bad: #ff8b90; --bad-bg: #3d1618; --bar: #6ea2f5; --bar-idle: #8b93a0; --vram: #f0a35c; color-scheme: dark; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
   header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header button { margin-left: auto; min-height: 44px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
   h1 { font-size: 18px; margin: 0; }
   h2 { font-size: 15px; margin: 0 0 8px; }
   main { padding: 16px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
@@ -71,6 +77,7 @@
   .att-row.lvl-bad { border-left-color: var(--bad); background: var(--bad-bg); }
   .att-row.lvl-warn { border-left-color: var(--warn); background: var(--warn-bg); }
   .att-row.ok-row { border-left-color: var(--ok); background: var(--ok-bg); font-weight: 600; }
+  .attention-summary { padding: 8px 12px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); }
   .att-level { font-weight: 700; min-width: 6.5rem; flex: none; }
   .lvl-bad .att-level { color: var(--bad); } .lvl-warn .att-level { color: var(--warn); }
   .att-text { font-weight: 600; overflow-wrap: anywhere; }
@@ -90,6 +97,11 @@
   .spark.gpu-graph { height: 72px; margin: 0; }
   .spark polyline.line-vram { stroke: var(--vram); }
   .gpu-facts { color: var(--muted); display: grid; gap: 2px; }
+  .gpu-processes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .gpu-process { font: 13px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+  .usage-highlights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; }
+  .usage-highlight { display: flex; flex-wrap: wrap; gap: 5px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  .usage-highlight span { font-variant-numeric: tabular-nums; }
   .host-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); gap: 12px; margin-bottom: 18px; align-items: start; }
   .host-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
   .host-head { display: flex; justify-content: space-between; align-items: baseline; }
@@ -101,6 +113,10 @@
   .fold summary { font-size: 13px; padding: 4px 0; }
   .quiet { color: var(--muted); font-size: 13px; margin: 2px 0; }
   .live-block { margin-bottom: 18px; }
+  .session-cards { display: none; }
+  .session-list { min-width: 0; }
+  .mobile-fold > summary { display: none; }
+  .page-fold > summary { display: none; }
   .limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 8px 22px; margin-bottom: 10px; }
   .limit-name { font-weight: 600; }
   @media (max-width: 900px) {
@@ -110,8 +126,36 @@
     .io { grid-column: 1 / -1; }
   }
   @media (max-width: 560px) {
-    .gpu-row, .host-band { grid-template-columns: 1fr; }
-    .att-row { flex-direction: column; gap: 2px; }
+    main { padding: 10px 10px 28px; gap: 14px; }
+    header { gap: 8px 12px; padding: 10px; }
+    header .pill { max-width: calc(100vw - 20px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gpus { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .gpu-row { grid-template-columns: 1fr; gap: 7px; padding: 9px; }
+    .gpu-index { font-size: 16px; }
+    .num-big { font-size: 24px; }
+    .gpu-nums { gap: 0; }
+    .gpu-num { display: flex; align-items: baseline; gap: 3px; flex-wrap: wrap; }
+    .num-label { font-size: 11px; }
+    .spark.gpu-graph { height: 42px; }
+    .gpu-facts { font-size: 11px; }
+    .gpu-processes { display: block; font-size: 11px; }
+    .att-row { gap: 2px 8px; padding: 6px 8px; }
+    .att-level { min-width: 0; }
+    .mobile-fold > summary { display: list-item; padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-weight: 600; }
+    .page-fold > summary { display: list-item; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-weight: 600; }
+    .mobile-fold[open] > :not(summary) { margin-top: 8px; }
+    .host-band { grid-template-columns: 1fr; }
+    .usage-highlights { gap: 6px; }
+    .usage-highlight { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 7px; }
+    .session-table-wrap { display: none; }
+    .session-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .session-card { min-width: 0; padding: 9px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+    .session-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 10px; margin-bottom: 5px; }
+    .session-card-name { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+    .session-engine { color: var(--muted); font-size: 12px; }
+    .session-card-field { display: grid; grid-template-columns: minmax(5.5rem, 40%) minmax(0, 1fr); gap: 8px; padding: 2px 0; border-top: 1px solid var(--line); }
+    .session-card-label { color: var(--muted); font-size: 12px; }
+    .session-card-value { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
   }
   .live-problems { margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
   #live-section { display: none; }
@@ -128,14 +172,15 @@
   <h1>mai-watch</h1>
   <span id="collector" class="pill warn">reading...</span>
   <span id="generated" class="mono"></span>
+  <button id="theme" type="button" aria-label="Change color theme">Theme: System</button>
 </header>
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
   <section id="live-section"><div class="section-head"><h2>Live resources</h2><span id="live-status" class="pill warn">reading...</span></div><div id="live"></div></section>
-  <section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section>
-  <section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section>
-  <section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section>
+  <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
+  <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>
+  <details id="eventsfold" class="page-fold"><summary>Recent events</summary><section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section></details>
 </main>
 <script src="viewer-health.js"></script>
 <script src="viewer-live.js"></script>
@@ -143,6 +188,25 @@
 (function () {
   'use strict';
   var POLL_MS = 5000;
+  var narrow = window.matchMedia ? window.matchMedia('(max-width: 640px)').matches : window.innerWidth <= 640;
+  ['devicesfold', 'workloadsfold', 'eventsfold'].forEach(function (id) {
+    var fold = document.getElementById(id);
+    if (fold) fold.open = !narrow;
+  });
+  var themes = ['system', 'light', 'dark'];
+  var themeButton = document.getElementById('theme');
+  var theme = 'system';
+  try { theme = localStorage.getItem('mai-watch-theme') || 'system'; } catch (e) { theme = 'system'; }
+  if (themes.indexOf(theme) < 0) theme = 'system';
+  function setTheme(value) {
+    theme = value;
+    document.body.removeAttribute('data-theme');
+    if (theme !== 'system') document.body.setAttribute('data-theme', theme);
+    themeButton.textContent = 'Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1);
+    try { localStorage.setItem('mai-watch-theme', theme); } catch (e) { /* storage can be disabled */ }
+  }
+  setTheme(theme);
+  themeButton.addEventListener('click', function () { setTheme(themes[(themes.indexOf(theme) + 1) % themes.length]); });
 
   function age(s) {
     if (s === null || s === undefined) return 'n/a';
@@ -178,9 +242,19 @@
     var box = document.getElementById('alerts');
     if (!alerts || !alerts.length) { box.style.display = 'none'; return; }
     box.style.display = 'block';
-    box.textContent = alerts.length + ' alert' + (alerts.length > 1 ? 's' : '') + ': ' + alerts.map(function (a) {
+    clear(box);
+    var bad = alerts.filter(function (a) { return /missing|invalid|unavailable|stale|disappeared|problem/.test(a.type); }).length;
+    var summary = el('strong', 'Now ' + bad + ' · soon ' + (alerts.length - bad) + ' · ' + alerts.length + ' alerts');
+    box.appendChild(summary);
+    var detail = el('details', undefined, 'alert-details');
+    detail.appendChild(el('summary', 'Show alert details'));
+    var rows = el('div');
+    var labels = alerts.map(function (a) {
       return a.type + (a.id ? ' ' + a.id : a.uuid ? ' ' + short(a.uuid) : a.file ? ' ' + a.file : '');
-    }).join(', ');
+    });
+    labels.forEach(function (text) { rows.appendChild(el('div', text)); });
+    detail.appendChild(rows);
+    box.appendChild(detail);
   }
 
   function showDevices(snap) {
@@ -278,10 +352,10 @@
         var pill = document.getElementById('collector');
         pill.className = 'pill warn';
         pill.textContent = 'workload recording off (start live with --config to record workloads and idle time)';
-        ['devices-section', 'workloads-section', 'events-section'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = 'none'; });
+        ['devices-section', 'workloads-section', 'events-section', 'devicesfold', 'workloadsfold', 'eventsfold'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = 'none'; });
         return;
       }
-      ['devices-section', 'workloads-section', 'events-section'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = ''; });
+      ['devices-section', 'workloads-section', 'events-section', 'devicesfold', 'workloadsfold', 'eventsfold'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = ''; });
       if (got.fail) { showFailure(got.fail); showCollector(hb, null); return; }
       var snap = got.snap;
       var shape = MaiWatchHealth.structureProblems(snap);

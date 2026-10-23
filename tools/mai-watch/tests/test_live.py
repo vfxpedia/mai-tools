@@ -54,6 +54,36 @@ def sampler(gpu_text=GPU_TEXT, ps='fake', **kw):
 
 
 class SamplerTests(unittest.TestCase):
+    def test_ram_process_view_is_sorted_and_capped_at_five(self):
+        class Proc:
+            def __init__(self, pid, rss): self.info = {'pid': pid, 'name': 'worker%d.exe' % pid, 'memory_info': type('Mem', (), {'rss': rss})()}
+        class Ps:
+            def process_iter(self, attrs): return [Proc(i, i * 2 ** 20) for i in range(1, 8)]
+        rows = live.LiveSampler._ram_processes(Ps())
+        self.assertEqual([(x['pid'], x['rss_mib']) for x in rows], [(7, 7.0), (6, 6.0), (5, 5.0), (4, 4.0), (3, 3.0)])
+
+    def test_gpu_processes_are_grouped_per_gpu_with_memory_and_safe_run_name(self):
+        s = sampler()
+        s._apps_reader = lambda: ('GPU-aaaaaaaa-0000-0000-0000-000000000001, 42, python.exe, 2048\n'
+                                  'GPU-bbbbbbbb-0000-0000-0000-000000000002, 43, trainer.exe, [N/A]\n')
+        class Proc:
+            def __init__(self, pid): self.pid = pid
+            def create_time(self): return 1799999900
+            def cmdline(self): return ['python', '--run_name', 'terrain trial']
+        s._ps().Process = Proc
+        sample = s.sample_once()
+        p0 = sample['gpus'][0]['processes'][0]
+        self.assertEqual((p0['pid'], p0['process'], p0['run_name'], p0['elapsed_s'], p0['vram_mib']),
+                         (42, 'python.exe', 'terrain_trial', 100, 2048))
+        self.assertEqual(sample['gpus'][1]['processes'][0]['vram_mib'], None)
+
+    def test_failed_compute_apps_query_is_unknown_not_an_empty_process_list(self):
+        s = sampler()
+        s._apps_reader = lambda: None
+        sample = s.sample_once()
+        self.assertIsNone(sample['gpus'][0]['processes'])
+        self.assertTrue(any('per-process GPU use is unknown' in x for x in sample['problems']))
+
     def test_first_cpu_reading_is_unknown_then_the_average_of_cores(self):
         s = sampler()
         first = s.sample_once()
@@ -150,6 +180,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.get(base + '/snapshot.json')[0], 404)
         self.assertEqual(self.get(base + '/')[0], 200)
 
+    def test_pwa_manifest_and_icon_are_served_as_package_assets(self):
+        base = self.serve(None)
+        code, manifest = self.get(base + '/manifest.webmanifest')
+        self.assertEqual(code, 200)
+        self.assertEqual(json.loads(manifest)['short_name'], 'mai-watch')
+        self.assertEqual(self.get(base + '/viewer-icon.svg')[0], 200)
+
 
 class SparkTests(unittest.TestCase):
     def test_points_place_time_on_x_value_on_y_and_break_at_unknowns(self):
@@ -160,6 +197,30 @@ class SparkTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         # x = 300 - age/120*300; y = 48 - clamp(v)/100*48; null breaks the line; 150 is clamped to the top
         self.assertEqual(json.loads(p.stdout), ['0.0,48.0 75.0,24.0', '225.0,0.0 300.0,0.0'])
+
+
+class RamTopTests(unittest.TestCase):
+    def test_slow_process_scan_never_holds_the_sample(self):
+        # 10/23: the full process scan took 4.5 s on AI-WS01; the 1 s sample must not wait for it
+        import time as _t
+        done = threading.Event()
+
+        class Slow:
+            def process_iter(self, attrs):
+                _t.sleep(0.5)
+                done.set()
+                return []
+        s = sampler()
+        t0 = _t.perf_counter()
+        first = s._ram_top(Slow())
+        self.assertLess(_t.perf_counter() - t0, 0.2)
+        self.assertIsNone(first)
+        self.assertTrue(done.wait(3))
+        for _ in range(50):
+            if not s._ram_busy:
+                break
+            _t.sleep(0.05)
+        self.assertEqual(s._ram_top(Slow()), [], 'the finished scan is served from the cache, not scanned again at once')
 
 
 class LimitLabelTests(unittest.TestCase):

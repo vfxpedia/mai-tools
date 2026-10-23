@@ -12,9 +12,12 @@ const inline = html.split('<script>')[1].split('</script>')[0];
 const ids = Array.from(html.matchAll(/id="([a-z]+)"/g)).map(m => m[1]);
 
 function makeEl() {
-  const e = { style: {}, className: '', children: [], _text: '', colSpan: 1 };
+  const e = { style: {}, className: '', children: [], _text: '', colSpan: 1, attrs: {}, listeners: {} };
   e.appendChild = c => { e.children.push(c); return c; };
   e.removeChild = c => { e.children.splice(e.children.indexOf(c), 1); return c; };
+  e.setAttribute = (k, v) => { e.attrs[k] = String(v); };
+  e.removeAttribute = k => { delete e.attrs[k]; };
+  e.addEventListener = (k, f) => { e.listeners[k] = f; };
   Object.defineProperty(e, 'firstChild', { get: () => e.children[0] || null });
   Object.defineProperty(e, 'textContent', { get: () => e._text, set: v => { e._text = String(v); e.children = []; } });
   return e;
@@ -24,7 +27,8 @@ function allText(e) { return e._text + e.children.map(allText).join(' '); }
 async function runCase(c) {
   const els = {};
   ids.forEach(i => { els[i] = makeEl(); });
-  const document = { getElementById: i => els[i], createElement: () => makeEl() };
+  const document = { getElementById: i => els[i], createElement: () => makeEl(), body: makeEl() };
+  const localStorage = { getItem: () => null, setItem: () => {} };
   let timer = null;
   const responses = {
     'collector_heartbeat.json': c.hb === null ? { status: 404, body: '' } : { status: 200, body: JSON.stringify(c.hb) },
@@ -39,7 +43,7 @@ async function runCase(c) {
   const FakeDate = function () { return new RealDate(c.now_ms); };
   FakeDate.now = () => c.now_ms;
   FakeDate.parse = RealDate.parse;
-  const sandbox = { document, fetch, Date: FakeDate, Math, JSON, Promise, Object, Array, String, Number, isNaN, isFinite, setInterval: () => 0, console };
+  const sandbox = { document, localStorage, fetch, Date: FakeDate, Math, JSON, Promise, Object, Array, String, Number, isNaN, isFinite, setInterval: () => 0, console };
   sandbox.window = sandbox; sandbox.self = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(healthSrc, sandbox);
@@ -51,6 +55,9 @@ async function runCase(c) {
     pill: els.collector._text,
     pill_class: els.collector.className,
     device_rows: els.devices.children.length,
+    alerts_text: allText(els.alerts),
+    alert_parts: els.alerts.children.length,
+    theme_label: els.theme._text,
     workload_text: allText(els.workloads),
   };
 }

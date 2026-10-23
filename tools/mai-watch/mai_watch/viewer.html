@@ -61,14 +61,23 @@
   .tile-detail { color: var(--muted); }
   .spark { width: 100%; height: 48px; display: block; margin: 6px 0 4px; background: var(--bg); border-radius: 4px; }
   .spark polyline { fill: none; stroke: var(--bar); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-  .cores { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; margin-top: 10px; flex: 1; min-height: 100px; }
-  .core { min-height: 18px; border-radius: 3px; background: var(--bar); }
+  .cores { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; margin: 5px 0; flex: 0 0 100px; height: 100px; }
+  .core { min-height: 6px; border-radius: 2px; background: var(--bar); }
+  .warning-evidence { display: inline-block; margin-left: 8px; min-width: 0; overflow-wrap: anywhere; }
+  .warning-evidence summary { font-size: 12px; padding: 0; }
+  .warning-evidence[open] { display: block; margin-left: 0; }
+  .view-options { margin-bottom: 12px; }
+  .view-options label { display: inline-block; margin: 8px 16px 8px 0; }
+  .view-options select, .view-options button { background: var(--panel); color: var(--fg); padding: 8px; min-height: 44px; border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+  [data-focus="cpu"] .cpu-card, [data-focus="gpu"] .gpu-row, [data-focus="ai"] .usage-highlight { border-color: var(--bar); }
   .live-more { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; margin-top: 18px; }
   .live-block h3 { font-size: 14px; margin: 14px 0 6px; }
   .live-block h3:first-child { margin-top: 0; }
   table.compact td, table.compact th { padding: 4px 12px 4px 0; white-space: nowrap; }
   table.compact td:last-child { white-space: normal; }
   table.compact .spark { width: 160px; height: 22px; margin: 0; }
+  table.cpu-processes { font-size: 12px; line-height: 1.25; }
+  table.cpu-processes th, table.cpu-processes td { padding-top: 1px; padding-bottom: 1px; }
   .strong { font-weight: 700; font-variant-numeric: tabular-nums; }
   .meter-cell { display: inline-flex; align-items: center; gap: 8px; }
   .meter { display: inline-block; width: 90px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; flex: none; }
@@ -156,7 +165,7 @@
     .page-fold > summary { display: list-item; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-weight: 600; }
     .mobile-fold[open] > :not(summary) { margin-top: 8px; }
     .host-band { grid-template-columns: 1fr; }
-    .cores { grid-template-columns: repeat(8, minmax(0, 1fr)); min-height: 120px; }
+    .cores { grid-template-columns: repeat(8, minmax(0, 1fr)); height: 86px; flex-basis: 86px; }
     .usage-highlights { gap: 6px; }
     .usage-highlight { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 7px; }
     .session-table-wrap { display: none; }
@@ -182,7 +191,7 @@
 <body>
 <header>
   <h1>mai-watch</h1>
-  <span class="quiet">0.2.0a2</span>
+  <span class="quiet">0.3.0a1</span>
   <span id="collector" class="pill warn">reading...</span>
   <span id="generated" class="mono"></span>
   <div class="header-actions"><button id="refresh" type="button" title="Reload this page, not the collector" aria-label="Reload page">↻ Reload</button><button id="theme" type="button" aria-label="Change color theme">Theme: System</button></div>
@@ -190,7 +199,14 @@
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
-  <section id="live-section"><div class="section-head"><h2>Live resources</h2><span id="live-status" class="pill warn" aria-live="off">reading...</span><span id="live-freshness" class="quiet" aria-live="off"></span></div><div id="live"></div></section>
+  <section id="live-section"><div class="section-head"><h2>Live resources</h2><span id="live-status" class="pill warn" aria-live="off">reading...</span><span id="live-freshness" class="quiet" aria-live="off"></span></div>
+    <details class="view-options"><summary>View settings and safe diagnostics</summary>
+      <label>Graph window <select id="graph-range"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="600" selected>10 minutes</option></select></label>
+      <label>Emphasis <select id="view-focus"><option value="balanced">Balanced</option><option value="cpu">CPU</option><option value="gpu">GPU</option><option value="ai">AI limits</option></select></label>
+      <label><input type="checkbox" id="expand-tables"> Expand supporting tables on mobile</label>
+      <button type="button" id="diagnostic-download">Download safe diagnostics</button><span id="diagnostic-result" class="quiet" role="status"></span>
+      <p class="quiet">Settings stay in this browser. Warnings, GPUs and limit summaries always remain visible. Graphs show only retained measurements, not invented history.</p>
+    </details><div id="live"></div></section>
   <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
   <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>
   <details id="eventsfold" class="page-fold"><summary>Recent events</summary><section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section></details>

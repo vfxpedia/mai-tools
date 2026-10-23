@@ -34,6 +34,10 @@ def make_handler(out_dir, live=None):
                 with open(VIEWER, 'rb') as f:
                     return self._send(200, f.read(), 'text/html; charset=utf-8')
             name = path.lstrip('/')
+            if name == 'diagnostic.json':
+                if live is None:
+                    return self._send(404, b'no live sampler', 'text/plain')
+                return self._send(200, json.dumps(live.diagnostics(), allow_nan=False).encode('utf-8'), 'application/json')
             if name == 'status.json':
                 if live is None:
                     return self._send(404, b'no live sampler: start with mai-watch', 'text/plain')

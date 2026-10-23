@@ -103,6 +103,16 @@ Full contract: `schema/status.v1.schema.json`; `mai-watch validate <files>` chec
 
 ## Commands
 
+## 0.3 preview: diagnosis and a fixed layout
+
+The CPU core grid uses about half its former height, with the top three measured CPU processes below it. CPU uses cumulative user/system time differences across background scans (about five seconds), keyed by PID and creation time. **One logical core is 100%**, so a multithreaded process may exceed 100%. First scans and denied or stale readings are unknown, not zero. Process command lines are not requested for this CPU view.
+
+Open **View settings and safe diagnostics** for 1/5/10-minute graph windows, CPU/GPU/AI emphasis and supporting-table expansion. These preferences stay in this browser, tolerate blocked storage and never hide warnings, GPU cards or limit summaries. Windows show only retained samples; the existing default is ten minutes, with an absolute cap of 36,000 samples.
+
+Each warning has expandable numeric evidence, continuously observed duration and a next check. Missing observations and gaps do not count as continuous observation or prove resolution. Incident history is limited to 256 findings and 24 hours **in memory**, and resets on collector restart. It is an operational observation record, not a durable audit log.
+
+Capability diagnostics explain unavailable measurements and next checks. **Download safe diagnostics** fetches `/diagnostic.json`: a fixed allowlist of metric numbers and generic capability results. It excludes names, paths, session titles, commands, environment variables and raw logs. Review the downloaded file before sharing. The normal dashboard still contains operational names and paths: do not confuse the safe export with making the dashboard public. Loopback binding is unchanged; reverse proxies need their own access controls. No internet authentication or telemetry was added.
+
 `mai-watch` (same as `live`) · `demo [folder]` · `status [--json]` · `init <folder>` · `collect [--once]` · `check` (exit 1 on any alert) · `show` (the whole snapshot as JSON) · `serve` (page for a separate collector) · `validate <files>`. Everything listens on 127.0.0.1 only.
 
 Design, idle rules and review history: [DESIGN.md](DESIGN.md). Tests: `python -I tests/test_mai_watch.py`, `tests/test_live.py`, `tests/test_resources.py`, `tests/test_judge.py`, `tests/test_notify.py`, `tests/test_schema_contract.py` (needs `jsonschema`; the page tests need Node.js).

@@ -6,6 +6,14 @@ Status: preview
 
 # mai-watch changes
 
+## 0.3.0a1
+
+- Half-height CPU core area and top-three CPU-time-delta process attribution, without moving the desktop host grid.
+- Capability diagnostics and an identity-free support JSON download, without reading authentication files.
+- Warning evidence, observed duration and next-check guidance.
+- Browser-local graph range, emphasis and supporting-table preferences. Warnings and limit summaries are never hidden.
+- Bounded in-memory incident history: 256 records, 24 hours, reset on restart. Unknown is not resolution.
+
 ## 0.2.0a2
 
 - Reload page next to Theme, with a labelled 44-pixel touch target and repeated-click protection.

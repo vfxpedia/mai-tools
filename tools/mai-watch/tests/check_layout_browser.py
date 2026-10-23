@@ -32,6 +32,7 @@ def fixture():
         samples.append({'t': iso(now - 120 + i), 'cpu_pct': 30, 'cpu_per_core': [float((j * 7) % 100) for j in range(64)],
                         'ram_pct': 42, 'ram_used_gib': 108, 'ram_total_gib': 256, 'swap_total_gib': 16, 'swap_used_gib': 1,
                         'ram_processes': [{'pid': j + 100, 'process': 'worker-%d.exe' % j, 'rss_mib': 4000 - j * 400} for j in range(5)],
+                        'cpu_processes': [{'pid': j + 200, 'process': 'compute-%d.exe' % j, 'cpu_pct': 125 - j * 30} for j in range(3)], 'cpu_process_age_s': 2,
                         'gpus': gpus, 'disks': [],
                         'nics': [{'nic': 'Ethernet', 'kind': 'wired', 'rx_mib_s': 1.2, 'tx_mib_s': 0.3, 'link_mbps': 100}]})
     limits = [{'engine': name, 'five_hour': {'pct': 15, 'read_at': iso(now)},
@@ -41,6 +42,8 @@ def fixture():
                     'Project volume has 12 GiB free', 'Wired link is 100 Mbps', 'Backup volume needs review'])]
     return {'schema': 'mai-watch-live-v1', 'interval_s': 1, 'history_s': 600,
             'host': {'available': True, 'logical_cpus': 64}, 'samples': samples, 'judgments': judgments, 'disks': {},
+            'diagnostics': {'schema': 'mai-watch-diagnostic-v1', 'checks': [{'source': 'gpu', 'state': 'available', 'reason': 'measurement available', 'next_check': 'No change needed'}]},
+            'incidents': [{'last_seen': now - 10, 'state': 'cleared', 'text': 'Earlier GPU temperature warning'}],
             'slow': {'paths': [], 'usage': {'available': True, 'limits': limits, 'sessions': []}}}
 
 
@@ -49,6 +52,7 @@ setTimeout(function () {
   function rect(e) { var r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom}; }
   function visible(e) { return !!e && !e.closest('details:not([open])') && e.getBoundingClientRect().height>0; }
   var result={width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,
+    coreGrid:document.querySelector('.cores')?rect(document.querySelector('.cores')):null,
     gpus:Array.from(document.querySelectorAll('.gpu-row')).map(rect),
     hosts:Array.from(document.querySelectorAll('.host-band > *')).map(rect),
     attention:document.querySelector('.attention')?rect(document.querySelector('.attention')):null,
@@ -71,6 +75,7 @@ def main():
     ap.add_argument('--ref', default='')
     ap.add_argument('--label', default='after')
     ap.add_argument('--recovery', action='store_true')
+    ap.add_argument('--product', action='store_true')
     args = ap.parse_args()
     assets = {}
     for name in ('viewer.html', 'viewer-live.js', 'viewer-health.js', 'viewer-connection.js', 'manifest.webmanifest', 'viewer-icon.svg'):
@@ -96,6 +101,9 @@ def main():
             if name == 'live.json':
                 payload = json.dumps(fixture()).encode('utf-8')
                 content = 'application/json'
+            elif name == 'diagnostic.json':
+                payload = json.dumps(fixture()['diagnostics']).encode('utf-8')
+                content = 'application/json'
             elif name in assets:
                 payload = assets[name]
                 content = 'text/html' if name.endswith('.html') else 'text/javascript' if name.endswith('.js') else 'application/octet-stream'
@@ -119,7 +127,9 @@ def main():
             shot = out / ('%s-%d.png' % (args.label, width))
             command = ['node', str(TOOL / 'tests' / 'capture_cdp.mjs'), args.browser,
                        'http://127.0.0.1:%d/' % server.server_address[1], str(width), str(height), str(shot)]
-            if args.recovery:
+            if args.product:
+                command.append('product')
+            elif args.recovery:
                 command.append('recovery')
             p = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
             if p.returncode or not p.stdout.strip() or not shot.is_file():
@@ -140,8 +150,12 @@ def main():
                 hosts = result['hosts']
                 if len(hosts) != 3 or max(h['y'] for h in hosts) - min(h['y'] for h in hosts) > 1 or max(h['height'] for h in hosts) - min(h['height'] for h in hosts) > 1:
                     errors.append('host card edges do not align')
-                if not result['cores'] or min(c['height'] for c in result['cores']) < 18:
-                    errors.append('CPU core cells do not fill card')
+                if not result['cores'] or min(c['height'] for c in result['cores']) < (6 if args.product else 18):
+                    errors.append('CPU core cells too small')
+                if args.product and result['coreGrid']['height'] > 101:
+                    errors.append('CPU core area not reduced to approximately half')
+                if args.product and any(abs(h['height'] - 327) > 1 for h in hosts):
+                    errors.append('existing desktop host card height changed')
                 alert = result['attention']
                 if len(hosts) == 3 and (not alert or abs(alert['x'] - hosts[2]['x']) > 1 or
                         abs(result['gpus'][0]['x'] + result['gpus'][0]['width'] - hosts[1]['x'] - hosts[1]['width']) > 1):

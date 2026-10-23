@@ -11,7 +11,7 @@ import re
 import threading
 import time
 
-from . import disks, host, judge, nics, nvidia, usage
+from . import disks, host, judge, nics, nvidia, usage, product
 
 LIVE_SCHEMA = 'mai-watch-live-v1'
 STATUS_SCHEMA = 'mai-watch-status-v1'
@@ -23,6 +23,7 @@ EXTRA_KEYS = ('sm_clock_mhz', 'sm_clock_max_mhz', 'mem_clock_mhz', 'throttle', '
 # NVML clock event reasons (nvmlClocksEventReasons). Bits not listed are kept by number, never dropped
 THROTTLE_BITS = ((0x1, 'gpu_idle'), (0x2, 'applications_clocks_setting'), (0x4, 'sw_power_cap'), (0x8, 'hw_slowdown'), (0x10, 'sync_boost'),
                  (0x20, 'sw_thermal_slowdown'), (0x40, 'hw_thermal_slowdown'), (0x80, 'hw_power_brake_slowdown'), (0x100, 'display_clock_setting'))
+_PROCESS_SCAN_LOCK = threading.Lock()  # psutil process_iter caches Process objects and rewrites their .info
 
 
 def decode_throttle(field):
@@ -68,7 +69,7 @@ class LiveSampler:
         self.interval_s = float(interval_s)
         self.history_s = float(history_s)
         self.clock = clock
-        self.samples = collections.deque(maxlen=max(1, int(round(history_s / interval_s))))
+        self.samples = collections.deque(maxlen=min(36000, max(1, int(round(history_s / interval_s)))))
         self.lock = threading.Lock()
         self._psutil = psutil_module
         self._gpu_reader = gpu_reader or self._read_gpu
@@ -77,6 +78,9 @@ class LiveSampler:
         # most every slow_interval_s and the sample shows the last result, so the 1 s sampling never waits for it
         self._ram_every_s = float(slow_interval_s)
         self._ram_cache, self._ram_at, self._ram_busy = None, None, False
+        self._cpu_cache, self._cpu_at, self._cpu_done, self._cpu_busy = None, None, None, False
+        self._cpu_counter = product.CpuProcesses()
+        self._incidents = product.Incidents()
         self._extra_ok = None          # None: not tried yet; False: the driver refused the extra fields, so the core query only
         self._primed = False
         self._rates = host.Rates(clock=rate_clock)
@@ -128,7 +132,8 @@ class LiveSampler:
         """One sample. Every field the source cannot give is None, with the reason in problems."""
         now = self.clock()
         s = {'t': _z(now), 'cpu_pct': None, 'cpu_per_core': None, 'ram_used_gib': None, 'ram_total_gib': None, 'ram_pct': None,
-             'swap_used_gib': None, 'swap_total_gib': None, 'ram_processes': None, 'gpus': None, 'disks': None, 'nics': None, 'problems': []}
+             'swap_used_gib': None, 'swap_total_gib': None, 'ram_processes': None, 'cpu_processes': None,
+             'cpu_process_age_s': None, 'gpus': None, 'disks': None, 'nics': None, 'problems': []}
         ps = self._ps()
         if ps:
             try:
@@ -142,6 +147,7 @@ class LiveSampler:
                 sw = ps.swap_memory()
                 s.update(swap_used_gib=_gib(sw.used), swap_total_gib=_gib(sw.total))
                 s['ram_processes'] = self._ram_top(ps)
+                s['cpu_processes'], s['cpu_process_age_s'] = self._cpu_top(ps)
             except Exception as e:
                 s['problems'].append('host metrics failed: %s' % type(e).__name__)
         else:
@@ -186,7 +192,46 @@ class LiveSampler:
                                     key=lambda p: (-p['vram_mib'], p['pid']))[:3])
         with self.lock:
             self.samples.append(s)
+            items = list(self.samples)
+            slow = dict(self.slow)
+        slow['paths'] = self._paths_now()
+        findings = judge.judge(items, slow, self.thresholds, self.interval_s)
+        observed = set(judge.observable(items, slow))
+        with self.lock:
+            # A valid newest row cannot prove that a time-window finding cleared after a hole.
+            limits = dict(judge.DEFAULTS, **self.thresholds)
+            idle_keys = {f['kind'] + '|' + str(f['subject']) for f in findings if f['kind'] == 'gpu_vram_idle'}
+            for g in s.get('gpus') or []:
+                key = 'gpu_vram_idle|GPU %s' % g.get('index')
+                u, v = g.get('util_pct'), g.get('vram_used_mib')
+                if key not in idle_keys and (u is None or v is None or (u < limits['idle_util_pct'] and v >= limits['idle_vram_mib'])):
+                    observed.discard(key)
+            self._incidents.update(findings, observed, now, self.interval_s)
         return s
+
+    def _cpu_top(self, ps):
+        now = time.monotonic()
+        if not self._cpu_busy and (self._cpu_at is None or now - self._cpu_at >= 5):
+            self._cpu_busy, self._cpu_at = True, now
+            def scan():
+                try:
+                    # No cmdline, username or executable path is requested.
+                    with _PROCESS_SCAN_LOCK:
+                        rows = list(ps.process_iter(['pid', 'name', 'create_time', 'cpu_times']))
+                        result = self._cpu_counter.update(rows, time.monotonic())
+                    with self.lock:
+                        self._cpu_cache, self._cpu_done = result, time.monotonic()
+                except Exception:
+                    with self.lock:
+                        self._cpu_cache, self._cpu_done = None, None
+                    self._cpu_counter = product.CpuProcesses()
+                finally:
+                    self._cpu_busy = False
+            threading.Thread(target=scan, name='mai-watch-cpu-top', daemon=True).start()
+        with self.lock:
+            age = None if self._cpu_done is None else max(0, now - self._cpu_done)
+            return (self._cpu_cache if age is not None and age <= 15 else None,
+                    round(age, 1) if age is not None else None)
 
     def _process_meta(self, ps, pid):
         try:
@@ -215,7 +260,8 @@ class LiveSampler:
 
             def scan():
                 try:
-                    self._ram_cache = self._ram_processes(ps)
+                    with _PROCESS_SCAN_LOCK:
+                        self._ram_cache = self._ram_processes(ps)
                 finally:
                     self._ram_busy = False
             threading.Thread(target=scan, name='mai-watch-ram-top', daemon=True).start()
@@ -328,6 +374,8 @@ class LiveSampler:
             slow = dict(self.slow)
         slow['paths'] = self._paths_now()
         found = judge.judge(items, slow, self.thresholds, self.interval_s)
+        with self.lock:
+            found = self._incidents.decorate(found, self.clock())
         counts = {k: sum(1 for f in found if f['level'] == k) for k in ('bad', 'warn', 'info')}
         last = items[-1]['t'] if items else None
         # review R15: a served document is not proof of sampling; it says how old the last sample is and whether that is fresh
@@ -341,6 +389,15 @@ class LiveSampler:
                 'max_sample_age_s': limit, 'fresh': fresh, 'stale_reason': reason, 'counts': counts, 'judgments': found,
                 'blind': judge.blind(items, slow), 'observable': judge.observable(items, slow), 'notify': self.notify_state}
 
+    def diagnostics(self):
+        with self.lock:
+            last = dict(self.samples[-1]) if self.samples else {}
+            slow = dict(self.slow)
+        stamp = judge._sec(last.get('t'))
+        age = None if stamp is None else self.clock() - stamp
+        fresh = age is not None and 0 <= age <= max(3 * self.interval_s, 10)
+        return product.diagnostic(last, self.host_info, slow, fresh)
+
     def payload(self, since=None):
         with self.lock:
             items = list(self.samples)
@@ -348,10 +405,16 @@ class LiveSampler:
         slow['paths'] = self._paths_now()
         slow['paths_dropped'] = list(self.paths.dropped)
         judgments = judge.judge(items, slow, self.thresholds, self.interval_s)
+        with self.lock:
+            judgments = self._incidents.decorate(judgments, self.clock())
+            incidents = self._incidents.rows(self.clock())
         if since:
             items = [x for x in items if x['t'] > since]
         return {'schema': LIVE_SCHEMA, 'interval_s': self.interval_s, 'history_s': self.history_s, 'host': self.host_info,
-                'generated_at': _z(self.clock()), 'samples': items, 'slow': slow, 'disks': self.disk_map, 'judgments': judgments}
+                'generated_at': _z(self.clock()), 'samples': items, 'slow': slow, 'disks': self.disk_map, 'judgments': judgments,
+                'diagnostics': self.diagnostics(), 'incidents': incidents,
+                'incident_retention': {'limit': 256, 'seconds': 86400, 'storage': 'memory; resets on restart'},
+                'sample_limit': self.samples.maxlen}
 
     def run(self, stop, sleep=time.sleep):
         """Samples until stop is set. A slow source delays the next sample; samples are never invented to fill a gap."""

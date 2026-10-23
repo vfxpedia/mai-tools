@@ -39,6 +39,12 @@ mai-watch
 - 요금제 한도 % 는 실시간 측정이 아니다. 세션이 턴을 주고받을 때 계기판이 기록한 마지막 값이고, 화면에 그 기록의 나이를 적는다.
 - 디스크는 모델명과 드라이브 문자로 보여 준다. 아무것도 보여 줄 게 없는 줄 (쉬는 디스크, 가상 네트워크 카드, 조용한 세션) 은 접어 둔다.
 
+큰 화면에서는 GPU 오른쪽에 경고를 놓고 CPU · RAM · Network 카드와 같은 격자에 맞춘다. 좁은 화면에서는 GPU를 위아래로 쌓는다. GPU 상태 · 경고 · 요금제 한도 요약은 펼쳐 두고, 긴 저장 장치 · 세션 표만 접을 수 있다.
+
+GPU 프로세스는 VRAM이 유한한 양수이고 PID와 실행 파일 이름이 유효한 계산 항목만 보여 준다. GPU마다 VRAM이 큰 순서로 최대 3개다. 조회 실패는 `unknown`으로 남긴다. 확인된 목록이 비어도 학습이 없다는 뜻은 아니다. Windows에서 프로세스별 VRAM을 주지 않을 수 있기 때문이다. 화면에서도 옛 live payload를 같은 기준으로 거른다.
+
+선택 브라우저 회귀 검사는 Node.js 22 이상 (내장 WebSocket)과 로컬 Chrome/Chromium 실행 파일이 필요하다. 저장소 뿌리에서 `python tools/mai-watch/tests/check_layout_browser.py --browser /path/to/chrome --out /tmp/watch-review`로 실행한다. 합성 입력만 loopback으로 제공하고, 독립 임시 브라우저에서 1920 · 390 CSS 픽셀 화면을 재어 캡처와 배치 수치를 남긴다. 설치된 감시 도구는 재시작하지 않는다. [전후 비교 기록](../../docs/reviews/watch-layout-20261023/README.md)을 참고한다.
+
 RTX 5080 두 장의 Windows 11 에서 잰 것: 화면 값이 `nvidia-smi` 와 맞았다. `nvidia-smi` 한 번에 약 0.08초. 응답하지 않는 NAS 주소는 Windows 가 실패를 알리기까지 21초가 걸렸고, 화면은 3초 만에 `no answer` 로 표시하면서 나머지는 계속 갱신했다.
 
 ## AI 에이전트와 스크립트용

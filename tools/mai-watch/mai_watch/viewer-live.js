@@ -116,7 +116,7 @@
       rows.appendChild(row);
     });
     box.appendChild(bar);
-    box.appendChild(fold('Show ' + list.length + ' details', rows, 'judgments'));
+    box.appendChild(rows);
     return box;
   }
 
@@ -156,10 +156,15 @@
     facts.appendChild(el('div', known(g.sm_clock_mhz) ? 'SM ' + g.sm_clock_mhz + (g.sm_clock_max_mhz ? ' / ' + g.sm_clock_max_mhz : '') + ' MHz' : 'clock unknown'));
     facts.appendChild(el('div', limitText(g)));
     row.appendChild(facts);
+    // Also protect a new viewer reading a still-running sampler's older payload.
     var procs = g.processes;
+    if (Array.isArray(procs)) procs = procs.filter(function (p) {
+      return p && typeof p.vram_mib === 'number' && isFinite(p.vram_mib) && p.vram_mib > 0 &&
+        typeof p.process === 'string' && p.process.trim() && p.process.trim().charAt(0) !== '[';
+    }).sort(function (a, b) { return b.vram_mib - a.vram_mib || (a.pid || 0) - (b.pid || 0); }).slice(0, 3);
     var procBox = el('div', undefined, 'gpu-processes');
     if (procs === null || procs === undefined) procBox.appendChild(el('span', 'Process list unknown', 'quiet'));
-    else if (!procs.length) procBox.appendChild(el('span', 'No compute process', 'quiet'));
+    else if (!procs.length) procBox.appendChild(el('span', 'No verified compute process · unreadable VRAM is not evidence of no work', 'quiet'));
     else procs.forEach(function (p) {
       var name = p.run_name ? p.process + ' · run ' + p.run_name : p.process + ' · run unknown';
       var elapsed = known(p.elapsed_s) ? 'running ' + ago(p.elapsed_s) : 'elapsed unknown';
@@ -364,8 +369,7 @@
     status.textContent += ' · graphs show ' + (spanS >= 120 ? Math.round(spanS / 60) + ' min' : Math.round(spanS) + ' s');
     if (state.host && state.host.available === false) status.textContent += ' · CPU, RAM, disks and network unknown: ' + state.host.reason;
 
-    box.appendChild(attention());
-
+    var overview = el('div', undefined, 'overview');
     var gpus = el('section', undefined, 'gpus');
     (last.gpus || []).forEach(function (g) { gpus.appendChild(gpuRow(g, list, times)); });
     if (!last.gpus) gpus.appendChild(el('div', 'GPU unknown: no nvidia-smi reading', 'att-row lvl-info'));
@@ -374,7 +378,9 @@
       legend.appendChild(el('span', 'use', 'u-key')); legend.appendChild(el('span', 'VRAM', 'v-key'));
       gpus.appendChild(legend);
     }
-    box.appendChild(gpus);
+    overview.appendChild(gpus);
+    overview.appendChild(attention());
+    box.appendChild(overview);
 
     if (state.slow) box.appendChild(usageHighlights(state.slow.usage));
 
@@ -388,7 +394,7 @@
     ram.appendChild(el('p', 'RAM history: last 10 minutes', 'quiet'));
     band.appendChild(ram);
     band.appendChild(ioBand(list));
-    box.appendChild(mobileFold('Host metrics', band, 'host-metrics'));
+    box.appendChild(band);
 
     if (state.slow) box.appendChild(mobileFold('Storage', storage(state.slow), 'storage'));
     if (state.slow) box.appendChild(mobileFold('AI sessions and recent activity', usageBlock(state.slow.usage), 'sessions'));

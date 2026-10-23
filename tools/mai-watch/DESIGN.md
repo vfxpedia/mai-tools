@@ -182,6 +182,14 @@ Measured on the reference machine: with the existing Telegram sender as the comm
 
 Every child program (nvidia-smi each second, the PowerShell disk and adapter queries, the notification command) is started with CREATE_NO_WINDOW on Windows. Measured: a console-less parent (pythonw, as a scheduled task runs it) calling nvidia-smi 10 times without the flag opened 10 visible console windows; mai-watch itself under pythonw for 20 s opened none.
 
+## 9h. Desktop and mobile layout follow-up (2026-10-23, mai-os#55)
+
+The overview and host band share a three-column grid. GPUs span the first two columns, attention occupies the third, and CPU, RAM and network occupy one column each. At narrower widths the overview becomes one column. At 390 CSS pixels both GPUs remain vertically stacked. Warning rows, GPU status and quota highlights never start inside a closed details group. Long storage and session tables retain folding.
+
+The live sampler excludes compute rows with unavailable or non-positive VRAM, invalid PIDs and placeholder process names before reading process metadata. Each GPU retains at most three, sorted by VRAM descending and PID for ties. The viewer repeats the memory/name filter for older payloads. Unknown query and empty verified list have different messages; neither claims that an unmeasurable Windows workload is absent. These presentation limits do not change job or idle judgments.
+
+Regression checks use the real renderer with a small DOM harness for visibility and process rows. An optional Chrome CDP runner measures actual geometry and screenshots at exact 1920x1080 and 390x844 CSS viewports, using a public-safe fixture. It checks shared grid edges, host heights, core-cell size, warning visibility, vertical GPU order and overflow. Failed baseline assertions are recorded alongside the passing new layout. No monitor restart is required for the check.
+
 ## 10. Security and safety
 
 - Read-only toward workloads. No stop or kill capability, and nothing is launched except two things the owner asks for: the read-only OS queries (nvidia-smi, PowerShell Get-Disk and Get-NetAdapter, lsblk) and, only when `notify_cmd` is set, the owner's notification command.

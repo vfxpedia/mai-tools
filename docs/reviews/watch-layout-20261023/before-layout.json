@@ -1,0 +1,1106 @@
+[
+  {
+    "width": 1920,
+    "height": 1080,
+    "overflow": false,
+    "gpus": [
+      {
+        "x": 24,
+        "y": 215.5,
+        "width": 1857,
+        "height": 139.1875,
+        "bottom": 354.6875
+      },
+      {
+        "x": 24,
+        "y": 364.6875,
+        "width": 1857,
+        "height": 429.4375,
+        "bottom": 794.125
+      }
+    ],
+    "hosts": [
+      {
+        "x": 24,
+        "y": 900.125,
+        "width": 458.25,
+        "height": 140.5,
+        "bottom": 1040.625
+      },
+      {
+        "x": 494.25,
+        "y": 900.125,
+        "width": 458.25,
+        "height": 327,
+        "bottom": 1227.125
+      },
+      {
+        "x": 964.5,
+        "y": 900.125,
+        "width": 916.5,
+        "height": 164.5,
+        "bottom": 1064.625
+      }
+    ],
+    "attention": {
+      "x": 24,
+      "y": 123.5,
+      "width": 1857,
+      "height": 74,
+      "bottom": 197.5
+    },
+    "cores": [
+      {
+        "x": 37,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 48,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 59,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 70,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 81,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 92,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 103,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 114,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 125,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 136,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 147,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 158,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 169,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 180,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 191,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 202,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 213,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 224,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 235,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 246,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 257,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 268,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 279,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 290,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 301,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 312,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 323,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 334,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 345,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 356,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 367,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 378,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 389,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 400,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 411,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 422,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 433,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 444,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 455,
+        "y": 1009.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1018.625
+      },
+      {
+        "x": 37,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 48,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 59,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 70,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 81,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 92,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 103,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 114,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 125,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 136,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 147,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 158,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 169,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 180,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 191,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 202,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 213,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 224,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 235,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 246,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 257,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 268,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 279,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 290,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      },
+      {
+        "x": 301,
+        "y": 1020.625,
+        "width": 9,
+        "height": 9,
+        "bottom": 1029.625
+      }
+    ],
+    "warningsVisible": false,
+    "highlightsVisible": true,
+    "processes": [
+      "trainer.exe \u00b7 run terrain \u00b7 running 1.5 h \u00b7 8.0 GiB VRAM",
+      "desktop-0.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-1.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-2.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-3.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-4.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-5.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-6.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-7.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-8.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-9.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-10.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-11.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-12.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-13.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-14.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-15.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-16.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-17.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-18.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-19.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-20.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-21.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-22.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-23.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-24.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-25.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-26.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-27.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-28.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-29.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-30.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-31.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-32.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-33.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-34.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-35.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-36.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM"
+    ],
+    "gpuCount": 2,
+    "warningCount": 5,
+    "error": "",
+    "failures": [
+      "warnings or limits hidden",
+      "unverified desktop processes shown",
+      "host card edges do not align",
+      "CPU core cells do not fill card",
+      "overview and host columns do not share grid edges"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "gpus": [
+      {
+        "x": 16,
+        "y": 302,
+        "width": 176,
+        "height": 2962.75,
+        "bottom": 3264.75
+      },
+      {
+        "x": 198,
+        "y": 302,
+        "width": 176,
+        "height": 2962.75,
+        "bottom": 3264.75
+      }
+    ],
+    "hosts": [
+      {
+        "x": 16,
+        "y": 3456.25,
+        "width": 358,
+        "height": 151.5,
+        "bottom": 3607.75
+      },
+      {
+        "x": 16,
+        "y": 3619.75,
+        "width": 358,
+        "height": 327,
+        "bottom": 3946.75
+      },
+      {
+        "x": 16,
+        "y": 3958.75,
+        "width": 358,
+        "height": 206.5,
+        "bottom": 4165.25
+      }
+    ],
+    "attention": {
+      "x": 16,
+      "y": 210,
+      "width": 358,
+      "height": 74,
+      "bottom": 284
+    },
+    "cores": [
+      {
+        "x": 29,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 40,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 51,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 62,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 73,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 84,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 95,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 106,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 117,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 128,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 139,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 150,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 161,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 172,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 183,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 194,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 205,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 216,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 227,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 238,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 249,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 260,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 271,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 282,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 293,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 304,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 315,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 326,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 337,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 348,
+        "y": 3565.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3574.75
+      },
+      {
+        "x": 29,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 40,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 51,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 62,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 73,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 84,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 95,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 106,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 117,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 128,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 139,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 150,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 161,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 172,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 183,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 194,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 205,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 216,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 227,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 238,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 249,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 260,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 271,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 282,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 293,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 304,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 315,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 326,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 337,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 348,
+        "y": 3576.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3585.75
+      },
+      {
+        "x": 29,
+        "y": 3587.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3596.75
+      },
+      {
+        "x": 40,
+        "y": 3587.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3596.75
+      },
+      {
+        "x": 51,
+        "y": 3587.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3596.75
+      },
+      {
+        "x": 62,
+        "y": 3587.75,
+        "width": 9,
+        "height": 9,
+        "bottom": 3596.75
+      }
+    ],
+    "warningsVisible": false,
+    "highlightsVisible": true,
+    "processes": [
+      "trainer.exe \u00b7 run terrain \u00b7 running 1.5 h \u00b7 8.0 GiB VRAM",
+      "desktop-0.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-1.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-2.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-3.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-4.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-5.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-6.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-7.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-8.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-9.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-10.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-11.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-12.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-13.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-14.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-15.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-16.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-17.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-18.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-19.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-20.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-21.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-22.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-23.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-24.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-25.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-26.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-27.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-28.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-29.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-30.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-31.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-32.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-33.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-34.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-35.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM",
+      "desktop-36.exe \u00b7 run unknown \u00b7 elapsed unknown \u00b7 unknown GiB VRAM"
+    ],
+    "gpuCount": 2,
+    "warningCount": 5,
+    "error": "",
+    "failures": [
+      "warnings or limits hidden",
+      "unverified desktop processes shown",
+      "mobile GPUs are not stacked"
+    ]
+  }
+]

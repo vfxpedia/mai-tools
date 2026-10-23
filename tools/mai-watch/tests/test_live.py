@@ -199,6 +199,30 @@ class SparkTests(unittest.TestCase):
         self.assertEqual(json.loads(p.stdout), ['0.0,48.0 75.0,24.0', '225.0,0.0 300.0,0.0'])
 
 
+class RamTopTests(unittest.TestCase):
+    def test_slow_process_scan_never_holds_the_sample(self):
+        # 10/23: the full process scan took 4.5 s on AI-WS01; the 1 s sample must not wait for it
+        import time as _t
+        done = threading.Event()
+
+        class Slow:
+            def process_iter(self, attrs):
+                _t.sleep(0.5)
+                done.set()
+                return []
+        s = sampler()
+        t0 = _t.perf_counter()
+        first = s._ram_top(Slow())
+        self.assertLess(_t.perf_counter() - t0, 0.2)
+        self.assertIsNone(first)
+        self.assertTrue(done.wait(3))
+        for _ in range(50):
+            if not s._ram_busy:
+                break
+            _t.sleep(0.05)
+        self.assertEqual(s._ram_top(Slow()), [], 'the finished scan is served from the cache, not scanned again at once')
+
+
 class LimitLabelTests(unittest.TestCase):
     def test_old_reading_is_grey_and_says_old_fresh_high_is_hot(self):
         js = os.path.join(ROOT, 'mai_watch', 'viewer-live.js').replace(os.sep, '/')

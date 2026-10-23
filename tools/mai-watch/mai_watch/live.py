@@ -73,6 +73,10 @@ class LiveSampler:
         self._psutil = psutil_module
         self._gpu_reader = gpu_reader or self._read_gpu
         self._apps_reader = lambda: nvidia.run_csv(self.nvidia_cmd, 'query-compute-apps', nvidia.APPS_QUERY, timeout=5)
+        # the RAM top-5 scan walks every process: 4.5 s for 809 processes on AI-WS01 (10/23). It runs on its own thread at
+        # most every slow_interval_s and the sample shows the last result, so the 1 s sampling never waits for it
+        self._ram_every_s = float(slow_interval_s)
+        self._ram_cache, self._ram_at, self._ram_busy = None, None, False
         self._extra_ok = None          # None: not tried yet; False: the driver refused the extra fields, so the core query only
         self._primed = False
         self._rates = host.Rates(clock=rate_clock)
@@ -137,7 +141,7 @@ class LiveSampler:
                 s.update(ram_used_gib=_gib(vm.total - vm.available), ram_total_gib=_gib(vm.total), ram_pct=round(vm.percent, 1))
                 sw = ps.swap_memory()
                 s.update(swap_used_gib=_gib(sw.used), swap_total_gib=_gib(sw.total))
-                s['ram_processes'] = self._ram_processes(ps)
+                s['ram_processes'] = self._ram_top(ps)
             except Exception as e:
                 s['problems'].append('host metrics failed: %s' % type(e).__name__)
         else:
@@ -198,6 +202,19 @@ class LiveSampler:
             return {'run_name': run_name, 'elapsed_s': max(0, int(self.clock() - born))}
         except Exception:
             return {}
+
+    def _ram_top(self, ps):
+        now = time.monotonic()
+        if not self._ram_busy and (self._ram_at is None or now - self._ram_at >= self._ram_every_s):
+            self._ram_busy, self._ram_at = True, now
+
+            def scan():
+                try:
+                    self._ram_cache = self._ram_processes(ps)
+                finally:
+                    self._ram_busy = False
+            threading.Thread(target=scan, name='mai-watch-ram-top', daemon=True).start()
+        return self._ram_cache
 
     @staticmethod
     def _ram_processes(ps):

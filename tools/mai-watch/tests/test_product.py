@@ -63,7 +63,8 @@ class ProductTests(unittest.TestCase):
         self.assertIn('hot earlier', text)
 
     def test_sampler_diagnostics_and_http_export_are_real_allowlist(self):
-        s = LiveSampler(psutil_module=False, gpu_reader=lambda: None, paths=['PRIVATE_SENTINEL'])
+        clock = [1800000000.0]
+        s = LiveSampler(psutil_module=False, gpu_reader=lambda: None, paths=['PRIVATE_SENTINEL'], clock=lambda: clock[0])
         s.sample_once()
         d = s.diagnostics()
         self.assertEqual(d['schema'], 'mai-watch-diagnostic-v1')
@@ -74,6 +75,9 @@ class ProductTests(unittest.TestCase):
         try:
             with urllib.request.urlopen('http://127.0.0.1:%d/diagnostic.json' % srv.server_port) as r:
                 self.assertEqual(json.load(r), d)
+            clock[0] += 11
+            with urllib.request.urlopen('http://127.0.0.1:%d/diagnostic.json' % srv.server_port) as r:
+                self.assertFalse(json.load(r)['fresh'])
         finally:
             srv.shutdown()
             srv.server_close()

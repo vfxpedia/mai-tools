@@ -26,6 +26,7 @@ Status: verification in progress, not yet deployed
 - Reused/reset-only process lists now remain unknown. Repeated incidents retain previous cleared episodes within the same total cap.
 - Remaining performance limit: the maximum 36,000-sample / eight-GPU / 0.2-second configuration is not a real-time guarantee. Slow reads or calculation extend the interval. Basic judgment work no longer holds the sampler lock and diagnostics do not repeat a full judgment pass.
 - Final CI and deployment results will be recorded after measurement.
+- First macOS CI exposed a test-clock error: the HTTP equality test compared real-time freshness across a slow request and crossed the ten-second expiry. The fixture now supplies a fixed clock, then explicitly advances eleven seconds and checks that the HTTP export becomes stale. Runtime expiry is unchanged.
 
 ## Unmeasured
 

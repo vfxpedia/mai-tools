@@ -356,8 +356,13 @@ class SafeSend(unittest.TestCase):
     def test_hidden_typed_text_is_not_overwritten(self):
         self.assertEqual(self.send([{'text': 'out\n❯\n', 'prompt_trailing': 0}]), (4, []))
 
-    def test_screen_still_changing_is_not_quiet(self):
-        moving = [{'text': 'out %d\n❯ \n' % n, 'prompt_trailing': 1} for n in range(40)]
+    def test_busy_agent_with_an_empty_prompt_gets_it(self):
+        # 10/23: a working pane's timer keeps the screen moving; the empty prompt queues the message
+        moving = [{'text': 'Working (%ds)\n❯ \n' % n, 'prompt_trailing': 1} for n in range(40)]
+        self.assertEqual(self.send(moving), (0, [('L', 'report')]))
+
+    def test_prompt_row_still_changing_is_not_quiet(self):
+        moving = [{'text': 'out\n❯ Try "fix %d"\n' % n, 'prompt_trailing': 1} for n in range(40)]
         self.assertEqual(self.send(moving), (4, []))
 
     def test_quiet_empty_prompt_is_sent_once(self):

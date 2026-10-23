@@ -268,14 +268,17 @@ def safe_send(orca, handle, text, wait_s=600, step_s=5, sleep=time.sleep, log=pr
             log('read failed: %s' % e)
             return 2
         now = dt.datetime.now(dt.timezone.utc)
-        quiet = a == b and not core.screen_state(eng, a, now)['typing'] and not core.screen_state(eng, b, now)['typing']
+        # only the prompt row decides: a working agent's screen keeps moving (its timer) but an empty prompt queues the
+        # message (10/23: the hand-off to a busy pipeline never went because the whole screen never read the same twice)
+        quiet = (core.prompt_key(eng, a) == core.prompt_key(eng, b) and not core.screen_state(eng, a, now)['typing']
+                 and not core.screen_state(eng, b, now)['typing'])
         if quiet:
             try:
                 last = orca.screen(handle)
             except (RuntimeError, OSError, subprocess.SubprocessError) as e:
                 log('read failed: %s' % e)
                 return 2
-            if last == b:
+            if core.prompt_key(eng, last) == core.prompt_key(eng, b) and not core.screen_state(eng, last, now)['typing']:
                 ok = orca.send(handle, core.one_line(text))
                 log('sent' if ok else 'send refused')
                 return 0 if ok else 2

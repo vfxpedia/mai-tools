@@ -51,7 +51,7 @@ After:
 
 ## Verification
 
-- `python common/run_all_tests.py`: exit 0, 501 tests run, zero failed files. Five existing Node tests skipped under their platform conditions. mai-watch alone contributes 173 tests.
+- `python common/run_all_tests.py`: exit 0, 501 tests run, zero failed files. Five optional Node integration tests skipped because `MAI_CODEX_TEST_EXE` and `MAI_NPM_TEST_CLI` were not configured. mai-watch alone contributes 173 tests. The dashboard tests were not skipped.
 - Added backend and real-renderer tests failed before the fix and passed after it. Cases cover unavailable VRAM, permission placeholders, zero and negative values, per-GPU caps, query failure and visibility outside closed mobile groups.
 - The former test that asserted the literal horizontal two-GPU CSS was removed. Actual browser geometry now checks the replacement vertical requirement instead of blessing a CSS string.
 - The first full-suite attempt exposed that obsolete test and failed. The final full run above was made after removing it. No failing file was skipped.

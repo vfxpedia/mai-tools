@@ -795,16 +795,6 @@ class ViewerPageTests(unittest.TestCase):
         got = self.run_cases([self.cases()['good']])[0]
         self.assertEqual(got['theme_label'], 'Theme: System')
 
-    def test_mobile_layout_puts_two_gpus_first_and_uses_os_theme_with_override(self):
-        with open(os.path.join(ROOT, 'mai_watch', 'viewer.html'), encoding='utf-8') as f:
-            html = f.read()
-        self.assertIn('@media (max-width: 560px)', html)
-        self.assertIn('.gpus { grid-template-columns: repeat(2, minmax(0, 1fr))', html)
-        self.assertIn('@media (prefers-color-scheme: dark)', html)
-        self.assertIn('Theme: ', html)
-        self.assertIn('mai-watch-theme', html)
-
-
 class RuntimeValidatorAgreement(unittest.TestCase):
     def test_runtime_validator_agrees_with_json_schema_on_every_example(self):
         sch = readj(os.path.join(ROOT, 'schema', 'status.v1.schema.json'))

@@ -39,6 +39,12 @@ How to read it:
 - Plan limit percentages are the gauges' last reading, taken when a session takes a turn; the page shows how old that reading is. They are not measured live.
 - Disks are named by model and drive letter. Rows that show nothing (idle disks, virtual adapters, quiet sessions) are folded.
 
+The desktop view places warnings beside the GPU column, on the same grid as the equal-height CPU, RAM and network cards. On narrow screens GPUs stack vertically. GPU status, warnings and plan-limit highlights stay expanded; long storage and session tables can be folded.
+
+GPU process rows are measured compute entries only: positive, finite VRAM, a valid PID and a non-placeholder executable name. Each GPU shows at most three, largest VRAM first. An unreadable query remains `unknown`. An empty verified list does not prove that no training is running: Windows can withhold per-process VRAM. The viewer also filters older live payloads.
+
+The optional browser regression check needs Node.js 22 or later (built-in WebSocket) and a local Chrome/Chromium executable. From the repository root, run `python tools/mai-watch/tests/check_layout_browser.py --browser /path/to/chrome --out /tmp/watch-review`. It serves only a synthetic fixture on loopback, opens its own temporary browser profile, checks 1920 and 390 CSS-pixel viewports, and writes screenshots and geometry results. It does not restart the installed monitor. See [the paired review](../../docs/reviews/watch-layout-20261023/README.md).
+
 Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one `nvidia-smi` query takes about 0.08 s; a NAS address that does not answer took Windows 21 s to fail, and the page marked it `no answer` after 3 s while the rest kept updating.
 
 ## For AI agents and scripts

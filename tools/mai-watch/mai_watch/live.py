@@ -171,14 +171,19 @@ class LiveSampler:
             by_uuid = {}
             if apps is not None:
                 for app in apps:
-                    if app['pid'] is None:
+                    name = os.path.basename(app['name'].replace('\\', '/')).strip()
+                    # WDDM can return desktop apps with unreadable memory, not a measured compute workload.
+                    if (app['pid'] is None or app['pid'] <= 0 or not float(app['pid']).is_integer()
+                            or app['memory_mib'] is None or app['memory_mib'] <= 0
+                            or not name or name.startswith('[')):
                         continue
                     meta = self._process_meta(ps, int(app['pid'])) if ps else {}
                     by_uuid.setdefault(app['gpu_uuid'], []).append({
-                        'pid': int(app['pid']), 'process': os.path.basename(app['name'].replace('\\', '/')) or 'unknown',
+                        'pid': int(app['pid']), 'process': name,
                         'run_name': meta.get('run_name'), 'elapsed_s': meta.get('elapsed_s'), 'vram_mib': app['memory_mib']})
             for gpu in s['gpus']:
-                gpu['processes'] = None if apps is None else by_uuid.get(gpu['uuid'], [])
+                gpu['processes'] = (None if apps is None else sorted(by_uuid.get(gpu['uuid'], []),
+                                    key=lambda p: (-p['vram_mib'], p['pid']))[:3])
         with self.lock:
             self.samples.append(s)
         return s

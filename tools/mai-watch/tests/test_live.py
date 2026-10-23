@@ -75,7 +75,29 @@ class SamplerTests(unittest.TestCase):
         p0 = sample['gpus'][0]['processes'][0]
         self.assertEqual((p0['pid'], p0['process'], p0['run_name'], p0['elapsed_s'], p0['vram_mib']),
                          (42, 'python.exe', 'terrain_trial', 100, 2048))
-        self.assertEqual(sample['gpus'][1]['processes'][0]['vram_mib'], None)
+        self.assertEqual(sample['gpus'][1]['processes'], [])
+
+    def test_compute_list_discards_unreadable_rows_before_metadata_and_caps_each_gpu(self):
+        s = sampler()
+        first = 'GPU-aaaaaaaa-0000-0000-0000-000000000001'
+        second = 'GPU-bbbbbbbb-0000-0000-0000-000000000002'
+        s._apps_reader = lambda: '\n'.join([
+            first + ', 1, explorer.exe, [N/A]', first + ', 2, chrome.exe, [N/A]',
+            first + ', 3, [Insufficient Permissions], 4096', first + ', 4, empty.exe, 0',
+            first + ', 10, train-a.exe, 100', first + ', 11, train-b.exe, 900',
+            first + ', 12, train-c.exe, 600', first + ', 13, train-d.exe, 300',
+            second + ', 20, eval.exe, 200', second + ', 21, invalid.exe, -1',
+        ])
+        looked_up = []
+        class Proc:
+            def __init__(self, pid): looked_up.append(pid)
+            def create_time(self): return 1799999900
+            def cmdline(self): return []
+        s._ps().Process = Proc
+        sample = s.sample_once()
+        self.assertEqual([p['pid'] for p in sample['gpus'][0]['processes']], [11, 12, 13])
+        self.assertEqual([p['pid'] for p in sample['gpus'][1]['processes']], [20])
+        self.assertTrue(set(looked_up).isdisjoint({1, 2, 3, 4, 21}))
 
     def test_failed_compute_apps_query_is_unknown_not_an_empty_process_list(self):
         s = sampler()
@@ -197,6 +219,37 @@ class SparkTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         # x = 300 - age/120*300; y = 48 - clamp(v)/100*48; null breaks the line; 150 is clamped to the top
         self.assertEqual(json.loads(p.stdout), ['0.0,48.0 75.0,24.0', '225.0,0.0 300.0,0.0'])
+
+
+class LiveViewTests(unittest.TestCase):
+    def render(self, processes=None, width=390):
+        harness = os.path.join(ROOT, 'tests', 'live_view_harness.js')
+        p = subprocess.run(['node', harness], input=json.dumps({'width': width, 'processes': processes}),
+                           capture_output=True, text=True, encoding='utf-8', timeout=15)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return json.loads(p.stdout)
+
+    def test_legacy_live_payload_cannot_show_unknown_memory_or_more_than_three_processes(self):
+        processes = [{'process': 'desktop.exe', 'vram_mib': None},
+                     {'process': '[Insufficient Permissions]', 'vram_mib': 9000},
+                     {'process': 'zero.exe', 'vram_mib': 0}]
+        processes += [{'process': name, 'vram_mib': memory} for name, memory in
+                      [('train-a.exe', 100), ('train-b.exe', 900), ('train-c.exe', 600), ('train-d.exe', 300)]]
+        nodes = self.render(processes)
+        shown = [n['text'] for n in nodes if n['cls'] == 'gpu-process']
+        self.assertEqual(len(shown), 3)
+        self.assertEqual([t.split(' · ')[0] for t in shown], ['train-b.exe', 'train-c.exe', 'train-d.exe'])
+
+    def test_attention_and_host_metrics_do_not_start_inside_closed_mobile_groups(self):
+        nodes = self.render([])
+        relevant = [n for n in nodes if n['cls'] in ('att-text', 'host-title', 'usage-highlight')]
+        self.assertGreaterEqual(len(relevant), 5)
+        self.assertTrue(all(not n['closed'] for n in relevant), relevant)
+
+    def test_failed_query_stays_unknown_but_filtered_empty_is_not_proof_of_no_training(self):
+        self.assertTrue(any('Process list unknown' in n['text'] for n in self.render(None)))
+        nodes = self.render([{'process': 'desktop.exe', 'vram_mib': None}])
+        self.assertTrue(any('No verified compute process' in n['text'] for n in nodes))
 
 
 class RamTopTests(unittest.TestCase):

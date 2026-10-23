@@ -5,7 +5,7 @@
  * read is shown as unknown, never as 0. Without a live sampler (plain `serve`) the panel stays hidden. */
 (function (root) {
   'use strict';
-  var state = { active: false, interval: 1, history: 600, samples: [], host: null, slow: null, judgments: [], disks: {}, timer: null, open: {} };
+  var state = { active: false, interval: 1, history: 600, samples: [], host: null, slow: null, judgments: [], disks: {}, open: {}, lastReceivedAt: null, error: null };
   root.MaiLive = state;
 
   function $(id) { return document.getElementById(id); }
@@ -356,18 +356,28 @@
     return box;
   }
 
+  function updateStatus() {
+    var last = state.samples[state.samples.length - 1];
+    var f = root.MaiWatchConnection.freshness(Date.now(), state.lastReceivedAt, last ? ms(last.t) : null, state.interval, state.error);
+    var status = $('live-status'), detail = $('live-freshness');
+    if (!status) return;
+    status.className = 'pill ' + (f.kind === 'live' ? 'ok' : f.kind === 'waiting' ? 'warn' : 'bad');
+    status.textContent = f.kind === 'live' ? 'live, every ' + state.interval + ' s' :
+      f.kind === 'disconnected' ? 'disconnected · retrying' : f.kind === 'stale' ? 'stale data' :
+      f.kind === 'waiting' ? 'waiting for data' : 'measurement time unknown';
+    var times = state.samples.map(function (s) { return ms(s.t); });
+    if (times.length) { var span = windowS(times); status.textContent += ' · graphs show ' + (span >= 120 ? Math.round(span / 60) + ' min' : Math.round(span) + ' s'); }
+    if (state.host && state.host.available === false) status.textContent += ' · CPU, RAM, disks and network unknown: ' + state.host.reason;
+    if (detail) detail.textContent = 'Received ' + (f.receivedAge === null ? 'unknown' : Math.floor(f.receivedAge) + ' s ago') +
+      ' · measured ' + (f.sampleAge === null ? 'unknown' : Math.floor(f.sampleAge) + ' s ago') + (state.error ? ' · ' + state.error : '');
+  }
+
   function draw() {
     var box = $('live'), list = state.samples;
     clear(box);
     if (!list.length) { box.appendChild(el('p', 'waiting for the first sample...', 'quiet')); return; }
     var last = list[list.length - 1], times = list.map(function (s) { return ms(s.t); });
-    var lag = (Date.now() - times[times.length - 1]) / 1000;
-    var status = $('live-status');
-    if (lag > Math.max(3 * state.interval, 5)) { status.className = 'pill bad'; status.textContent = 'stopped: last sample ' + Math.round(lag) + ' s ago'; }
-    else { status.className = 'pill ok'; status.textContent = 'live, every ' + state.interval + ' s'; }
-    var spanS = windowS(times);
-    status.textContent += ' · graphs show ' + (spanS >= 120 ? Math.round(spanS / 60) + ' min' : Math.round(spanS) + ' s');
-    if (state.host && state.host.available === false) status.textContent += ' · CPU, RAM, disks and network unknown: ' + state.host.reason;
+    updateStatus();
 
     var overview = el('div', undefined, 'overview');
     var gpus = el('section', undefined, 'gpus');
@@ -402,15 +412,15 @@
 
   state.draw = function () { draw(); };      // lets a browser check redraw from samples it set itself (review R11 DOM regression)
 
-  function poll() {
+  function poll(signal) {
     var since = state.samples.length ? state.samples[state.samples.length - 1].t : '';
-    fetch('live.json?since=' + encodeURIComponent(since) + '&t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
-      if (r.status === 404) { state.active = false; $('live-section').style.display = 'none'; return null; }
-      if (!r.ok) throw new Error('live.json returned ' + r.status);
-      return r.json();
-    }).then(function (d) {
-      if (!d) return;
-      if (d.schema !== 'mai-watch-live-v1') throw new Error('live.json has an unknown schema');
+    return root.MaiWatchConnection.read('live.json?since=' + encodeURIComponent(since), 'json', signal);
+  }
+  if (typeof document !== 'undefined' && document.getElementById && document.getElementById('live')) {
+    var loop = root.MaiWatchConnection.createLoop({task: poll, interval: function () { return state.interval * 1000; }, onData: function (d) {
+      if (!d || d.schema !== 'mai-watch-live-v1' || !Array.isArray(d.samples) ||
+          typeof d.interval_s !== 'number' || !isFinite(d.interval_s) || d.interval_s <= 0 ||
+          typeof d.history_s !== 'number' || !isFinite(d.history_s) || d.history_s <= 0) throw new Error('live.json has an invalid schema or timing');
       var wasActive = state.active;
       state.active = true; state.interval = d.interval_s; state.history = d.history_s; state.host = d.host; state.slow = d.slow || null;
       state.judgments = d.judgments || []; state.disks = d.disks || {};
@@ -418,16 +428,15 @@
       state.samples = state.samples.concat(d.samples);
       var cutoff = Date.now() - state.history * 1000;
       state.samples = state.samples.filter(function (s) { return ms(s.t) >= cutoff; });
+      state.lastReceivedAt = Date.now(); state.error = null;
       draw();
       if (!wasActive && root.maiWatchTick) root.maiWatchTick();
-      state.timer = setTimeout(poll, Math.max(500, state.interval * 1000));
-    }).catch(function (e) {
-      var status = $('live-status');
-      if (status) { status.className = 'pill bad'; status.textContent = 'live view cannot read live.json: ' + e.message; }
-      state.timer = setTimeout(poll, 3000);
-    });
+    }, onError: function (e) {
+      if (e.status === 404 && !state.active) { $('live-section').style.display = 'none'; loop.stop(); return; }
+      state.error = e.message; updateStatus();
+    }});
+    root.MaiWatchConnection.bind(loop); loop.start();
+    root.setInterval(updateStatus, 1000);
   }
-
-  if (typeof document !== 'undefined' && document.getElementById && document.getElementById('live')) poll();
   if (typeof module !== 'undefined') module.exports = { sparkPoints: sparkPoints, activity: activity, limitLabel: limitLabel };
 })(typeof window !== 'undefined' ? window : this);

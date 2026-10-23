@@ -190,6 +190,14 @@ The live sampler excludes compute rows with unavailable or non-positive VRAM, in
 
 Regression checks use the real renderer with a small DOM harness for visibility and process rows. An optional Chrome CDP runner measures actual geometry and screenshots at exact 1920x1080 and 390x844 CSS viewports, using a public-safe fixture. It checks shared grid edges, host heights, core-cell size, warning visibility, vertical GPU order and overflow. Failed baseline assertions are recorded alongside the passing new layout. No monitor restart is required for the check.
 
+## 9i. Viewer recovery (0.2.0a2, owner approval 2026-10-23)
+
+`viewer-connection.js` owns a bounded polling loop for each source (live resources and workload snapshots). Its six-second deadline covers headers and body parsing. A timed-out request is aborted, reports failure, and retries after three seconds. Regular requests never overlap within a source. A coalesced visibility/pageshow/online event replaces the pending request, invalidates the old generation and rejects late results before any DOM update. Workload rendering is separate from its read task for the same reason.
+
+Live status updates on a separate one-second timer, so a pending fetch cannot leave an old green badge or frozen age indefinitely. It distinguishes last successful receipt from the latest sample timestamp. Fresh HTTP with stale samples remains stale. Unknown and future measurement times are not live. The explicit reload button navigates the page only, disables repeated clicks, retains the saved theme, and never restarts the monitor. It is not a remote execution endpoint. Both header controls have at least 44 CSS pixels of height.
+
+The loopback binding, endpoint allowlist, no-store responses, local-only defaults and read-only monitoring model remain unchanged. Internet publication, remote control and account management are not included. External-release follow-ups are listed in the recovery review rather than silently added to this release.
+
 ## 10. Security and safety
 
 - Read-only toward workloads. No stop or kill capability, and nothing is launched except two things the owner asks for: the read-only OS queries (nvidia-smi, PowerShell Get-Disk and Get-NetAdapter, lsblk) and, only when `notify_cmd` is set, the owner's notification command.

@@ -4,6 +4,8 @@ Status: draft (M2, live view, wider resources). 161 tests pass on Windows (72 + 
 
 # mai-watch
 
+Preview 0.2.0a2 adds a page reload button beside the theme control, automatic reconnection when the page becomes visible or the connection returns, and separate received/measurement ages. Reads have a six-second deadline including the response body and retry after three seconds on failure. A successful HTTP response cannot make an old measurement look live. Reloading the page does not restart the collector or clear its server-side history; page-local folds and scroll position may reset, while the selected theme is retained.
+
 A read-only monitor for one machine. The page opens with what needs attention (for example a nearly full drive, a slow network link, a GPU that holds memory but does nothing), each line decided from measured numbers. Below that it shows, live:
 
 - CPU (every core), RAM and swap
@@ -43,7 +45,7 @@ The desktop view places warnings beside the GPU column, on the same grid as the 
 
 GPU process rows are measured compute entries only: positive, finite VRAM, a valid PID and a non-placeholder executable name. Each GPU shows at most three, largest VRAM first. An unreadable query remains `unknown`. An empty verified list does not prove that no training is running: Windows can withhold per-process VRAM. The viewer also filters older live payloads.
 
-The optional browser regression check needs Node.js 22 or later (built-in WebSocket) and a local Chrome/Chromium executable. From the repository root, run `python tools/mai-watch/tests/check_layout_browser.py --browser /path/to/chrome --out /tmp/watch-review`. It serves only a synthetic fixture on loopback, opens its own temporary browser profile, checks 1920 and 390 CSS-pixel viewports, and writes screenshots and geometry results. It does not restart the installed monitor. See [the paired review](../../docs/reviews/watch-layout-20261023/README.md).
+The optional browser regression check needs Node.js 22 or later (built-in WebSocket) and a local Chrome/Chromium executable. From the repository root, run `python tools/mai-watch/tests/check_layout_browser.py --browser /path/to/chrome --out /tmp/watch-review`. Add `--recovery` to exercise a hung body, timeout/retry, a burst of resume events, stale measurements, page reload and theme persistence in both viewports. It serves only a synthetic fixture on loopback, opens its own temporary browser profile, and writes screenshots and geometry results. It does not restart the installed monitor. See [the recovery review and release priorities](../../docs/reviews/watch-recovery-20261023/README.md).
 
 Measured on Windows 11 with two RTX 5080: page values matched `nvidia-smi`; one `nvidia-smi` query takes about 0.08 s; a NAS address that does not answer took Windows 21 s to fail, and the page marked it `no answer` after 3 s while the rest kept updating.
 

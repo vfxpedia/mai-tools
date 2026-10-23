@@ -4,6 +4,8 @@
 
 # mai-watch
 
+미리보기 0.2.0a2에는 테마 옆 페이지 새로고침 버튼, 화면 복귀·연결 복구 시 자동 재연결, 수신 시각과 측정 시각을 나눈 표시가 들어 있다. 응답 본문까지 6초 안에 읽지 못하면 실패로 표시하고 3초 뒤 재시도한다. HTTP 응답이 새것이어도 오래된 측정값을 정상으로 표시하지 않는다. 페이지 새로고침은 수집기를 재시작하거나 서버에 남은 그래프 이력을 지우지 않는다. 펼침·스크롤 상태는 초기화될 수 있지만 선택한 테마는 유지한다.
+
 기기 한 대를 보는 읽기 전용 감시 도구다. 화면 맨 위에 「확인할 것」 이 나온다 (예: 거의 찬 드라이브, 느린 네트워크 연결, 메모리만 잡고 일하지 않는 GPU). 줄마다 잰 숫자로 판정한다. 그 아래에 실시간으로 보여 준다.
 
 - CPU (코어마다), RAM 과 스왑
@@ -43,7 +45,7 @@ mai-watch
 
 GPU 프로세스는 VRAM이 유한한 양수이고 PID와 실행 파일 이름이 유효한 계산 항목만 보여 준다. GPU마다 VRAM이 큰 순서로 최대 3개다. 조회 실패는 `unknown`으로 남긴다. 확인된 목록이 비어도 학습이 없다는 뜻은 아니다. Windows에서 프로세스별 VRAM을 주지 않을 수 있기 때문이다. 화면에서도 옛 live payload를 같은 기준으로 거른다.
 
-선택 브라우저 회귀 검사는 Node.js 22 이상 (내장 WebSocket)과 로컬 Chrome/Chromium 실행 파일이 필요하다. 저장소 뿌리에서 `python tools/mai-watch/tests/check_layout_browser.py --browser /path/to/chrome --out /tmp/watch-review`로 실행한다. 합성 입력만 loopback으로 제공하고, 독립 임시 브라우저에서 1920 · 390 CSS 픽셀 화면을 재어 캡처와 배치 수치를 남긴다. 설치된 감시 도구는 재시작하지 않는다. [전후 비교 기록](../../docs/reviews/watch-layout-20261023/README.md)을 참고한다.
+선택 브라우저 회귀 검사는 Node.js 22 이상 (내장 WebSocket)과 로컬 Chrome/Chromium 실행 파일이 필요하다. 저장소 뿌리에서 `python tools/mai-watch/tests/check_layout_browser.py --browser /path/to/chrome --out /tmp/watch-review`로 실행한다. `--recovery`를 붙이면 두 폭에서 응답 본문 정지, 시간 제한·재시도, 복귀 이벤트 중복, 오래된 측정값, 페이지 새로고침과 테마 보존도 시험한다. 합성 입력만 loopback으로 제공하고 독립 임시 브라우저에서 캡처와 수치를 남긴다. 설치된 감시 도구는 재시작하지 않는다. [복구 검증과 출시 우선순위](../../docs/reviews/watch-recovery-20261023/README.md)를 참고한다.
 
 RTX 5080 두 장의 Windows 11 에서 잰 것: 화면 값이 `nvidia-smi` 와 맞았다. `nvidia-smi` 한 번에 약 0.08초. 응답하지 않는 NAS 주소는 Windows 가 실패를 알리기까지 21초가 걸렸고, 화면은 3초 만에 `no answer` 로 표시하면서 나머지는 계속 갱신했다.
 

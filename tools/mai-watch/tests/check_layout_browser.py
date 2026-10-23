@@ -70,19 +70,22 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--ref', default='')
     ap.add_argument('--label', default='after')
+    ap.add_argument('--recovery', action='store_true')
     args = ap.parse_args()
     assets = {}
-    for name in ('viewer.html', 'viewer-live.js', 'viewer-health.js', 'manifest.webmanifest', 'viewer-icon.svg'):
+    for name in ('viewer.html', 'viewer-live.js', 'viewer-health.js', 'viewer-connection.js', 'manifest.webmanifest', 'viewer-icon.svg'):
         if args.ref:
-            p = subprocess.run(['git', 'show', args.ref + ':tools/mai-watch/mai_watch/' + name], cwd=REPO, capture_output=True, check=True)
+            p = subprocess.run(['git', 'show', args.ref + ':tools/mai-watch/mai_watch/' + name], cwd=REPO, capture_output=True)
+            if p.returncode and name == 'viewer-connection.js' and b'viewer-connection.js' not in assets['viewer.html']:
+                continue  # Older HTML never requested the new helper.
+            p.check_returncode()
             assets[name] = p.stdout
         else:
             assets[name] = (TOOL / 'mai_watch' / name).read_bytes()
-    page = assets['viewer.html'].decode('utf-8').replace('<head>', '<head><script>localStorage.setItem("mai-watch-theme","dark");</script>')
+    page = assets['viewer.html'].decode('utf-8')
     page = page.replace('</body>', PROBE + '</body>')
     page = page.replace('<h1>mai-watch</h1>', '<h1>mai-watch</h1><span class="quiet">Review fixture · not live system</span>')
     assets['viewer.html'] = page.encode('utf-8')
-    data = fixture()
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, *unused):
@@ -91,7 +94,7 @@ def main():
         def do_GET(self):
             name = self.path.split('?')[0].lstrip('/') or 'viewer.html'
             if name == 'live.json':
-                payload = json.dumps(data).encode('utf-8')
+                payload = json.dumps(fixture()).encode('utf-8')
                 content = 'application/json'
             elif name in assets:
                 payload = assets[name]
@@ -113,10 +116,11 @@ def main():
     results = []
     try:
         for width, height in ((1920, 1080), (390, 844)):
-            data = fixture()
             shot = out / ('%s-%d.png' % (args.label, width))
             command = ['node', str(TOOL / 'tests' / 'capture_cdp.mjs'), args.browser,
                        'http://127.0.0.1:%d/' % server.server_address[1], str(width), str(height), str(shot)]
+            if args.recovery:
+                command.append('recovery')
             p = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
             if p.returncode or not p.stdout.strip() or not shot.is_file():
                 raise RuntimeError('Browser did not produce the layout measurement: ' + p.stderr[-500:])

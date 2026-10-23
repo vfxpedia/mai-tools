@@ -6,10 +6,11 @@ import os
 import urllib.parse
 
 ALLOWED = ('snapshot.json', 'collector_heartbeat.json', 'events.jsonl')
-PACKAGE_FILES = ('viewer-health.js', 'viewer-live.js', 'manifest.webmanifest', 'viewer-icon.svg')
+PACKAGE_FILES = ('viewer-health.js', 'viewer-live.js', 'viewer-connection.js', 'manifest.webmanifest', 'viewer-icon.svg')
 TAIL_BYTES = 128 * 1024      # events.jsonl is served as its last lines only, so a long log cannot make every poll heavy
 VIEWER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'viewer.html')
 TYPES = {'viewer-health.js': 'application/javascript; charset=utf-8', 'viewer-live.js': 'application/javascript; charset=utf-8',
+         'viewer-connection.js': 'application/javascript; charset=utf-8',
          'manifest.webmanifest': 'application/manifest+json; charset=utf-8', 'viewer-icon.svg': 'image/svg+xml',
          'snapshot.json': 'application/json', 'collector_heartbeat.json': 'application/json', 'events.jsonl': 'text/plain; charset=utf-8'}
 

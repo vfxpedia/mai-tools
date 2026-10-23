@@ -17,6 +17,7 @@ function run(c) {
   const box = { document, innerWidth: c.width || 390, Date, Math, JSON, console, isFinite, setTimeout: () => 0 };
   box.window = box;
   vm.createContext(box);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../mai_watch/viewer-connection.js'), 'utf8'), box);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../mai_watch/viewer-live.js'), 'utf8'), box);
   ready = true;
   const gpu = (index, processes) => ({ index, uuid: 'GPU-' + index, name: 'Example GPU', util_pct: 30,

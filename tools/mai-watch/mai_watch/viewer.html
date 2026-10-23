@@ -25,7 +25,10 @@
   body[data-theme="dark"] { --bg: #101215; --panel: #1a1d22; --fg: #eceef1; --muted: #c3c8d0; --line: #3a4049; --ok: #62d68c; --ok-bg: #12301f; --warn: #f2c14e; --warn-bg: #3a2c0a; --bad: #ff8b90; --bad-bg: #3d1618; --bar: #6ea2f5; --bar-idle: #8b93a0; --vram: #f0a35c; color-scheme: dark; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
   header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
-  header button { margin-left: auto; min-height: 44px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  .header-actions { display: flex; gap: 8px; margin-left: auto; }
+  header button { min-width: 44px; min-height: 44px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  header button:focus-visible { outline: 2px solid var(--bar); outline-offset: 3px; }
+  header button:disabled { cursor: wait; opacity: 0.65; }
   h1 { font-size: 18px; margin: 0; }
   h2 { font-size: 15px; margin: 0 0 8px; }
   main { padding: 16px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
@@ -179,24 +182,27 @@
 <body>
 <header>
   <h1>mai-watch</h1>
+  <span class="quiet">0.2.0a2</span>
   <span id="collector" class="pill warn">reading...</span>
   <span id="generated" class="mono"></span>
-  <button id="theme" type="button" aria-label="Change color theme">Theme: System</button>
+  <div class="header-actions"><button id="refresh" type="button" title="Reload this page, not the collector" aria-label="Reload page">↻ Reload</button><button id="theme" type="button" aria-label="Change color theme">Theme: System</button></div>
 </header>
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
-  <section id="live-section"><div class="section-head"><h2>Live resources</h2><span id="live-status" class="pill warn">reading...</span></div><div id="live"></div></section>
+  <section id="live-section"><div class="section-head"><h2>Live resources</h2><span id="live-status" class="pill warn" aria-live="off">reading...</span><span id="live-freshness" class="quiet" aria-live="off"></span></div><div id="live"></div></section>
   <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
   <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>
   <details id="eventsfold" class="page-fold"><summary>Recent events</summary><section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section></details>
 </main>
 <script src="viewer-health.js"></script>
+<script src="viewer-connection.js"></script>
 <script src="viewer-live.js"></script>
 <script>
 (function () {
   'use strict';
   var POLL_MS = 5000;
+  MaiWatchConnection.mountRefresh();
   var narrow = window.matchMedia ? window.matchMedia('(max-width: 640px)').matches : window.innerWidth <= 640;
   ['devicesfold', 'workloadsfold', 'eventsfold'].forEach(function (id) {
     var fold = document.getElementById(id);
@@ -228,11 +234,8 @@
   function el(tag, text, cls) { var e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
   function short(u) { return u ? u.replace(/^GPU-/, '').slice(0, 8) : ''; }
-  function get(url) {
-    return fetch(url + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
-      if (!r.ok) throw new Error(url + ' returned ' + r.status);
-      return r;
-    });
+  function get(url, kind, signal) {
+    return MaiWatchConnection.read(url, kind, signal);
   }
 
   function showCollector(hb, snap) {
@@ -343,17 +346,19 @@
     err.textContent = msg;
   }
 
-  function tick() {
-    var err = document.getElementById('error');
-    var hbP = get('collector_heartbeat.json').then(function (r) { return r.json(); }).catch(function () { return null; });
-    var evP = get('events.jsonl').then(function (r) { return r.text(); }).catch(function () { return ''; });
+  function tick(signal) {
+    var hbP = get('collector_heartbeat.json', 'json', signal).catch(function () { return null; });
+    var evP = get('events.jsonl', 'text', signal).catch(function () { return ''; });
     // The snapshot has three separate ways to fail, and each one is named for what it is.
-    var snapP = get('snapshot.json').then(function (r) { return r.text(); }).then(function (t) {
+    var snapP = get('snapshot.json', 'text', signal).then(function (t) {
       try { return { snap: JSON.parse(t) }; } catch (x) { return { fail: 'snapshot.json is not valid JSON: ' + x.message }; }
     }, function (e) {
       return { fail: 'Cannot read snapshot.json: ' + e.message + '. Open this page through "python -m mai_watch serve" (a file:// page cannot read files).' };
     });
-    Promise.all([hbP, snapP, evP]).then(function (v) {
+    return Promise.all([hbP, snapP, evP]);
+  }
+  function drawSnapshot(v) {
+      var err = document.getElementById('error');
       var hb = v[0], got = v[1];
       if (got.fail && hb === null && window.MaiLive && window.MaiLive.active && /returned 404/.test(got.fail)) {
         // live-only mode (`mai_watch live` without --config): there is no workload recording to report, which is not a failure
@@ -365,7 +370,7 @@
         return;
       }
       ['devices-section', 'workloads-section', 'events-section', 'devicesfold', 'workloadsfold', 'eventsfold'].forEach(function (id) { var n = document.getElementById(id); if (n) n.style.display = ''; });
-      if (got.fail) { showFailure(got.fail); showCollector(hb, null); return; }
+      if (got.fail) { showFailure(got.fail); showCollector(hb, null); throw new Error(got.fail); }
       var snap = got.snap;
       var shape = MaiWatchHealth.structureProblems(snap);
       if (shape.length) {
@@ -375,7 +380,7 @@
         ['devices', 'workloads', 'events'].forEach(function (id) { clear(document.getElementById(id)); });
         document.getElementById('alerts').style.display = 'none';
         document.getElementById('generated').textContent = '';
-        return;
+        throw new Error('snapshot.json has the wrong structure: ' + shape.join('; '));
       }
       err.style.display = 'none';
       showCollector(hb, snap);
@@ -384,13 +389,10 @@
       showDevices(snap);
       showWorkloads(snap);
       showEvents(v[2]);
-    }).catch(function (e) {
-      showFailure('The page could not draw snapshot.json: ' + e.message);
-    });
   }
-  window.maiWatchTick = tick;      // the live panel calls this once it knows live mode is on, so a live-only page never flashes an error
-  tick();
-  setInterval(tick, POLL_MS);
+  var loop = MaiWatchConnection.createLoop({task: tick, onData: drawSnapshot, interval: function () { return POLL_MS; }, onError: function (e) { showFailure(e.message + ' · retrying'); }});
+  window.maiWatchTick = function () { loop.requestNow(); };
+  MaiWatchConnection.bind(loop); loop.start();
 })();
 </script>
 </body>

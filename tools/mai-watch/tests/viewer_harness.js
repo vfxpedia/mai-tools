@@ -27,7 +27,7 @@ function allText(e) { return e._text + e.children.map(allText).join(' '); }
 async function runCase(c) {
   const els = {};
   ids.forEach(i => { els[i] = makeEl(); });
-  const document = { getElementById: i => els[i], createElement: () => makeEl(), body: makeEl() };
+  const document = { getElementById: i => els[i], createElement: () => makeEl(), body: makeEl(), addEventListener: () => {} };
   const localStorage = { getItem: () => null, setItem: () => {} };
   let timer = null;
   const responses = {
@@ -43,10 +43,11 @@ async function runCase(c) {
   const FakeDate = function () { return new RealDate(c.now_ms); };
   FakeDate.now = () => c.now_ms;
   FakeDate.parse = RealDate.parse;
-  const sandbox = { document, localStorage, fetch, Date: FakeDate, Math, JSON, Promise, Object, Array, String, Number, isNaN, isFinite, setInterval: () => 0, console };
+  const sandbox = { document, localStorage, fetch, Date: FakeDate, Math, JSON, Promise, Object, Array, String, Number, isNaN, isFinite, setInterval: () => 0, setTimeout: () => 0, clearTimeout: () => {}, addEventListener: () => {}, AbortController, console };
   sandbox.window = sandbox; sandbox.self = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(healthSrc, sandbox);
+  vm.runInContext(fs.readFileSync(path.join(dir, 'viewer-connection.js'), 'utf8'), sandbox);
   vm.runInContext(inline, sandbox);
   await new Promise(r => setTimeout(r, 30));
   return {

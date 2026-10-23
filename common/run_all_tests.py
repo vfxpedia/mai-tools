@@ -19,6 +19,7 @@ SUITES = {
 }
 # suites that are not Python: (folder, command, how to read the count)
 NODE_SUITES = {
+    'mai-watch-viewer': ('tools/mai-watch', ['node', '--test', '--test-reporter=tap', 'tests/connection.test.cjs']),
     'mai-codex-gauge': ('mods/mai-codex-gauge', ['node', '--test', '--test-reporter=tap', 'tests/*.test.mjs']),
 }
 

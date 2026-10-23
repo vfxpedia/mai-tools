@@ -5,7 +5,7 @@
  * read is shown as unknown, never as 0. Without a live sampler (plain `serve`) the panel stays hidden. */
 (function (root) {
   'use strict';
-  var state = { active: false, interval: 1, history: 600, samples: [], host: null, slow: null, judgments: [], disks: {}, open: {}, lastReceivedAt: null, error: null };
+  var state = { active: false, interval: 1, history: 600, range: 600, samples: [], host: null, slow: null, judgments: [], disks: {}, open: {}, lastReceivedAt: null, error: null, diagnostics: null, incidents: [] };
   root.MaiLive = state;
 
   function $(id) { return document.getElementById(id); }
@@ -47,7 +47,7 @@
   function windowS(times) {
     // the window grows with the data up to the kept history, so a fresh start fills the graph instead of a sliver at the right edge
     var span = times.length ? (times[times.length - 1] - times[0]) / 1000 : 0;
-    return Math.min(state.history, Math.max(60, span));
+    return Math.min(state.history, state.range, Math.max(60, span));
   }
 
   /* One graph, one or more series. Each series: {values, cls}. All share the time axis and the 0..max scale. */
@@ -112,7 +112,16 @@
     list.forEach(function (f) {
       var row = el('div', undefined, 'att-row lvl-' + f.level);
       row.appendChild(el('span', f.level === 'bad' ? 'act now' : f.level === 'warn' ? 'look soon' : 'note', 'att-level'));
-      row.appendChild(el('span', f.text, 'att-text'));
+      var text = el('span', f.text, 'att-text'); row.appendChild(text);
+      var body = el('div');
+      body.appendChild(el('p', 'Observed ' + ago(f.observed_s) + ' continuously in this collector; first seen ' + (f.first_observed_at || 'unknown'), 'quiet'));
+      var evidence = f.evidence || {};
+      Object.keys(evidence).forEach(function (key) {
+        body.appendChild(el('div', key + ': ' + (evidence[key] === null ? 'unknown' : String(evidence[key])), 'quiet'));
+      });
+      body.appendChild(el('p', f.next_check || 'Check the source and timestamp before taking action.', 'quiet'));
+      var explanation = fold('Details', body, 'warning:' + f.kind + '|' + f.subject);
+      explanation.className += ' warning-evidence'; text.appendChild(explanation);
       rows.appendChild(row);
     });
     box.appendChild(bar);
@@ -123,7 +132,7 @@
   function mobileFold(label, node, key) {
     var d = el('details', undefined, 'mobile-fold');
     var mobile = typeof root.innerWidth === 'number' && root.innerWidth <= 560;
-    d.open = state.open[key] === undefined ? !mobile : state.open[key];
+    d.open = state.open[key] === undefined ? (!mobile || state.expandTables === true) : state.open[key];
     d.addEventListener('toggle', function () { state.open[key] = d.open; });
     d.appendChild(el('summary', label)); d.appendChild(node); return d;
   }
@@ -373,7 +382,8 @@
   }
 
   function draw() {
-    var box = $('live'), list = state.samples;
+    var box = $('live'), all = state.samples, end = all.length ? ms(all[all.length - 1].t) : 0;
+    var list = all.filter(function (s) { return ms(s.t) >= end - state.range * 1000; });
     clear(box);
     if (!list.length) { box.appendChild(el('p', 'waiting for the first sample...', 'quiet')); return; }
     var last = list[list.length - 1], times = list.map(function (s) { return ms(s.t); });
@@ -396,18 +406,36 @@
 
     var band = el('section', undefined, 'host-band');
     var c = hostCard('CPU', fmt(last.cpu_pct, 0, '%'), state.host && state.host.logical_cpus ? state.host.logical_cpus + ' logical CPUs' : '', times, list.map(function (s) { return s.cpu_pct; }), last.cpu_per_core ? cores(last.cpu_per_core) : null);
+    c.className += ' cpu-card';
+    if (last.cpu_processes === null || last.cpu_processes === undefined) c.appendChild(el('p', 'Top CPU processes unknown · waiting for two scans or access denied', 'quiet'));
+    else c.appendChild(table(['top CPU process', 'PID', 'CPU %'], last.cpu_processes.slice(0, 3).map(function (p) { return [p.process, String(p.pid), fmt(p.cpu_pct, 1)]; }), 'compact cpu-processes'));
+    c.appendChild(el('p', '1 core = 100% · scan age ' + ago(last.cpu_process_age_s), 'quiet'));
     band.appendChild(c);
     var ram = hostCard('RAM', fmt(last.ram_pct, 0, '%'), fmt(last.ram_used_gib, 1) + ' / ' + fmt(last.ram_total_gib, 1) + ' GiB' + (last.swap_total_gib ? ' · swap ' + fmt(last.swap_used_gib, 1) + ' / ' + fmt(last.swap_total_gib, 1) : ''), times, list.map(function (s) { return s.ram_pct; }));
     var top = last.ram_processes;
     if (top === null || top === undefined) ram.appendChild(el('p', 'Top RAM processes unknown', 'quiet'));
     else ram.appendChild(table(['top RAM process', 'PID', 'RSS MiB'], top.map(function (p) { return [p.process, String(p.pid), p.rss_mib.toFixed(1)]; }), 'compact'));
-    ram.appendChild(el('p', 'RAM history: last 10 minutes', 'quiet'));
+    ram.appendChild(el('p', 'Graphs: up to ' + Math.round(Math.min(state.range, state.history) / 60) + ' minutes of retained samples', 'quiet'));
     band.appendChild(ram);
     band.appendChild(ioBand(list));
     box.appendChild(band);
 
     if (state.slow) box.appendChild(mobileFold('Storage', storage(state.slow), 'storage'));
     if (state.slow) box.appendChild(mobileFold('AI sessions and recent activity', usageBlock(state.slow.usage), 'sessions'));
+    if (state.diagnostics) {
+      var diagnostics = el('section', undefined, 'live-block');
+      diagnostics.appendChild(el('p', 'Read-only local monitor. No internet authentication. Export excludes names, paths, commands and logs.', 'quiet'));
+      (state.diagnostics.checks || []).forEach(function (check) {
+        diagnostics.appendChild(el('p', check.source + ' · ' + check.state + ': ' + check.reason + '. ' + check.next_check, 'quiet'));
+      });
+      box.appendChild(fold('Capability diagnostics and unknown values', diagnostics, 'diagnostics'));
+    }
+    var incidents = el('section', undefined, 'live-block');
+    incidents.appendChild(el('p', 'At most 256 incidents / 24 hours in memory. Resets on collector restart. Unknown is not cleared.', 'quiet'));
+    incidents.appendChild(table(['last observed', 'state', 'finding'], state.incidents.map(function (f) {
+      return [new Date(f.last_seen * 1000).toISOString(), f.state, f.text];
+    }), 'compact'));
+    box.appendChild(fold('Incident history (' + state.incidents.length + ')', incidents, 'incidents'));
   }
 
   state.draw = function () { draw(); };      // lets a browser check redraw from samples it set itself (review R11 DOM regression)
@@ -417,6 +445,42 @@
     return root.MaiWatchConnection.read('live.json?since=' + encodeURIComponent(since), 'json', signal);
   }
   if (typeof document !== 'undefined' && document.getElementById && document.getElementById('live')) {
+    function preference(key, fallback) { try { var v = root.localStorage.getItem('mai-watch-' + key); return v === null ? fallback : v; } catch (_) { return fallback; } }
+    function save(key, value) { try { root.localStorage.setItem('mai-watch-' + key, value); } catch (_) {} }
+    var range = $('graph-range'), focus = $('view-focus'), expand = $('expand-tables'), download = $('diagnostic-download');
+    if (range) {
+      range.value = preference('range', '600');
+      if (['60', '300', '600'].indexOf(range.value) < 0) range.value = '600';
+      state.range = Number(range.value);
+      range.addEventListener('change', function () { state.range = Number(range.value); save('range', range.value); draw(); });
+    }
+    function setFocus(value) {
+      if (['balanced', 'cpu', 'gpu', 'ai'].indexOf(value) < 0) value = 'balanced';
+      $('live-section').setAttribute('data-focus', value);
+      return value;
+    }
+    if (focus) {
+      focus.value = setFocus(preference('focus', 'balanced'));
+      focus.addEventListener('change', function () { save('focus', setFocus(focus.value)); });
+    }
+    if (expand) {
+      expand.checked = preference('tables', 'false') === 'true'; state.expandTables = expand.checked;
+      expand.addEventListener('change', function () { state.expandTables = expand.checked; state.open = {}; save('tables', String(expand.checked)); draw(); });
+    }
+    if (download) download.addEventListener('click', function () {
+      if (download.disabled) return;
+      download.disabled = true;
+      var controller = new root.AbortController();
+      var deadline;
+      var timeout = new Promise(function (_, reject) { deadline = root.setTimeout(function () { reject(new Error('Diagnostic timeout')); controller.abort(); }, 6000); });
+      Promise.race([root.MaiWatchConnection.read('diagnostic.json', 'json', controller.signal), timeout]).then(function (d) {
+        if (!d || d.schema !== 'mai-watch-diagnostic-v1') throw new Error('Invalid diagnostic document');
+        var url = root.URL.createObjectURL(new root.Blob([JSON.stringify(d, null, 2)], {type: 'application/json'}));
+        var a = el('a'); a.href = url; a.download = 'mai-watch-diagnostic.json'; a.click();
+        root.setTimeout(function () { root.URL.revokeObjectURL(url); }, 1000);
+        $('diagnostic-result').textContent = 'Downloaded identity-free diagnostics. Review before sharing.';
+      }).catch(function () { $('diagnostic-result').textContent = 'Diagnostic download failed; no file was created.'; }).finally(function () { root.clearTimeout(deadline); download.disabled = false; });
+    });
     var loop = root.MaiWatchConnection.createLoop({task: poll, interval: function () { return state.interval * 1000; }, onData: function (d) {
       if (!d || d.schema !== 'mai-watch-live-v1' || !Array.isArray(d.samples) ||
           typeof d.interval_s !== 'number' || !isFinite(d.interval_s) || d.interval_s <= 0 ||
@@ -424,6 +488,7 @@
       var wasActive = state.active;
       state.active = true; state.interval = d.interval_s; state.history = d.history_s; state.host = d.host; state.slow = d.slow || null;
       state.judgments = d.judgments || []; state.disks = d.disks || {};
+      state.diagnostics = d.diagnostics || null; state.incidents = d.incidents || [];
       $('live-section').style.display = 'block';
       state.samples = state.samples.concat(d.samples);
       var cutoff = Date.now() - state.history * 1000;

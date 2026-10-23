@@ -23,7 +23,7 @@ try {
   await call('Emulation.setDeviceMetricsOverride',{width:Number(w),height:Number(h),deviceScaleFactor:1,mobile:Number(w)===390});
   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
   await call('Page.enable');
-  if(mode==='recovery')await call('Page.addScriptToEvaluateOnNewDocument',{source:`
+  if(mode==='recovery'||mode==='product')await call('Page.addScriptToEvaluateOnNewDocument',{source:`
     window.__liveRequests=0;window.__hold=false;window.__oldSamples=false;window.__liveStatus=0;window.__snapshotRequests=0;window.__snapshotError=false;
     const realFetch=window.fetch.bind(window);
     window.fetch=function(url,options){
@@ -47,12 +47,27 @@ try {
   }
   if(!result)throw Error('Layout never became ready');
   if(result.width!==Number(w)||result.height!==Number(h))throw Error('Viewport mismatch');
-  if(mode==='recovery'){
+  if(mode==='recovery'||mode==='product'){
     async function evaluate(expression){const r=await call('Runtime.evaluate',{expression,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.text);return r.result.value;}
     function check(ok,message){if(!ok)throw Error(message);}
     check(await evaluate("typeof window.__liveRequests==='number'"),'Fault injection did not attach before page scripts');
     const buttons=await evaluate(`JSON.stringify([...document.querySelectorAll('.header-actions button')].map(e=>({id:e.id,h:e.getBoundingClientRect().height})))`);
     check(JSON.parse(buttons).length===2 && JSON.parse(buttons).every(b=>b.h>=44),'Reload/theme targets missing or too small');
+    if(mode==='product'){
+      check(await evaluate("document.querySelector('.cpu-processes').textContent.includes('compute-0.exe')"),'CPU processes missing');
+      await evaluate("document.getElementById('graph-range').value='60';document.getElementById('graph-range').dispatchEvent(new Event('change'));document.getElementById('view-focus').value='cpu';document.getElementById('view-focus').dispatchEvent(new Event('change'))");
+      check(await evaluate("MaiLive.range===60 && document.getElementById('live-section').getAttribute('data-focus')==='cpu'"),'Preferences not applied');
+      await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:profile});
+      await evaluate("document.getElementById('diagnostic-download').click()");
+      let exported;
+      for(let i=0;i<30;i++){try{exported=JSON.parse(await fs.readFile(path.join(profile,'mai-watch-diagnostic.json'),'utf8'));break;}catch{await delay(100);}}
+      check(exported?.schema==='mai-watch-diagnostic-v1','Actual diagnostic download failed');
+      check(await evaluate("document.querySelector('.view-options').textContent.includes('Settings stay')"),'Privacy guidance missing');
+      await call('Page.reload');await delay(2500);
+      check(await evaluate("MaiLive.range===60 && document.getElementById('view-focus').value==='cpu'"),'Preferences lost on reload');
+      await evaluate("document.getElementById('graph-range').value='600';document.getElementById('graph-range').dispatchEvent(new Event('change'))");
+      result.product='CPU / preferences / real diagnostic download PASS';
+    }
     await evaluate('window.__hold=true');await delay(2200);
     check(await evaluate("Number(document.getElementById('live-freshness').textContent.match(/Received (\\d+) s/)[1])>=1"),'Freshness stopped aging while the request was pending');
     await delay(5300);
@@ -87,6 +102,7 @@ try {
     const final=await evaluate("document.getElementById('layout-check')?.textContent");
     check(!!final,'Reload did not restore the viewer');
     result=JSON.parse(final);result.recovery='PASS: age timer, timeout, resume burst, stale measurement, workload HTTP retry, recovery, reload and theme';
+    if(mode==='product')result.product='PASS: CPU processes, local preferences survive reload, real diagnostic JSON download';
   }
   const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   await fs.writeFile(output,Buffer.from(shot.data,'base64'));

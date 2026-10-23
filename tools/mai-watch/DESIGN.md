@@ -298,6 +298,14 @@ Requested after M1, not before: the reviewer checks that the tests are not tauto
 
 ## 17. Open decisions (owner)
 
+### 0.3 bounded local UX extension
+
+Approved scope: mai-os#55, owner conversation 2026-10-23. CPU grid is approximately half the measured former height, keeping the host grid intact. A background CPU scan every five seconds compares cumulative user/system time by PID plus creation time; first and stale scans are unknown, one core is 100%. It never requests command lines. A stalled scan cannot spawn a second scan, and a result older than fifteen seconds is withheld.
+
+`product.py` owns identity-free diagnostic reconstruction and an in-memory incident set capped at 256 records / 24 hours. Safe exports copy only named numeric fields and generic strings authored by the program, never raw diagnostic strings or dictionaries. Normal live payloads remain private operational data. The single existing judgment list is decorated, not replaced, and unknown observations do not clear an incident. Continuous duration restarts after unknown or a sample gap exceeding max(3 intervals, 5 seconds).
+
+Browser preferences select 1/5/10-minute retained graph windows, resource emphasis and supporting-table expansion. They never hide warnings or quota summaries. No database, external telemetry, internet authentication or remote action interface is introduced. Incident history resets on restart; this limitation is visible in the viewer. Retained samples also have an absolute 36,000-entry cap.
+
 1. ~~Tool name~~ decided: `mai-watch` (folder), `mai_watch` (Python package).
 2. License for distribution.
 3. Registering the collector for automatic start on Windows logon (changes the machine).

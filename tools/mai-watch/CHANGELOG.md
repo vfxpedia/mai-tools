@@ -6,6 +6,10 @@ Status: preview
 
 # mai-watch changes
 
+## 0.3.0a2
+
+- Increase the bounded loopback accept queue from five to 32 for simultaneous browser assets and polling. Fixes locally reproduced refused connections and reverse-proxy 502 responses during page reload. Binding and authentication behavior are unchanged.
+
 ## 0.3.0a1
 
 - Half-height CPU core area and top-three CPU-time-delta process attribution, without moving the desktop host grid.

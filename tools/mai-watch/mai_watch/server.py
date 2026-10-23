@@ -70,5 +70,11 @@ def make_handler(out_dir, live=None):
     return Handler
 
 
+class ViewerServer(http.server.ThreadingHTTPServer):
+    # Browser reloads and a local reverse proxy can open assets and polling requests together.
+    # The stdlib default of five caused refused upstream connections and HTTP 502 responses.
+    request_queue_size = 32
+
+
 def make_server(out_dir, port=28765, live=None):
-    return http.server.ThreadingHTTPServer(('127.0.0.1', port), make_handler(out_dir, live))
+    return ViewerServer(('127.0.0.1', port), make_handler(out_dir, live))

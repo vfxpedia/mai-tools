@@ -12,6 +12,7 @@ import threading
 import urllib.request
 import subprocess
 import time
+import socket
 
 
 def proc(pid, born, cpu, name='worker'):
@@ -20,6 +21,22 @@ def proc(pid, born, cpu, name='worker'):
 
 
 class ProductTests(unittest.TestCase):
+    def test_server_accept_queue_holds_a_browser_resource_burst(self):
+        # A page reload can open more than five connections before the accept loop is scheduled.
+        srv = server.make_server(None, port=0)
+        opened = []
+        try:
+            for _ in range(12):
+                try:
+                    opened.append(socket.create_connection(srv.server_address, timeout=0.3))
+                except OSError:
+                    break
+            self.assertEqual(len(opened), 12)
+        finally:
+            for c in opened:
+                c.close()
+            srv.server_close()
+
     def test_overlapping_background_scans_do_not_overwrite_psutil_info(self):
         cpu_yielded, ram_entered = threading.Event(), threading.Event()
         p = proc(1, 1, 2)

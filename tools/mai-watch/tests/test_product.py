@@ -21,6 +21,17 @@ def proc(pid, born, cpu, name='worker'):
 
 
 class ProductTests(unittest.TestCase):
+    def test_served_page_identifies_the_installed_release(self):
+        from mai_watch import __version__
+        srv = server.make_server(None, port=0)
+        worker = threading.Thread(target=srv.serve_forever, daemon=True)
+        worker.start()
+        try:
+            with urllib.request.urlopen('http://127.0.0.1:%d/' % srv.server_port) as r:
+                self.assertIn('>' + __version__ + '</span>', r.read().decode('utf-8'))
+        finally:
+            srv.shutdown(); srv.server_close(); worker.join()
+
     def test_gpu_peak_renderer_expires_old_values_and_keeps_gpu_identity(self):
         def gpu(uuid, temp, watts):
             return {'uuid': uuid, 'index': 0, 'name': 'GPU', 'temperature_c': temp,

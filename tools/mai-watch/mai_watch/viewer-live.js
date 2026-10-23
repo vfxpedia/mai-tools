@@ -160,10 +160,28 @@
     var v = el('div', undefined, 'gpu-num'); v.appendChild(el('span', gib(g.vram_used_mib) + ' / ' + gib(g.vram_total_mib) + ' GiB', 'num-mid')); v.appendChild(el('span', 'VRAM ' + fmt(vpct, 0, '%'), 'num-label v-key')); nums.appendChild(v);
     row.appendChild(nums);
     row.appendChild(graph(times, [{ values: vram, cls: 'line-vram' }, { values: util, cls: 'line-util' }], 100, 'gpu-graph'));
-    var facts = el('div', undefined, 'gpu-facts mono');
-    facts.appendChild(el('div', (known(g.temperature_c) ? g.temperature_c + ' C' : 'temperature unknown') + '  ·  ' + (known(g.power_w) ? g.power_w.toFixed(0) : '?') + (g.power_limit_w ? ' / ' + g.power_limit_w.toFixed(0) : '') + ' W'));
-    facts.appendChild(el('div', known(g.sm_clock_mhz) ? 'SM ' + g.sm_clock_mhz + (g.sm_clock_max_mhz ? ' / ' + g.sm_clock_max_mhz : '') + ' MHz' : 'clock unknown'));
-    facts.appendChild(el('div', limitText(g)));
+    var facts = el('div', undefined, 'gpu-facts mono'), current = el('div', undefined, 'gpu-current');
+    current.appendChild(el('div', (known(g.temperature_c) ? g.temperature_c + ' C' : 'temperature unknown') + '  ·  ' + (known(g.power_w) ? g.power_w.toFixed(0) : '?') + (g.power_limit_w ? ' / ' + g.power_limit_w.toFixed(0) : '') + ' W'));
+    current.appendChild(el('div', known(g.sm_clock_mhz) ? 'SM ' + g.sm_clock_mhz + (g.sm_clock_max_mhz ? ' / ' + g.sm_clock_max_mhz : '') + ' MHz' : 'clock unknown'));
+    current.appendChild(el('div', limitText(g)));
+    facts.appendChild(current);
+    var now = Date.now(), seconds = Math.min(state.range, state.history), temp = null, power = null, oldest = now, count = 0;
+    state.samples.forEach(function (s) {
+      var t = ms(s.t);
+      if (!isFinite(t) || t < now - seconds * 1000 || t > now) return;
+      var x = find(s);
+      if (!x) return;
+      var valid = function (v) { return typeof v === 'number' && isFinite(v) && v >= 0; };
+      var ht = valid(x.temperature_c), hp = valid(x.power_w);
+      if (ht) temp = temp === null ? x.temperature_c : Math.max(temp, x.temperature_c);
+      if (hp) power = power === null ? x.power_w : Math.max(power, x.power_w);
+      if (ht || hp) { oldest = Math.min(oldest, t); count++; }
+    });
+    var peakText = 'Peak · last ' + Math.round(seconds / 60) + ' min\n' +
+      (temp === null ? 'Temperature unknown' : temp.toFixed(0) + ' C') + '\n' +
+      (power === null ? 'Power unknown' : power.toFixed(0) + ' W') + '\n' +
+      'observed span ' + ago(count ? (now - oldest) / 1000 : null) + ' · ' + count + ' samples';
+    facts.appendChild(el('div', peakText, 'gpu-peaks'));
     row.appendChild(facts);
     // Also protect a new viewer reading a still-running sampler's older payload.
     var procs = g.processes;

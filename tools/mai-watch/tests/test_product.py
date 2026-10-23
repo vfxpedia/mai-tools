@@ -21,6 +21,39 @@ def proc(pid, born, cpu, name='worker'):
 
 
 class ProductTests(unittest.TestCase):
+    def test_gpu_peak_renderer_expires_old_values_and_keeps_gpu_identity(self):
+        def gpu(uuid, temp, watts):
+            return {'uuid': uuid, 'index': 0, 'name': 'GPU', 'temperature_c': temp,
+                    'power_w': watts, 'util_pct': 0, 'vram_total_mib': 16384,
+                    'vram_used_mib': 0, 'processes': []}
+        def render(samples):
+            p = subprocess.run(['node', str(Path(__file__).with_name('live_view_harness.js'))],
+                               input=json.dumps({'peak_samples': samples}), capture_output=True,
+                               text=True, check=True)
+            return ' '.join(n['text'] for n in json.loads(p.stdout) if n['cls'] == 'gpu-peaks')
+        samples = [{'age_s': 601, 'gpus': [gpu('A', 99, 999)]},
+                   {'age_s': 300, 'gpus': [gpu('B', 98, 998), gpu('A', 68, 312)]},
+                   {'age_s': 0, 'gpus': [gpu('A', 50, 80)]}]
+        text = render(samples)
+        self.assertIn('68 C', text)
+        self.assertIn('312 W', text)
+        self.assertNotIn('999', text)
+        self.assertNotIn('998', text)
+        self.assertIn('observed span 5 min', text)
+        self.assertIn('50 C', render([samples[0], samples[-1]]))
+
+    def test_gpu_peak_renderer_unknown_is_not_zero_and_zero_is_valid(self):
+        def render(temp, watts):
+            samples = [{'age_s': 0, 'gpus': [{'uuid': 'A', 'index': 0, 'name': 'GPU',
+                        'temperature_c': temp, 'power_w': watts, 'processes': []}]}]
+            p = subprocess.run(['node', str(Path(__file__).with_name('live_view_harness.js'))],
+                               input=json.dumps({'peak_samples': samples}), capture_output=True,
+                               text=True, check=True)
+            return ' '.join(n['text'] for n in json.loads(p.stdout) if n['cls'] == 'gpu-peaks')
+        self.assertIn('Temperature unknown', render('68', None))
+        self.assertIn('Power unknown', render(None, None))
+        self.assertIn('0 W', render(None, 0))
+
     def test_server_accept_queue_holds_a_browser_resource_burst(self):
         # A page reload can open more than five connections before the accept loop is scheduled.
         srv = server.make_server(None, port=0)

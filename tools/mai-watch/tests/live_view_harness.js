@@ -26,6 +26,8 @@ function run(c) {
   state.samples = [{ t: new Date().toISOString(), cpu_pct: 25, cpu_per_core: [10, 20, 30, 40],
     ram_pct: 50, ram_used_gib: 32, ram_total_gib: 64, ram_processes: [], cpu_processes: c.cpu_processes, nics: [], disks: [],
     gpus: [gpu(0, c.processes), gpu(1, [])] }];
+  if (c.peak_samples) state.samples = c.peak_samples.map(s => Object.assign({}, state.samples[0],
+    {t: new Date(Date.now() - s.age_s * 1000).toISOString(), gpus: s.gpus}));
   state.slow = { paths: [], disks: [], usage: { available: false } };
   state.judgments = [{ kind: 'gpu_hot', subject: 'GPU-0', level: 'warn', text: 'GPU temperature needs attention' }];
   state.diagnostics = c.diagnostics;

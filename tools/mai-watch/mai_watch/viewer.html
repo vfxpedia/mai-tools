@@ -110,7 +110,8 @@
   .legend { display: flex; gap: 18px; justify-content: flex-end; }
   .spark.gpu-graph { height: 72px; margin: 0; }
   .spark polyline.line-vram { stroke: var(--vram); }
-  .gpu-facts { color: var(--muted); display: grid; gap: 2px; }
+  .gpu-facts { color: var(--muted); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; font-size: 11px; }
+  .gpu-peaks { white-space: pre-line; border-left: 1px solid var(--line); padding-left: 9px; overflow-wrap: anywhere; }
   .gpu-processes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 6px; border-top: 1px solid var(--line); }
   .gpu-process { font: 13px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
   .usage-highlights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; }

@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "description": "Keeps the open tabs in a library on this computer (127.0.0.1) and opens, sleeps or closes them when the library page asks.",
   "permissions": ["tabs", "tabGroups", "alarms", "storage"],
-  "host_permissions": ["http://127.0.0.1:28766/*"],
+  "host_permissions": ["http://127.0.0.1:28767/*"],
   "background": { "service_worker": "background.js" },
   "action": { "default_popup": "popup.html", "default_title": "mai-tabs" }
 }

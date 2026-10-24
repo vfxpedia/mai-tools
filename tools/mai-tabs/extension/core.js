@@ -9,8 +9,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  function report(tabs, groups) {
+  function report(tabs, groups, instance) {
     return {
+      instance: instance,
       tabs: (tabs || []).map(function (t) {
         return { id: t.id, windowId: t.windowId, url: t.url || t.pendingUrl || '', title: t.title || '', discarded: !!t.discarded,
                  active: !!t.active, pinned: !!t.pinned, audible: !!t.audible, groupId: typeof t.groupId === 'number' ? t.groupId : -1,
@@ -21,6 +22,25 @@
   }
 
   function isWebUrl(u) { return /^https?:\/\//i.test(String(u || '')); }
+
+  function samePage(a, b) {
+    try {
+      var x = new URL(a), y = new URL(b);
+      var h = function (u) { return u.hostname.toLowerCase().replace(/^www\./, ''); };
+      return x.protocol === y.protocol && h(x) === h(y) && x.port === y.port && x.pathname.replace(/\/+$/, '') === y.pathname.replace(/\/+$/, '');
+    } catch (e) { return false; }
+  }
+
+  /* The plan was made from a report up to 30 s old, so right before closing or sleeping a tab it is read again: it must still exist,
+   * still show the planned page, and not have become the tab the owner is looking at, a pinned tab or one playing sound. */
+  function refuse(tab, step) {
+    if (!tab) return 'it is gone';
+    if (tab.active) return 'it is the tab in front';
+    if (tab.pinned) return 'it is pinned';
+    if (tab.audible) return 'it is playing sound';
+    if (step.url && !samePage(tab.url || tab.pendingUrl || '', step.url)) return 'it shows another page now';
+    return null;
+  }
 
   function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
 
@@ -49,12 +69,12 @@
           var t = await api.create({ url: s.url, active: false });
           opened.push(t.id);
           if (s.asleep) toSleep.push(t.id);
-        } else if (s.do === 'discard') {
+        } else if (s.do === 'discard' || s.do === 'remove') {
           var cur = await api.get(s.tab);
-          if (!cur) throw new Error('tab is gone');
-          if (!cur.discarded) await api.discard(s.tab);
-        } else if (s.do === 'remove') {
-          await api.remove(s.tab);
+          var why = refuse(cur, s);
+          if (why) throw new Error('tab ' + s.tab + ' left alone: ' + why);
+          if (s.do === 'remove') await api.remove(s.tab);
+          else if (!cur.discarded && !(await api.discard(s.tab))) throw new Error('Chrome did not put tab ' + s.tab + ' to sleep');
         } else {
           throw new Error('unknown step ' + s.do);
         }
@@ -72,11 +92,11 @@
     for (var j = 0; j < toSleep.length; j++) {
       try {
         if (!(await whenAddressed(api, toSleep[j], tries))) throw new Error('page did not start loading, left awake');
-        await api.discard(toSleep[j]);
+        if (!(await api.discard(toSleep[j]))) throw new Error('Chrome did not put the new tab to sleep');
       } catch (e) { groupOk = false; notes.push('sleep: ' + String(e && e.message || e)); }
     }
     return { id: cmd.id, ok: failed === 0 && groupOk, done: done, failed: failed, note: notes.join('; ') };
   }
 
-  return { report: report, run: run, isWebUrl: isWebUrl };
+  return { report: report, run: run, isWebUrl: isWebUrl, samePage: samePage, refuse: refuse };
 });

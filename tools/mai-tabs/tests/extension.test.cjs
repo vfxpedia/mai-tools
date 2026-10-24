@@ -19,7 +19,8 @@ function fakeBrowser() {
 }
 
 test('report keeps what the server needs and nothing undefined', () => {
-  const r = core.report([{ id: 1, windowId: 2, url: 'https://a.example/', title: 'A', groupId: 3, lastAccessed: 5.6 }, { id: 2, pendingUrl: 'https://b.example/' }], [{ id: 3, title: 'G' }]);
+  const r = core.report([{ id: 1, windowId: 2, url: 'https://a.example/', title: 'A', groupId: 3, lastAccessed: 5.6 }, { id: 2, pendingUrl: 'https://b.example/' }], [{ id: 3, title: 'G' }], 'inst12345');
+  assert.strictEqual(r.instance, 'inst12345');
   assert.deepStrictEqual(r.tabs[0], { id: 1, windowId: 2, url: 'https://a.example/', title: 'A', discarded: false, active: false, pinned: false, audible: false, groupId: 3, lastAccessed: 6 });
   assert.strictEqual(r.tabs[1].url, 'https://b.example/');
   assert.strictEqual(r.tabs[1].groupId, -1);
@@ -65,7 +66,7 @@ test('a failed step is counted and the others still run', async () => {
   assert.strictEqual(res.ok, false);
   assert.strictEqual(res.done, 1);
   assert.strictEqual(res.failed, 3);
-  assert.match(res.note, /active tab/);
+  assert.match(res.note, /tab 5 left alone: it is the tab in front/);
   assert.ok(!b.tabs.has(6) && [...b.tabs.values()].some((t) => t.discarded && t.url === undefined));   // tab 6 slept (under a new id)
 });
 
@@ -81,4 +82,30 @@ test('an unknown step is a failure, not a silent skip', async () => {
   const b = fakeBrowser();
   const res = await core.run({ id: 3, steps: [{ do: 'format' }] }, b.api);
   assert.deepStrictEqual([res.ok, res.done, res.failed], [false, 0, 1]);
+});
+
+test('Chrome declining to discard (undefined) is a failure', async () => {
+  // review finding 2: chrome.tabs.discard resolves to undefined when it could not discard
+  const b = fakeBrowser();
+  b.tabs.set(6, { id: 6, url: 'https://a.example/x', active: false, discarded: false });
+  b.api.discard = async () => undefined;
+  const res = await core.run({ id: 1, steps: [{ do: 'discard', tab: 6, url: 'https://a.example/x' }, { do: 'open', url: 'https://a.example/y', asleep: true }] }, b.api);
+  assert.deepStrictEqual([res.ok, res.done, res.failed], [false, 1, 1]);
+  assert.match(res.note, /did not put tab 6 to sleep/);
+  assert.match(res.note, /did not put the new tab to sleep/);
+});
+
+test('a tab is checked again right before it is closed or put to sleep', async () => {
+  // review finding 1: the plan is up to 30 s old
+  const b = fakeBrowser();
+  b.tabs.set(1, { id: 1, url: 'https://a.example/x', active: true });
+  b.tabs.set(2, { id: 2, url: 'https://a.example/other' });
+  b.tabs.set(3, { id: 3, url: 'https://a.example/x', pinned: true });
+  b.tabs.set(4, { id: 4, url: 'https://a.example/x', audible: true });
+  b.tabs.set(5, { id: 5, url: 'https://www.a.example/x/' });
+  const steps = [1, 2, 3, 4, 5, 9].map((t) => ({ do: 'remove', tab: t, url: 'https://a.example/x' }));
+  const res = await core.run({ id: 2, steps }, b.api);
+  assert.deepStrictEqual([res.done, res.failed], [1, 5]);
+  assert.deepStrictEqual([...b.tabs.keys()].sort(), [1, 2, 3, 4]);
+  for (const why of ['in front', 'another page', 'pinned', 'playing sound', 'gone']) assert.ok(res.note.includes(why), why);
 });

@@ -29,13 +29,16 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mai-tabs-e2e-'));
 const procs = [];
 let chrome;
 try {
-  const libPort = await free(), pagePort = await free();
+  const pagePort = await free();                // the test pages; the library needs two ports in a row and neither may be this one
+  let libPort = await free();
+  while (libPort === pagePort || libPort + 1 === pagePort ||
+         !(await new Promise((ok) => { const s = net.createServer(); s.once('error', () => ok(false)); s.listen(libPort + 1, '127.0.0.1', () => s.close(() => ok(true))); }))) libPort = await free();
   const pages = path.join(tmp, 'pages'), home = path.join(tmp, 'home'), ext = path.join(tmp, 'ext'), profile = path.join(tmp, 'profile');
   fs.mkdirSync(pages); fs.mkdirSync(home); fs.cpSync(path.join(tool, 'extension'), ext, { recursive: true });
   for (const n of [1, 2, 3, 4]) fs.writeFileSync(path.join(pages, `p${n}.html`), `<!doctype html><title>Page ${n}</title><p>page ${n}`);
   for (const f of ['background.js', 'manifest.json']) {
     const p = path.join(ext, f);
-    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('127.0.0.1:28766', '127.0.0.1:' + libPort));
+    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('127.0.0.1:28767', '127.0.0.1:' + (libPort + 1)));
   }
   procs.push(spawn(python, ['-m', 'mai_tabs', 'serve', '--port', String(libPort), '--home', home], { cwd: tool, stdio: 'ignore' }));
   procs.push(spawn(python, ['-m', 'http.server', String(pagePort), '--bind', '127.0.0.1', '--directory', pages], { stdio: 'ignore' }));
@@ -43,15 +46,27 @@ try {
   for (let i = 0; i < 50; i++) { try { if ((await fetch(lib + '/healthz')).ok) break; } catch {} await sleep(200); }
   const view = async () => (await fetch(lib + '/api/view')).json();
   const command = async (body) => (await fetch(lib + '/api/command', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mai-Tabs': '1' }, body: JSON.stringify(body) })).json();
+  let cdp = null;
   async function until(what, fn, ms = 40000) {
     const end = Date.now() + ms;
     let last;
     while (Date.now() < end) { last = await fn(); if (last) return last; await sleep(500); }
     check(what, false, 'timed out');
     try {
-      console.log('  live tabs: ' + JSON.stringify(JSON.parse(fs.readFileSync(path.join(home, 'live.json'), 'utf8')).tabs.map((t) => [t.item, t.discarded, t.group])));
+      const browsers = Object.values(JSON.parse(fs.readFileSync(path.join(home, 'live.json'), 'utf8')).browsers);
+      console.log('  live tabs: ' + JSON.stringify(browsers.map((b) => b.tabs.map((t) => [t.item, t.discarded, t.group]))));
       console.log('  last actions: ' + JSON.stringify((await view()).commands.slice(0, 2).map((c) => [c.action, c.state, c.result])));
     } catch {}
+    try {                                       // what the extension itself recorded
+      const { targetInfos } = await cdp('Target.getTargets');
+      const sw = targetInfos.find((t) => t.type === 'service_worker' && t.url.startsWith('chrome-extension://'));
+      if (!sw) console.log('  no extension service worker running');
+      else {
+        const { sessionId } = await cdp('Target.attachToTarget', { targetId: sw.targetId, flatten: true });
+        const r = await cdp('Runtime.evaluate', { expression: 'chrome.storage.local.get(null).then(JSON.stringify)', awaitPromise: true, returnByValue: true }, sessionId);
+        console.log('  extension storage: ' + (r.result && r.result.value) + (r.exceptionDetails ? ' ' + JSON.stringify(r.exceptionDetails.exception) : ''));
+      }
+    } catch (e) { console.log('  could not read the extension: ' + e); }
     throw new Error('timed out: ' + what);
   }
 
@@ -68,17 +83,17 @@ try {
       if (msg.id && waiting.has(msg.id)) { waiting.get(msg.id)(msg); waiting.delete(msg.id); }
     }
   });
-  const cdp = (method, params = {}) => new Promise((ok, bad) => {
+  cdp = (method, params = {}, sessionId) => new Promise((ok, bad) => {
     const id = nextId++;
     waiting.set(id, (m) => (m.error ? bad(new Error(method + ': ' + m.error.message)) : ok(m.result)));
-    toChrome.write(JSON.stringify({ id, method, params }) + '\0');
+    toChrome.write(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }) + '\0');
   });
 
   const loaded = await cdp('Extensions.loadUnpacked', { path: ext });
   check('extension loads in Chrome ' + (await cdp('Browser.getVersion')).product, loaded && loaded.id, loaded && loaded.id);
   for (const n of [1, 2, 2, 3]) await cdp('Target.createTarget', { url: page(n), background: true });
 
-  let v = await until('tabs reach the library', async () => { const x = await view(); return x.items.length === 3 && x.live.tabs >= 4 && x; });
+  let v = await until('tabs reach the library', async () => { const x = await view(); return x.items.length === 3 && x.live.tabs >= 4 && ['Page 1', 'Page 2', 'Page 3'].every((t) => x.items.some((i) => i.title === t)) && x; });
   const byTitle = (x, t) => x.items.find((i) => i.title === t);
   check('a page open twice is one item', byTitle(v, 'Page 2').open_tabs === 2 && v.live.duplicates === 1);
 
@@ -98,7 +113,9 @@ try {
 
   await command({ action: 'open', items: [p3, p2], group: 'E2E 묶음', asleep: true });
   v = await until('group opened', async () => { const x = await view(); return byTitle(x, 'Page 3').open_tabs === 1 && byTitle(x, 'Page 2').open_tabs === 2 && x; });
-  const live = JSON.parse(fs.readFileSync(path.join(home, 'live.json'), 'utf8'));
+  const browsers = Object.values(JSON.parse(fs.readFileSync(path.join(home, 'live.json'), 'utf8')).browsers);
+  check('one browser instance reported', browsers.length === 1, `${browsers.length}`);
+  const live = browsers[0];
   const group = live.groups.find((g) => g.title === 'E2E 묶음');
   const inGroup = group ? live.tabs.filter((t) => t.group === group.id) : [];
   check('opened as one named tab group', group && inGroup.length === 2, group ? `${inGroup.length} tabs in group` : 'no group');

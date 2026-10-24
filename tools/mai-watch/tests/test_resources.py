@@ -261,6 +261,22 @@ class UsageTests(unittest.TestCase):
         self.assertEqual((by['z1']['cost_usd_today'], by['z1']['cost_turns']), (0, 1))                                  # a real 0 is 0
         self.assertIsNone(by['lead_no_log']['turns_today'] if 'lead_no_log' in by else None)
 
+    def test_codex_log_in_utc_folder_counts_only_local_today(self):
+        # Codex names the cost log folder by UTC date, Claude by local date; the dashboard's day is the local one (10/25 lead_tmp unknown)
+        import datetime
+        midnight = datetime.datetime(2026, 10, 18).astimezone()
+        ms = lambda dt: int(dt.timestamp() * 1000)
+        inside, before = ms(midnight + datetime.timedelta(minutes=30)), ms(midnight - datetime.timedelta(minutes=30))
+        folder = datetime.datetime.fromtimestamp(inside / 1000, datetime.timezone.utc).date().isoformat()
+        os.makedirs(os.path.join(self.home, 'costlog', folder), exist_ok=True)
+        json.dump({'sessionId': 'u1', 'name': 'lead_tmp', 'account': 'codex:box', 'events': [
+            {'kind': 'turn', 'key': 't1', 'at': inside, 'inputTokens': 10, 'outputTokens': 5},
+            {'kind': 'turn', 'key': 't0', 'at': before, 'inputTokens': 999, 'outputTokens': 1}]},
+            W(os.path.join(self.home, 'costlog', folder, 'u1.json')))
+        json.dump({'id': 'u1', 'name': 'lead_tmp', 'updatedAt': self.now_ms - 1000}, W(os.path.join(self.home, 'sessions', 'u1.json')))
+        by = {r['id']: r for r in usage.sessions(os.path.realpath(self.home), self.now_ms, [], today='2026-10-18')}
+        self.assertEqual((by['u1']['engine'], by['u1']['turns_today'], by['u1']['tokens_today']), ('codex', 1, 15))
+
     def test_session_without_cost_log_has_unknown_turns_not_zero(self):
         json.dump({'id': 's9', 'name': 'quiet', 'updatedAt': self.now_ms - 1000}, W(os.path.join(self.home, 'sessions', 's9.json')))
         by = {r['id']: r for r in usage.sessions(os.path.realpath(self.home), self.now_ms, [], today='2026-10-18')}

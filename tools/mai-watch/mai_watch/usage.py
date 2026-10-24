@@ -3,7 +3,7 @@
 The source is what the session gauges (mods/mai-gauge, mods/mai-codex-gauge) already record under the gauge home, by default ~/.mai:
   limits.json                    plan limit use in percent with the reset time, per account
   sessions/<id>.json             session name, what it says it is doing, context use
-  costlog/<local date>/<id>.json  one record per turn
+  costlog/<date>/<id>.json       one record per turn; the Claude gauge names the folder by local date, the Codex gauge by UTC date
 The gauges read these from the signed-in CLIs themselves, so a user who is logged in sees them without any key.
 
 Boundary (review R1): a file is read only when its real path stays inside the real gauge home (a junction or link that leads out is
@@ -175,27 +175,46 @@ def sessions(root_real, now_ms, problems, today=None, max_age_s=DAY):
                      'context_pct': _num(d.get('contextPercent'), 0, 100), 'last_active_s': round(max(0, now_ms - upd) / 1000),
                      'engine': None, 'turns_today': None, 'cost_usd_today': None, 'cost_turns': 0, 'tokens_today': None, 'token_turns': 0}
     today = today or datetime.date.today().isoformat()
-    cdir = os.path.join(root_real, 'costlog', today)
-    for name in _list(root_real, cdir, problems):
-        try:
-            d = _load(root_real, os.path.join(cdir, name))
-        except Refused as e:
-            problems.append('refused cost log file: %s' % e)
+    # Codex writes its cost log by UTC date, so local "today" spans up to two UTC folders besides the local one. Read them all and keep
+    # only the turns whose time falls on the local day; one turn sits in one folder, a turn key only guards against a copy in two.
+    midnight = datetime.datetime.combine(datetime.date.fromisoformat(today), datetime.time()).astimezone()
+    day_ms = (midnight.timestamp() * 1000, (midnight + datetime.timedelta(days=1)).timestamp() * 1000)
+    folders = [today] + sorted({datetime.datetime.fromtimestamp(t / 1000, datetime.timezone.utc).date().isoformat()
+                                for t in (day_ms[0], day_ms[1] - 1)} - {today})
+    logs = {}
+    for folder in folders:
+        cdir = os.path.join(root_real, 'costlog', folder)
+        for name in _list(root_real, cdir, problems):
+            try:
+                d = _load(root_real, os.path.join(cdir, name))
+            except Refused as e:
+                problems.append('refused cost log file: %s' % e)
+                continue
+            if not isinstance(d, dict):
+                continue
+            sid = _text(d.get('sessionId'), 64) or name[:-5][:64]
+            log = logs.setdefault(sid, {'name': d.get('name'), 'account': d.get('account'), 'turns': {}, 'today': False})
+            log['today'] = log['today'] or folder == today          # a log only in another day's folder is no log for today
+            for i, e in enumerate(d.get('events') if isinstance(d.get('events'), list) else []):
+                if isinstance(e, dict) and e.get('kind') == 'turn':
+                    at = _num(e.get('at'), 0)
+                    if at is not None and day_ms[0] <= at < day_ms[1]:
+                        key = e.get('key') if isinstance(e.get('key'), str) else (folder, name, i)   # no key: never merged
+                        log['turns'][key] = e
+                        log['today'] = True
+    for sid, log in logs.items():
+        turns = list(log['turns'].values())
+        if not log['today']:
             continue
-        if not isinstance(d, dict):
-            continue
-        sid = _text(d.get('sessionId'), 64) or name[:-5][:64]
-        events = d.get('events') if isinstance(d.get('events'), list) else []
-        turns = [e for e in events if isinstance(e, dict) and e.get('kind') == 'turn']
         r = rows.get(sid)
         if r is None:
             last = max((_num(e.get('at'), 0) or 0 for e in turns), default=0)
             if not last or (now_ms - last) / 1000 > max_age_s:
                 continue
-            r = rows[sid] = {'id': sid, 'name': _text(d.get('name'), 40), 'doing': '', 'context_pct': None,
+            r = rows[sid] = {'id': sid, 'name': _text(log['name'], 40), 'doing': '', 'context_pct': None,
                              'last_active_s': round(max(0, now_ms - last) / 1000), 'engine': None, 'turns_today': None,
                              'cost_usd_today': None, 'cost_turns': 0, 'tokens_today': None, 'token_turns': 0}
-        engine = engine_of(d.get('account'))
+        engine = engine_of(log['account'])
         costs = [c for c in (_turn_cost(e, engine) for e in turns) if c is not None]
         toks = [t for t in (_turn_tokens(e) for e in turns) if t is not None]
         r.update(engine=engine, turns_today=len(turns),

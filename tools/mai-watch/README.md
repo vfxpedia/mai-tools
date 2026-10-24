@@ -7,7 +7,8 @@ Status: draft (M2, live view, wider resources). 161 tests pass on Windows (72 + 
 GPU cards show observed peak temperature and power for the selected graph window
 (10 minutes by default). Peaks refresh with each sample, not once every 10 minutes.
 Expired samples drop out; unreadable values stay unknown. The observed span and
-sample count do not guarantee uninterrupted coverage. Restarting the collector
+sample count live under the collapsed measurement details and do not guarantee
+uninterrupted coverage. A short observation hint appears only during warm-up. Restarting the collector
 clears its history. The collection interval is unchanged.
 
 Preview 0.2.0a2 adds a page reload button beside the theme control, automatic reconnection when the page becomes visible or the connection returns, and separate received/measurement ages. Reads have a six-second deadline including the response body and retry after three seconds on failure. A successful HTTP response cannot make an old measurement look live. Reloading the page does not restart the collector or clear its server-side history; page-local folds and scroll position may reset, while the selected theme is retained.

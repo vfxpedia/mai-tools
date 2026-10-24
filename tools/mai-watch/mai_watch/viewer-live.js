@@ -177,11 +177,26 @@
       if (hp) power = power === null ? x.power_w : Math.max(power, x.power_w);
       if (ht || hp) { oldest = Math.min(oldest, t); count++; }
     });
-    var peakText = 'Peak · last ' + Math.round(seconds / 60) + ' min\n' +
-      (temp === null ? 'Temperature unknown' : temp.toFixed(0) + ' C') + '\n' +
-      (power === null ? 'Power unknown' : power.toFixed(0) + ' W') + '\n' +
-      'observed span ' + ago(count ? (now - oldest) / 1000 : null) + ' · ' + count + ' samples';
-    facts.appendChild(el('div', peakText, 'gpu-peaks'));
+    var peaks = el('div', undefined, 'gpu-peaks');
+    peaks.appendChild(el('div', '최근 ' + Math.round(seconds / 60) + '분 최고', 'gpu-peak-title'));
+    function peakLine(label, value, kind) {
+      var line = el('div', undefined, 'gpu-peak-line');
+      line.appendChild(el('span', label, 'gpu-peak-label'));
+      line.appendChild(el('strong', value, 'gpu-peak-value ' + kind));
+      return line;
+    }
+    peaks.appendChild(peakLine('최고 온도', temp === null ? '미확인' : temp.toFixed(0) + '°C', 'peak-temperature'));
+    peaks.appendChild(peakLine('최대 소비전력', power === null ? '미확인' : power.toFixed(0) + ' W', 'peak-power'));
+    var span = count ? (now - oldest) / 1000 : 0;
+    var spanLabel = span < 90 ? Math.round(span) + '초' : Math.round(span / 60) + '분';
+    if (span < seconds - Math.max(5, 3 * state.interval)) {
+      peaks.appendChild(el('div', count ? '관측 ' + spanLabel : '측정 대기', 'gpu-peak-coverage'));
+    }
+    var detail = el('div', '관측 ' + (count ? spanLabel : '미확인') + ' · 표본 ' + count + '개. 누락 구간은 추정하지 않습니다. 수집기 재시작 시 초기화됩니다.', 'gpu-peak-detail');
+    var disclosure = fold('측정 상세', detail, 'gpu-peaks:' + g.uuid);
+    disclosure.className += ' gpu-peak-disclosure';
+    peaks.appendChild(disclosure);
+    facts.appendChild(peaks);
     row.appendChild(facts);
     // Also protect a new viewer reading a still-running sampler's older payload.
     var procs = g.processes;

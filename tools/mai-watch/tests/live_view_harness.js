@@ -48,4 +48,6 @@ function run(c) {
   return nodes;
 }
 let input = '';
-process.stdin.on('data', x => input += x).on('end', () => console.log(JSON.stringify(run(JSON.parse(input)))));
+// JSON escapes keep the transport ASCII on Windows code-page consoles; decoded labels stay Unicode.
+process.stdin.on('data', x => input += x).on('end', () => console.log(JSON.stringify(run(JSON.parse(input)))
+  .replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))));

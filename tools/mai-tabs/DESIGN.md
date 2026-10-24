@@ -91,7 +91,7 @@ The owner asked for five things: open the same tabs again later, a one-line note
 | Part | Where | Job |
 |---|---|---|
 | extension 0.2 | `extension/background.js`, `core.js` | every 30 s and 2 s after any tab change, send the open tabs to the server; carry out the actions the server hands back; report each result |
-| server | `mai_tabs/server.py`, `python -m mai_tabs serve` | 127.0.0.1 only: page port 28766 (the page, the library, the action queue), extension port 28767 (tab reports and results) |
+| server | `mai_tabs/server.py`, `python -m mai_tabs serve` | 127.0.0.1 only: page port 28770 (the page, the library, the action queue), extension port 28771 (tab reports and results) |
 | library | `mai_tabs/library.py` | what is stored, one item per page, the days each page was open, actions and their results |
 | page | `mai_tabs/app.html`, `app.js` | by category or by date, search, select; open on this device, or ask the computer's Chrome to open, sleep or close |
 | memory | `mai_tabs/memory.py` | Chrome's memory and each GPU's used memory before an action and 20 s after it |
@@ -119,7 +119,9 @@ Order matters: Chrome gives a tab a new id when it is discarded, and a tab disca
 
 ### 12.5 Who may do what
 
-Two listeners, both on 127.0.0.1. The page port (28766) serves the page, `/api/view` and `/api/command`, and is the only one Tailscale Serve exposes. The extension port (28767) takes only `/api/sync` and `/api/ack`, and is never exposed.
+Ports on 127.0.0.1 used by the mai tools, so a new one does not collide: 28765 mai-watch, 28766 mai-resume (its single-instance lock), 28770 and 28771 mai-tabs (page, extension). 0.2.0 first used 28766 and 28767 and could not start next to mai-resume (2026-10-25).
+
+Two listeners, both on 127.0.0.1. The page port (28770) serves the page, `/api/view` and `/api/command`, and is the only one Tailscale Serve exposes. The extension port (28771) takes only `/api/sync` and `/api/ack`, and is never exposed.
 
 - `Host` must name the server (127.0.0.1, localhost, or on the page port a `*.ts.net` name), which stops DNS rebinding.
 - Every POST needs the header `X-Mai-Tabs: 1` and a JSON body. A site open in the browser cannot add that header to a request to another origin without a preflight, and no preflight is answered, so a site cannot press the buttons. `NaN` and `Infinity` are refused in JSON.

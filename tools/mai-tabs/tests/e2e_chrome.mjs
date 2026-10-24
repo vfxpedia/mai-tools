@@ -38,7 +38,7 @@ try {
   for (const n of [1, 2, 3, 4]) fs.writeFileSync(path.join(pages, `p${n}.html`), `<!doctype html><title>Page ${n}</title><p>page ${n}`);
   for (const f of ['background.js', 'manifest.json']) {
     const p = path.join(ext, f);
-    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('127.0.0.1:28767', '127.0.0.1:' + (libPort + 1)));
+    fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('127.0.0.1:28771', '127.0.0.1:' + (libPort + 1)));
   }
   procs.push(spawn(python, ['-m', 'mai_tabs', 'serve', '--port', String(libPort), '--home', home], { cwd: tool, stdio: 'ignore' }));
   procs.push(spawn(python, ['-m', 'http.server', String(pagePort), '--bind', '127.0.0.1', '--directory', pages], { stdio: 'ignore' }));

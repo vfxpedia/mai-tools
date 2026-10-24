@@ -1,11 +1,11 @@
 /* mai-tabs 0.2 background worker. Every 30 seconds, and two seconds after any tab change, it sends the open tabs to the local library
  * server and carries out the actions the server hands back (open, sleep, close), then reports each result.
- * It talks only to the server's extension port on this computer (127.0.0.1:28767), which is never exposed to other devices; the page on
+ * It talks only to the server's extension port on this computer (127.0.0.1:28771), which is never exposed to other devices; the page on
  * a phone talks to the server, never to the browser. Each browser profile has its own random instance id, so actions planned from one
  * profile's tabs are only handed to that profile. */
 importScripts('core.js');
 
-var SERVER = 'http://127.0.0.1:28767';
+var SERVER = 'http://127.0.0.1:28771';
 var timer = null;
 
 async function post(path, body) {

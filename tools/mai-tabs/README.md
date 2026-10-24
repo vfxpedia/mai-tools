@@ -13,9 +13,9 @@ Before you close a pile of browser tabs, save them as a categorized Markdown lis
 
 Keeps every page the browser had open as one line, by category or by date, and lets you open them again in the computer's Chrome (one by one, as a named tab group, or asleep), put them to sleep, or close them, with buttons. A page you opened several times is one item marked "duplicate 3 tabs" and can be cut down to one. Before and after a sleep or close it measures Chrome's memory and each GPU's memory, so you see what was actually freed. The same page and buttons work on a phone (inside your Tailscale network only).
 
-1. Server: from `tools/mai-tabs`, `python -m mai_tabs serve` (page on 127.0.0.1:28766, extension port 28767, data in `~/.mai/tabs`). For other devices: `tailscale serve --bg --https=8443 http://127.0.0.1:28766`, then put your Tailscale login in `~/.mai/tabs/config.json` as `{"owner_logins": ["you@example.com"]}`; other people and tagged devices on the tailnet are refused
+1. Server: from `tools/mai-tabs`, `python -m mai_tabs serve` (page on 127.0.0.1:28770, extension port 28771, data in `~/.mai/tabs`). For other devices: `tailscale serve --bg --https=8443 http://127.0.0.1:28770`, then put your Tailscale login in `~/.mai/tabs/config.json` as `{"owner_logins": ["you@example.com"]}`; other people and tagged devices on the tailnet are refused
 2. Extension: in `chrome://extensions` turn on Developer mode, **Load unpacked**, choose `tools/mai-tabs/extension` (if you had 0.1, press reload there). The mai-tabs button should say "sent n seconds ago, tabs n"
-3. Page: http://127.0.0.1:28766/ on the computer, port 8443 of your Tailscale name elsewhere
+3. Page: http://127.0.0.1:28770/ on the computer, port 8443 of your Tailscale name elsewhere
 
 Not stored: sign-in, mail and bank hosts, sign-in and password-reset paths, token-like values in addresses (`?token=` and similar). Add hosts to block to `~/.mai/tabs/deny.txt`, one per line. Page content is never read (the one-line note comes from the address and title).
 

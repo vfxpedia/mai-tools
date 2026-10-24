@@ -40,18 +40,18 @@ class ProductTests(unittest.TestCase):
         def render(samples):
             p = subprocess.run(['node', str(Path(__file__).with_name('live_view_harness.js'))],
                                input=json.dumps({'peak_samples': samples}), capture_output=True,
-                               text=True, check=True)
-            return ' '.join(n['text'] for n in json.loads(p.stdout) if n['cls'] == 'gpu-peaks')
+                               text=True, encoding='utf-8', check=True)
+            return ' '.join(n['text'] for n in json.loads(p.stdout) if n['cls'].startswith('gpu-peak'))
         samples = [{'age_s': 601, 'gpus': [gpu('A', 99, 999)]},
                    {'age_s': 300, 'gpus': [gpu('B', 98, 998), gpu('A', 68, 312)]},
                    {'age_s': 0, 'gpus': [gpu('A', 50, 80)]}]
         text = render(samples)
-        self.assertIn('68 C', text)
+        self.assertIn('68°C', text)
         self.assertIn('312 W', text)
         self.assertNotIn('999', text)
         self.assertNotIn('998', text)
-        self.assertIn('observed span 5 min', text)
-        self.assertIn('50 C', render([samples[0], samples[-1]]))
+        self.assertIn('관측 5분', text)
+        self.assertIn('50°C', render([samples[0], samples[-1]]))
 
     def test_gpu_peak_renderer_unknown_is_not_zero_and_zero_is_valid(self):
         def render(temp, watts):
@@ -59,11 +59,28 @@ class ProductTests(unittest.TestCase):
                         'temperature_c': temp, 'power_w': watts, 'processes': []}]}]
             p = subprocess.run(['node', str(Path(__file__).with_name('live_view_harness.js'))],
                                input=json.dumps({'peak_samples': samples}), capture_output=True,
-                               text=True, check=True)
-            return ' '.join(n['text'] for n in json.loads(p.stdout) if n['cls'] == 'gpu-peaks')
-        self.assertIn('Temperature unknown', render('68', None))
-        self.assertIn('Power unknown', render(None, None))
+                               text=True, encoding='utf-8', check=True)
+            return ' '.join(n['text'] for n in json.loads(p.stdout) if n['cls'].startswith('gpu-peak'))
+        self.assertIn('미확인', render('68', None))
+        self.assertIn('미확인', render(None, None))
         self.assertIn('0 W', render(None, 0))
+
+    def test_gpu_peaks_labels_and_single_time_range_hide_sampling_details(self):
+        gpu = {'uuid': 'A', 'index': 0, 'name': 'GPU', 'temperature_c': 63,
+               'power_w': 239, 'processes': []}
+        p = subprocess.run(['node', str(Path(__file__).with_name('live_view_harness.js'))],
+                           input=json.dumps({'peak_samples': [{'age_s': 599, 'gpus': [gpu]},
+                                                             {'age_s': 0, 'gpus': [gpu]}]}),
+                           capture_output=True, text=True, encoding='utf-8', check=True)
+        nodes = [n for n in json.loads(p.stdout) if n['cls'].startswith('gpu-peak')]
+        visible = ' '.join(n['text'] for n in nodes if not n['closed'])
+        self.assertIn('최고 온도', visible)
+        self.assertIn('최대 소비전력', visible)
+        self.assertEqual(visible.count('10분'), 1)
+        self.assertNotIn('표본', visible)
+        self.assertNotIn('관측 ', visible)
+        self.assertTrue(any(n['tag'] == 'strong' and n['text'] == '63°C' for n in nodes))
+        self.assertTrue(any(n['closed'] and '표본 2개' in n['text'] for n in nodes))
 
     def test_server_accept_queue_holds_a_browser_resource_burst(self):
         # A page reload can open more than five connections before the accept loop is scheduled.

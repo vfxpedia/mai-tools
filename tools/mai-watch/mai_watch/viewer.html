@@ -111,7 +111,15 @@
   .spark.gpu-graph { height: 72px; margin: 0; }
   .spark polyline.line-vram { stroke: var(--vram); }
   .gpu-facts { color: var(--muted); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; font-size: 11px; }
-  .gpu-peaks { white-space: pre-line; border-left: 1px solid var(--line); padding-left: 9px; overflow-wrap: anywhere; }
+  .gpu-peaks { border-left: 1px solid var(--line); padding-left: 9px; overflow-wrap: anywhere; font-family: system-ui, sans-serif; }
+  .gpu-peak-title { font-size: 12px; font-weight: 600; color: var(--fg); margin-bottom: 5px; }
+  .gpu-peak-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px; }
+  .gpu-peak-label { font-size: 10px; }
+  .gpu-peak-value { font-size: 14px; font-variant-numeric: tabular-nums; }
+  .peak-temperature { color: var(--bar); }
+  .peak-power { color: var(--vram); }
+  .gpu-peak-coverage, .gpu-peak-disclosure { font-size: 10px; margin-top: 3px; }
+  .gpu-peaks .gpu-peak-disclosure > summary { font-size: 10px; padding: 0; }
   .gpu-processes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 6px; border-top: 1px solid var(--line); }
   .gpu-process { font: 13px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
   .usage-highlights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; }
@@ -192,7 +200,7 @@
 <body>
 <header>
   <h1>mai-watch</h1>
-  <span class="quiet">0.3.0a3</span>
+  <span class="quiet">0.3.0a4</span>
   <span id="collector" class="pill warn">reading...</span>
   <span id="generated" class="mono"></span>
   <div class="header-actions"><button id="refresh" type="button" title="Reload this page, not the collector" aria-label="Reload page">↻ Reload</button><button id="theme" type="button" aria-label="Change color theme">Theme: System</button></div>

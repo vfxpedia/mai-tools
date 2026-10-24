@@ -9,6 +9,18 @@
 - 작은 Chrome 확장 (권한은 `tabs`, `tabGroups` 둘뿐) 이 열린 탭을 JSON 파일 하나로 내려받는다. 주소는 브라우저를 떠나기 전에 `?` 뒤와 `#` 뒤를 지우므로, 주소에 든 토큰은 저장되지 않는다.
 - Python 명령이 그 파일을 Markdown, 정리 제안, 프로세스 보고로 바꾼다.
 
+## 탭 보관함 (0.2)
+
+열려 있던 탭을 페이지 하나에 한 줄씩 모아 두고, 분류별 · 날짜별로 보고, 버튼으로 PC 의 Chrome 에서 다시 열거나 (하나씩 · 그룹으로 · 잠든 채로) 재우거나 닫는다. 같은 페이지를 여러 번 열었으면 한 항목에 「중복 3 탭」 으로 보이고 한 번에 하나만 남길 수 있다. 재우기 · 닫기 전후로 Chrome 메모리와 GPU 메모리를 재서 실제로 얼마나 줄었는지 보여 준다. 휴대폰에서도 같은 화면과 버튼을 쓴다 (Tailscale 안에서만).
+
+1. 서버: `tools/mai-tabs` 에서 `python -m mai_tabs serve` (화면 127.0.0.1:28766, 확장용 28767, 자료는 `~/.mai/tabs`). 다른 기기에서 보려면 `tailscale serve --bg --https=8443 http://127.0.0.1:28766` 뒤에 `~/.mai/tabs/config.json` 에 내 Tailscale 로그인을 `{"owner_logins": ["you@example.com"]}` 로 적는다. tailnet 의 다른 사람 · 태그 기기는 막힌다
+2. 확장: `chrome://extensions` 에서 개발자 모드를 켜고 **압축해제된 확장 프로그램을 로드합니다** 로 `tools/mai-tabs/extension` 을 고른다 (0.1 을 쓰던 사람은 같은 자리에서 새로고침). 도구 모음의 mai-tabs 를 누르면 「몇 초 전에 보냄 · 탭 n」 이 보여야 한다
+3. 화면: PC 는 http://127.0.0.1:28766/ , 휴대폰은 Tailscale 주소의 8443 포트
+
+저장하지 않는 것: 로그인 · 메일 · 은행 주소, 로그인 · 비밀번호 재설정 경로, 주소 속 토큰 같은 값 (`?token=` 등). 더 막을 주소는 `~/.mai/tabs/deny.txt` 에 한 줄씩. 페이지 본문은 읽지 않는다 (한 줄 설명은 주소와 제목으로 만든다).
+
+시험: `python -I tests/test_library.py` · `node --test tests/extension.test.cjs` · 실제 Chrome 확인 `node tests/e2e_chrome.mjs` (내 프로필은 건드리지 않는다). 설계: [DESIGN.md](DESIGN.md) 12 절.
+
 ## 실습
 
 `tools/mai-tabs` 에서 실행한다.

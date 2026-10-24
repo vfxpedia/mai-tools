@@ -1,4 +1,7 @@
-"""Command line: python -m mai_tabs {render,propose,procs,check-rules}. Read-only: it never closes a tab or ends a process."""
+"""Command line: python -m mai_tabs {render,propose,procs,check-rules,verify,serve}.
+
+The report commands are read-only. `serve` runs the tab library (DESIGN.md section 12): it closes or sleeps tabs only when the owner
+presses a button on its page, and only through the extension in the owner's own browser."""
 import argparse
 import json
 import os
@@ -28,7 +31,14 @@ def main(argv=None):
     q = sub.add_parser('procs'); q.add_argument('--json', action='store_true'); q.add_argument('--name', action='append', help='process name to include (repeatable, case-insensitive), e.g. chrome.exe; default: Chrome, Edge, Brave and Firefox')
     c = sub.add_parser('check-rules'); c.add_argument('rules')
     v = sub.add_parser('verify', help='re-read a downloaded export and print what it contains, to compare with the popup message'); v.add_argument('export'); v.add_argument('--expect-tabs', type=int)
+    s = sub.add_parser('serve', help='run the tab library on 127.0.0.1 (reach it from a phone through Tailscale Serve)')
+    s.add_argument('--port', type=int, default=28766, help='page port; the extension port is this plus one'); s.add_argument('--home', help='data folder (default ~/.mai/tabs or MAI_TABS_HOME)')
     a = ap.parse_args(argv)
+    if a.cmd == 'serve':
+        from . import server
+        server.serve(a.port, a.home, ready=lambda page, ext: print('mai-tabs library on http://127.0.0.1:%d (extension port %d)'
+                                                                  % (page.server_address[1], ext.server_address[1]), flush=True))
+        return 0
     try:
         if a.cmd == 'render':
             text = render.render(load_export(a.export), classify.load_rules(a.rules))

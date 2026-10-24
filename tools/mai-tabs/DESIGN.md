@@ -1,4 +1,4 @@
-Status: draft. M0 (design, schema, contract tests) and M1 (extension, renderer, classifier, proposal, verify) are implemented, 40 tests. Independently exercised in an isolated Chrome profile (popup, API calls, download, verify). Not measured: a large real profile, audible tabs, incognito or other profiles, other operating systems.
+Status: v0.2 draft. M0 to M2 as before (40 tests). v0.2 adds the tab library (section 12): a server on 127.0.0.1, a page that works on a phone through Tailscale Serve, and an extension that opens, sleeps and closes tabs when the owner presses a button. 45 more tests, plus a real-Chrome check (`tests/e2e_chrome.mjs`, 11 checks, Chrome 155 on Windows, 2026-10-25). Not measured yet: the owner's own profile with hundreds of tabs, Linux and macOS Chrome.
 
 **Start with myself. Validate with evidence. Generalize for others.**
 
@@ -8,7 +8,7 @@ Status: draft. M0 (design, schema, contract tests) and M1 (extension, renderer, 
 
 Before the owner cleans up Chrome processes, write down what is open (windows, tab groups, pages), classified by category, into a Markdown file. Then propose, never perform, what could be closed. Process termination only after the owner confirms.
 
-In scope: browser extension that exports tabs as JSON, URL sanitizer, rule-based classifier, Markdown renderer, cleanup proposal, read-only process report. Out of scope: closing tabs, ending processes, any network access, any dependency on MAI CAPTURE or other MAI world modules (deferred by the owner on 10/17; the export keeps `schema` and an optional `labels` object so a later integration needs no rewrite).
+In scope: browser extension that exports tabs as JSON, URL sanitizer, rule-based classifier, Markdown renderer, cleanup proposal, read-only process report. Out of scope for the v0.1 export: closing tabs, ending processes, any network access (v0.2 adds closing and sleeping tabs on the owner's request, through the library in section 12; ending processes stays out of scope), any dependency on MAI CAPTURE or other MAI world modules (deferred by the owner on 10/17; the export keeps `schema` and an optional `labels` object so a later integration needs no rewrite).
 
 ## 2. Terminology
 
@@ -81,3 +81,67 @@ Boundaries stated by the same review. The list is for review and classification,
 1. Distribution: load unpacked for now, or the Chrome Web Store later (account and review needed).
 2. License.
 3. After M3: whether the Markdown should be rendered inside the extension too. Today it is not: two renderers would need the same conformance test the sanitizer has.
+
+## 12. Tab library (v0.2, owner request 2026-10-25, vfxpedia/mai-os#57)
+
+The owner asked for five things: open the same tabs again later, a one-line note per tab, tabs grouped by topic (papers with papers), the memory a cleanup actually freed, and the list from anywhere, phone included, with the buttons working there too. The design keeps the v0.1 export as it was and adds a second path next to it.
+
+### 12.1 Parts
+
+| Part | Where | Job |
+|---|---|---|
+| extension 0.2 | `extension/background.js`, `core.js` | every 30 s and 2 s after any tab change, send the open tabs to the server; carry out the actions the server hands back; report each result |
+| server | `mai_tabs/server.py`, `python -m mai_tabs serve` | 127.0.0.1 only: page port 28766 (the page, the library, the action queue), extension port 28767 (tab reports and results) |
+| library | `mai_tabs/library.py` | what is stored, one item per page, the days each page was open, actions and their results |
+| page | `mai_tabs/app.html`, `app.js` | by category or by date, search, select; open on this device, or ask the computer's Chrome to open, sleep or close |
+| memory | `mai_tabs/memory.py` | Chrome's memory and each GPU's used memory before an action and 20 s after it |
+
+The page never talks to the browser. A phone presses a button, the server queues the action, and the extension in the computer's Chrome picks it up within 30 seconds. Opening a link on the phone itself is a plain link.
+
+### 12.2 What is stored
+
+The library keeps addresses that can be opened again, so the decision is made in `library.clean_url` before anything is written: only http and https; user name and password dropped; query parameters whose name contains a secret word (token, secret, key, auth, pass, session, code, invite, saml, signature and others, matched inside longer names such as `private_token` or `invite_code`) or whose value is 40 or more random-looking characters, and tracking parameters, dropped. A page is not stored at all when its host is deny-listed (sign-in, mail and bank hosts by default, more in `<data>/deny.txt`), when a path part is a sign-in step (login, oauth, sso, auth, saml) or names a one-time link (password, reset, verify, confirm, magic, invite, activate), or when a path part looks like a token: a JWT, or 24 or more mixed letters and digits that are not a UUID or plain hex. Hosts whose page ids look like that by design (Google Docs and Drive, GitHub, YouTube, Notion, Figma) are exempt from the last rule; their pages are kept and stay inside the owner's library. The page counts what was not stored. The data folder is `~/.mai/tabs` (or `MAI_TABS_HOME`), never the repository.
+
+### 12.3 One item per page, two views
+
+Two tabs are the same page when their cleaned addresses are equal after dropping `www.` and a trailing slash and sorting the query; an arXiv paper is one page whatever its version or format. A fragment is dropped except a plain route (`#/doc/1`, no `=`), so hash-routed apps keep one item per view and an OAuth fragment (`#access_token=...`) is never stored. A page open three times is one item marked "duplicate 3 tabs", and "keep one" or "PC duplicate cleanup" closes the copies, keeping the most recently used one. The owner asked whether to sort by date or by category; the page does both over the same items: by category for "what do I have", by date for "what was I doing on Tuesday" (each local date keeps the ids that were open that day). A closed tab stays in the library, so either view can open it again, one by one, as a named Chrome tab group, or asleep.
+
+### 12.4 Actions
+
+| Action | What the extension does | Never touches |
+|---|---|---|
+| open | creates the tabs in the background; with a group name, puts them in that tab group (reusing a group of the same name); asleep: waits for each tab's address, then discards it | addresses that are not in the library, anything but http and https |
+| sleep | `chrome.tabs.discard` | the active tab, pinned and audible tabs |
+| close | `chrome.tabs.remove` | the active tab, pinned and audible tabs |
+| dedupe | closes extra copies of a page, keeps the most recently used | the same three |
+
+Order matters: Chrome gives a tab a new id when it is discarded, and a tab discarded before its address commits loses the address, so the extension groups first, waits for the address, then discards. A step that fails is counted and named in the result, and a group that could not be made makes the whole action "failed", never a quiet success (all three found by the real-Chrome check, now in `tests/extension.test.cjs`).
+
+### 12.5 Who may do what
+
+Two listeners, both on 127.0.0.1. The page port (28766) serves the page, `/api/view` and `/api/command`, and is the only one Tailscale Serve exposes. The extension port (28767) takes only `/api/sync` and `/api/ack`, and is never exposed.
+
+- `Host` must name the server (127.0.0.1, localhost, or on the page port a `*.ts.net` name), which stops DNS rebinding.
+- Every POST needs the header `X-Mai-Tabs: 1` and a JSON body. A site open in the browser cannot add that header to a request to another origin without a preflight, and no preflight is answered, so a site cannot press the buttons. `NaN` and `Infinity` are refused in JSON.
+- A request that came through Serve (`Host` is `*.ts.net`) must carry `Tailscale-User-Login` equal to one of `owner_logins` in `<data>/config.json`. Tagged devices (no login header) and other people on the tailnet get 403, and so does everyone while the list is empty.
+- The extension port refuses anything forwarded (Tailscale or `X-Forwarded-*` headers) and any `Origin` that is not a Chrome extension id. The first extension that reports is written to `config.json` as `extension_origin`, and any other extension is refused from then on. So the library only holds addresses this browser reported, and the page can only ask to open those.
+- The page's script is a separate file and the page's CSP allows scripts only from the server itself; text from the browser is only set with `textContent`, and links are made only for http and https addresses.
+
+Each browser profile running the extension has its own random instance id. An action is planned from the newest report and is handed only to that browser. It is handed out once (`delivered`), expires if nobody picks it up within 2 minutes (`expired`), and is marked `unknown` if picked up but never answered. At hand-out, close and sleep steps are checked against that browser's latest report (the tab must still show the same page and must not have become active, pinned or audible). Right before acting, the extension reads the tab once more and refuses it for the same reasons, and it counts a discard that Chrome declined (`chrome.tabs.discard` resolves to nothing) as a failure. Each refusal is named in the result. These checks came from an independent review of the first draft (2026-10-25).
+
+Writes go to a temporary file, are flushed to disk, and replace the old file, retried while Windows holds it (an indexer or antivirus). An action is written before it can be handed out, so a failed write never leaves an action the browser runs but the page cannot see. Any unexpected error is a JSON 500 with its reason, never a dropped connection.
+
+Not handled: an arXiv tab that shows another version of the paper than the stored address (pdf against abs) is refused by the extension's last check, which compares origin and path. That is the safe side, and the result says so.
+
+### 12.6 Memory figure
+
+Per-tab memory is not available to an extension, and per-process GPU memory under WDDM does not add up (dwm shows more than the GPU's total), so the figure is the whole: Chrome's private bytes on Windows (resident memory elsewhere) and each GPU's used memory from `nvidia-smi`, before the action and 20 s after the extension reported it done. The page says the difference also contains whatever else changed in those seconds.
+
+### 12.7 Testing
+
+`tests/test_library.py` (36): cleaning (secret names inside longer names, one-time and sign-in paths, token-shaped path parts, route fragments) and the deny list, one item per page, arXiv versions, the days, planning only known items for a connected browser, sparing active, pinned and audible tabs, dedupe never closing them, actions bound to one browser, stale steps dropped at hand-out, expiry and single hand-out, ack input checked first, a failed write handing out nothing, write retries, a lost after-reading, and the server: round trip, the asleep flag on disk, reports only on the extension port and only from the first extension, only the owner through Tailscale, POST needs the header, unknown hosts, 400 and 500 instead of a dropped connection, and the CSP. Five protections were broken on purpose one at a time and each made a test fail. `tests/extension.test.cjs` (9): the extension core against a fake browser that, like Chrome, renames a discarded tab, loses the address of a tab discarded too early, and can decline a discard; the last check before closing or sleeping. `tests/e2e_chrome.mjs` (11 checks, not in CI): a throwaway Chrome profile and data folder, the extension loaded with `Extensions.loadUnpacked` over a DevTools pipe (Chrome 137+ ignores `--load-extension`), local test pages; it checks duplicates, sleep, dedupe, close, opening a named group asleep, the memory reading and that every action was acknowledged. The page was looked at at 390 px and 1280 px, light and dark, with no sideways scroll at 390 px.
+
+### 12.8 Not done yet
+
+Page-content summaries (the one-line note is built from the address and title only; reading page text would need wider permissions and would send page text to a model, which is the owner's call). Other browsers. Chrome on Linux and macOS is expected to work the same and has not been run. A copy of the library on the NAS.
+

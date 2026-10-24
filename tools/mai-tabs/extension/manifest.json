@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "mai-tabs",
-  "version": "0.1.0",
-  "description": "Saves the open tabs as a JSON file (URLs without query or fragment). Read-only, no network, stores nothing.",
-  "permissions": ["tabs", "tabGroups"],
-  "action": { "default_popup": "popup.html", "default_title": "mai-tabs: export open tabs" }
+  "version": "0.2.0",
+  "description": "Keeps the open tabs in a library on this computer (127.0.0.1) and opens, sleeps or closes them when the library page asks.",
+  "permissions": ["tabs", "tabGroups", "alarms", "storage"],
+  "host_permissions": ["http://127.0.0.1:28767/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "mai-tabs" }
 }

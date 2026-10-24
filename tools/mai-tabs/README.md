@@ -9,6 +9,18 @@ Before you close a pile of browser tabs, save them as a categorized Markdown lis
 - A small Chrome extension (permissions: `tabs`, `tabGroups` only) downloads one JSON file of the open tabs. Addresses are stripped of query strings and fragments before they leave the browser, so tokens in URLs are not saved.
 - Python commands turn that file into Markdown, a cleanup proposal, and a process report.
 
+## Tab library (0.2)
+
+Keeps every page the browser had open as one line, by category or by date, and lets you open them again in the computer's Chrome (one by one, as a named tab group, or asleep), put them to sleep, or close them, with buttons. A page you opened several times is one item marked "duplicate 3 tabs" and can be cut down to one. Before and after a sleep or close it measures Chrome's memory and each GPU's memory, so you see what was actually freed. The same page and buttons work on a phone (inside your Tailscale network only).
+
+1. Server: from `tools/mai-tabs`, `python -m mai_tabs serve` (127.0.0.1:28766, data in `~/.mai/tabs`). For other devices: `tailscale serve --bg --https=8443 http://127.0.0.1:28766`
+2. Extension: in `chrome://extensions` turn on Developer mode, **Load unpacked**, choose `tools/mai-tabs/extension` (if you had 0.1, press reload there). The mai-tabs button should say "sent n seconds ago, tabs n"
+3. Page: http://127.0.0.1:28766/ on the computer, port 8443 of your Tailscale name elsewhere
+
+Not stored: sign-in, mail and bank hosts, sign-in and password-reset paths, token-like values in addresses (`?token=` and similar). Add hosts to block to `~/.mai/tabs/deny.txt`, one per line. Page content is never read (the one-line note comes from the address and title).
+
+Tests: `python -I tests/test_library.py`, `node --test tests/extension.test.cjs`, real Chrome: `node tests/e2e_chrome.mjs` (your own profile is not touched). Design: [DESIGN.md](DESIGN.md) section 12.
+
 ## Try it
 
 From `tools/mai-tabs`.

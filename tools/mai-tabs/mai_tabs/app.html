@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>탭 보관함</title>
+<meta name="theme-color" content="#f6f7f9">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --fg: #15171a; --muted: #3d434b; --line: #c9ced6;
+    --accent: #2b6fd6; --accent-fg: #ffffff; --ok: #0b7a3b; --ok-bg: #d9f2e3; --warn: #8a5a00; --warn-bg: #fdecc8; --bad: #a3191f; --bad-bg: #fbdcdd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101215; --panel: #1a1d22; --fg: #eceef1; --muted: #c3c8d0; --line: #3a4049;
+      --accent: #6ea2f5; --accent-fg: #101215; --ok: #62d68c; --ok-bg: #12301f; --warn: #f2c14e; --warn-bg: #3a2c0a; --bad: #ff8b90; --bad-bg: #3d1618;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, "Segoe UI", "Malgun Gothic", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  .top { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+  h1 { font-size: 18px; margin: 0; }
+  #pc { font-weight: 600; }
+  #mem { color: var(--muted); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+  input[type=search] { flex: 1 1 14rem; min-width: 0; min-height: 40px; padding: 6px 10px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  button { min-height: 40px; padding: 6px 12px; font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  button.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button.go { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button.danger { border-color: var(--bad); color: var(--bad); }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label.chk { display: inline-flex; gap: 6px; align-items: center; min-height: 40px; }
+  main { padding: 12px 16px 120px; }
+  #note { padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; display: none; }
+  #note.warn { display: block; color: var(--warn); background: var(--warn-bg); }
+  #note.bad { display: block; color: var(--bad); background: var(--bad-bg); }
+  section.grp { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; }
+  .ghead { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .ghead h2 { font-size: 16px; margin: 0; margin-right: auto; }
+  .count { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: 4px 8px; align-items: start; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: 0; }
+  li input { width: 20px; height: 20px; margin-top: 3px; }
+  .t a { color: var(--fg); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  .t a:hover { text-decoration: underline; }
+  .line { color: var(--muted); overflow-wrap: anywhere; font-size: 14px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+  .b { font-size: 13px; padding: 0 8px; border-radius: 999px; font-weight: 600; }
+  .b.awake { color: var(--ok); background: var(--ok-bg); }
+  .b.asleep { color: var(--warn); background: var(--warn-bg); }
+  .b.dup { color: var(--bad); background: var(--bad-bg); }
+  .acts { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+  .acts button { min-height: 36px; padding: 4px 8px; font-size: 14px; }
+  .more { padding: 8px 12px; }
+  #log { margin-top: 18px; }
+  #log h2 { font-size: 16px; }
+  #log li { grid-template-columns: minmax(0, 1fr); }
+  #sel { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 2px solid var(--accent); padding: 10px 16px; display: none; flex-wrap: wrap; gap: 8px; align-items: center; z-index: 3; }
+  #sel.show { display: flex; }
+  #sel span { font-weight: 600; margin-right: auto; }
+  @media (max-width: 640px) {
+    header { position: static; }
+    li { grid-template-columns: 2rem minmax(0, 1fr); }
+    .acts { grid-column: 2; justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>탭 보관함</h1><span id="pc">PC 연결 확인 중</span><span id="mem"></span></div>
+  <div class="controls">
+    <button id="by-cat" class="on" type="button">분류별</button>
+    <button id="by-day" type="button">날짜별</button>
+    <input id="q" type="search" placeholder="제목 · 주소 · 설명 찾기" aria-label="찾기">
+    <label class="chk"><input id="openonly" type="checkbox"> PC 에 열린 것만</label>
+    <button id="dedupe" class="danger" type="button" hidden>PC 중복 탭 정리</button>
+  </div>
+</header>
+<main>
+  <div id="note" role="status"></div>
+  <div id="list"></div>
+  <section id="log"><h2>최근 동작</h2><ul id="logs"></ul></section>
+</main>
+<div id="sel" role="region" aria-label="선택한 항목"><span id="selcount"></span>
+  <button class="go" data-act="open-group" type="button">PC 에 그룹으로 열기</button>
+  <button data-act="open-asleep" type="button">잠든 채로 열기</button>
+  <button data-act="sleep" type="button">재우기</button>
+  <button class="danger" data-act="close" type="button">닫기</button>
+  <button data-act="clear" type="button">선택 해제</button>
+</div>
+<script>
+'use strict';
+var LABEL = { 'research': '논문 · 연구', 'code': '코드', 'ai': 'AI', 'docs and notes': '문서 · 노트', 'video and music': '영상 · 음악',
+              'chat and mail': '채팅 · 메일', 'browser internal': '브라우저', 'uncategorized': '기타', 'other': '기타' };
+var ORDER = ['research', 'code', 'ai', 'docs and notes', 'video and music', 'chat and mail', 'uncategorized', 'other'];
+var PAGE = 60;
+var state = { view: null, mode: 'cat', q: '', openOnly: false, sel: new Set(), shown: {}, armed: null };
+
+function $(id) { return document.getElementById(id); }
+function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function ago(ms) {
+  if (!ms) return '알 수 없음';
+  var s = Math.round((Date.now() - ms) / 1000);
+  if (s < 90) return s + ' 초 전';
+  if (s < 5400) return Math.round(s / 60) + ' 분 전';
+  if (s < 172800) return Math.round(s / 3600) + ' 시간 전';
+  return Math.round(s / 86400) + ' 일 전';
+}
+function mib(n) { return n === null || n === undefined ? '못 잼' : (Math.abs(n) >= 1024 ? (n / 1024).toFixed(1) + ' GB' : n + ' MB'); }
+function signed(n) { return n === null || n === undefined ? '못 잼' : (n > 0 ? '+' : '') + mib(n); }
+
+async function api(path, body) {
+  var r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mai-Tabs': '1' }, body: JSON.stringify(body) } : { cache: 'no-store' });
+  var d = await r.json().catch(function () { return {}; });
+  if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+  return d;
+}
+
+function note(text, cls) { var n = $('note'); n.textContent = text || ''; n.className = text ? cls : ''; }
+
+async function act(action, ids, group, asleep) {
+  try {
+    var c = await api('/api/command', { action: action, items: ids, group: group || null, asleep: !!asleep });
+    note(c.state === 'pending' ? 'PC 에 보냈습니다. PC 의 Chrome 이 30 초 안에 처리합니다.' : '할 일이 없습니다 (' + (c.result || '') + ')', 'warn');
+    await load();
+  } catch (e) { note('보내지 못했습니다: ' + e.message, 'bad'); }
+}
+
+function confirmThen(key, btn, text, fn) {
+  if (state.armed === key) { state.armed = null; fn(); return; }
+  state.armed = key; btn.textContent = text; btn.classList.add('on');
+  setTimeout(function () { if (state.armed === key) { state.armed = null; render(); } }, 4000);
+}
+
+function matches(it) {
+  if (state.openOnly && !it.open_tabs) return false;
+  if (!state.q) return true;
+  var q = state.q.toLowerCase();
+  return (it.title + ' ' + it.url + ' ' + it.line).toLowerCase().indexOf(q) >= 0;
+}
+
+function groupButtons(head, ids, title) {
+  var openIds = ids.filter(function (i) { return state.byId[i].open_tabs; });
+  var b1 = el('button', 'go', 'PC 에 그룹으로 열기'); b1.type = 'button';
+  b1.onclick = function () { act('open', ids, title); };
+  var b2 = el('button', '', '잠든 채로 열기'); b2.type = 'button';
+  b2.onclick = function () { act('open', ids, title, true); };
+  head.append(b1, b2);
+  if (openIds.length) {
+    var b3 = el('button', '', '모두 재우기'); b3.type = 'button';
+    b3.onclick = function () { act('sleep', openIds); };
+    var b4 = el('button', 'danger', '모두 닫기'); b4.type = 'button';
+    b4.onclick = function () { confirmThen('close:' + title, b4, '한 번 더 누르면 ' + openIds.length + ' 개 닫음', function () { act('close', openIds); }); };
+    head.append(b3, b4);
+  }
+}
+
+function itemRow(it) {
+  var li = el('li');
+  var cb = el('input'); cb.type = 'checkbox'; cb.checked = state.sel.has(it.id); cb.setAttribute('aria-label', '선택');
+  cb.onchange = function () { if (cb.checked) state.sel.add(it.id); else state.sel.delete(it.id); selBar(); };
+  var mid = el('div', 't');
+  var a = el('a', '', it.title || it.url); a.href = it.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  mid.append(a, el('div', 'line', it.line));
+  var badges = el('div', 'badges');
+  if (it.open_tabs) {
+    if (it.awake_tabs) badges.append(el('span', 'b awake', 'PC 깨어 있음 ' + it.awake_tabs));
+    if (it.open_tabs - it.awake_tabs) badges.append(el('span', 'b asleep', 'PC 잠듦 ' + (it.open_tabs - it.awake_tabs)));
+    if (it.open_tabs > 1) badges.append(el('span', 'b dup', '중복 ' + it.open_tabs + ' 탭'));
+  }
+  badges.append(el('span', 'line', '마지막으로 본 때 ' + ago(it.last_seen)));
+  mid.append(badges);
+  var acts = el('div', 'acts');
+  var o = el('button', 'go', 'PC 열기'); o.type = 'button'; o.onclick = function () { act('open', [it.id]); };
+  acts.append(o);
+  if (it.awake_tabs) { var s = el('button', '', '재우기'); s.type = 'button'; s.onclick = function () { act('sleep', [it.id]); }; acts.append(s); }
+  if (it.open_tabs) { var c = el('button', 'danger', '닫기'); c.type = 'button'; c.onclick = function () { act('close', [it.id]); }; acts.append(c); }
+  if (it.open_tabs > 1) { var d = el('button', '', '하나만 남기기'); d.type = 'button'; d.onclick = function () { act('dedupe', [it.id]); }; acts.append(d); }
+  li.append(cb, mid, acts);
+  return li;
+}
+
+function section(key, title, items) {
+  var sec = el('section', 'grp');
+  var head = el('div', 'ghead');
+  var h = el('h2', '', title); h.append(el('span', 'count', items.length + ' 개'));
+  head.append(h);
+  groupButtons(head, items.map(function (i) { return i.id; }), title);
+  sec.append(head);
+  var ul = el('ul');
+  var n = state.shown[key] || PAGE;
+  items.slice(0, n).forEach(function (it) { ul.append(itemRow(it)); });
+  sec.append(ul);
+  if (items.length > n) {
+    var m = el('button', '', '더 보기 (' + (items.length - n) + ' 개 남음)'); m.type = 'button';
+    m.onclick = function () { state.shown[key] = n + PAGE; render(); };
+    var w = el('div', 'more'); w.append(m); sec.append(w);
+  }
+  return sec;
+}
+
+function render() {
+  var v = state.view; if (!v) return;
+  var list = $('list'); list.textContent = '';
+  var items = v.items.filter(matches);
+  if (state.mode === 'cat') {
+    var groups = {};
+    items.forEach(function (it) { (groups[it.category] = groups[it.category] || []).push(it); });
+    Object.keys(groups).sort(function (a, b) {
+      var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return (ia < 0 ? 50 : ia) - (ib < 0 ? 50 : ib) || groups[b].length - groups[a].length;
+    }).forEach(function (k) { list.append(section('c:' + k, LABEL[k] || k, groups[k])); });
+  } else {
+    Object.keys(v.days).forEach(function (d) {
+      var its = v.days[d].map(function (i) { return state.byId[i]; }).filter(function (it) { return it && matches(it); });
+      if (its.length) list.append(section('d:' + d, d, its));
+    });
+  }
+  if (!list.children.length) list.append(el('p', '', v.items.length ? '찾는 것이 없습니다.' : '아직 보관된 탭이 없습니다. PC 의 Chrome 에 mai-tabs 확장이 켜져 있는지 보세요.'));
+  var logs = $('logs'); logs.textContent = '';
+  (v.commands || []).slice(0, 12).forEach(function (c) {
+    var name = { open: '열기', sleep: '재우기', close: '닫기', dedupe: '중복 정리' }[c.action] || c.action;
+    var st = { pending: 'PC 처리 기다림', done: '끝남', failed: '일부 실패' }[c.state] || c.state;
+    var t = name + ' · 항목 ' + c.items.length + ' · ' + st + ' · ' + ago(c.created);
+    if (c.result && typeof c.result === 'object') t += ' · 성공 ' + c.result.done + ', 실패 ' + c.result.failed + (c.result.note ? ' (' + c.result.note + ')' : '');
+    var li = el('li', '', t);
+    if (c.after && c.after.change) {
+      var ch = c.after.change;
+      var g = (ch.gpus || []).map(function (x) { return 'GPU' + x.index + ' ' + signed(x.mib); }).join(' · ');
+      li.append(el('div', 'line', '실측 (' + ch.seconds + ' 초 사이, 그동안 다른 프로그램이 바꾼 양도 섞임): Chrome 메모리 ' + signed(ch.browser_mib) + (g ? ' · ' + g : '')));
+    } else if (c.before && c.state !== 'pending') {
+      li.append(el('div', 'line', '메모리 다시 재는 중 (20 초 뒤)'));
+    }
+    logs.append(li);
+  });
+  var live = v.live || {};
+  var fresh = v.live_at && Date.now() - v.live_at < 90000;
+  $('pc').textContent = v.live_at ? (fresh ? 'PC Chrome 연결됨' : 'PC Chrome 소식 없음') + ' · ' + ago(v.live_at) + ' · 열린 탭 ' + live.tabs + ' (깨어 있음 ' + live.awake + ')' : 'PC Chrome 에서 아직 소식 없음';
+  $('pc').style.color = fresh ? 'var(--ok)' : 'var(--warn)';
+  var m = v.memory || {};
+  $('mem').textContent = 'Chrome 메모리 ' + mib(m.browser_mib) + (m.gpus || []).map(function (g) { return ' · GPU' + g.index + (g.display ? '(화면)' : '') + ' ' + mib(g.used_mib) + ' / ' + mib(g.total_mib); }).join('');
+  var dd = $('dedupe'); dd.hidden = !live.duplicates; dd.textContent = 'PC 중복 탭 정리 (' + (live.duplicates || 0) + ')';
+  selBar();
+}
+
+function selBar() {
+  var n = state.sel.size;
+  $('sel').classList.toggle('show', n > 0);
+  $('selcount').textContent = '선택 ' + n + ' 개';
+}
+
+$('sel').addEventListener('click', function (e) {
+  var a = e.target.getAttribute && e.target.getAttribute('data-act'); if (!a) return;
+  var ids = Array.from(state.sel);
+  var stamp = new Date().toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (a === 'clear') { state.sel.clear(); render(); return; }
+  if (a === 'open-group') act('open', ids, '선택 ' + stamp);
+  if (a === 'open-asleep') act('open', ids, '선택 ' + stamp, true);
+  if (a === 'sleep') act('sleep', ids);
+  if (a === 'close') confirmThen('close:sel', e.target, '한 번 더 누르면 닫음', function () { act('close', ids); });
+});
+$('by-cat').onclick = function () { state.mode = 'cat'; $('by-cat').classList.add('on'); $('by-day').classList.remove('on'); render(); };
+$('by-day').onclick = function () { state.mode = 'day'; $('by-day').classList.add('on'); $('by-cat').classList.remove('on'); render(); };
+$('q').oninput = function () { state.q = this.value.trim(); render(); };
+$('openonly').onchange = function () { state.openOnly = this.checked; render(); };
+$('dedupe').onclick = function () { var b = this; confirmThen('dedupe', b, '한 번 더 누르면 중복 탭 닫음 (가장 최근 것 하나는 남김)', function () { act('dedupe', []); }); };
+
+async function load() {
+  try {
+    var v = await api('/api/view');
+    state.view = v; state.byId = {};
+    v.items.forEach(function (it) { state.byId[it.id] = it; });
+    state.sel.forEach(function (i) { if (!state.byId[i]) state.sel.delete(i); });
+    if ($('note').className === 'bad') note('');
+    if (!state.armed) render();
+  } catch (e) { note('보관함 서버에 닿지 못했습니다: ' + e.message, 'bad'); }
+}
+load();
+setInterval(function () { if (!document.hidden) load(); }, 10000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+</script>
+</body>
+</html>

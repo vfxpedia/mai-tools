@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="utf-8">
 <title>mai-tabs</title>
@@ -12,14 +12,22 @@
   p { margin: 0 0 10px; color: var(--muted); }
   button { font: inherit; padding: 7px 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); border-radius: 6px; cursor: pointer; }
   #status { margin-top: 10px; min-height: 1.4em; }
+  a { color: var(--accent); margin-left: 8px; }
+  hr { border: 0; border-top: 1px solid var(--muted); margin: 12px 0; }
 </style>
 </head>
 <body>
 <h1>mai-tabs</h1>
+<section id="lib">
+<p id="libstate">탭 보관함: 확인 중</p>
+<button id="syncnow">지금 보내기</button> <a id="openlib" href="http://127.0.0.1:28766/" target="_blank" rel="noopener">보관함 열기</a>
+</section>
+<hr>
 <p>Saves every open tab to a JSON file. Query strings and fragments are removed from URLs. Nothing is sent anywhere and nothing is closed.</p>
 <button id="export">Export open tabs</button>
 <div id="status" role="status"></div>
 <script src="export.js"></script>
 <script src="popup.js"></script>
+<script src="popup-sync.js"></script>
 </body>
 </html>

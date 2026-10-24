@@ -1,6 +1,6 @@
 """Library server (DESIGN.md section 12.3). Two listeners, both on 127.0.0.1 only:
 
-  page port (default 28766), the one Tailscale Serve may expose to the owner's other devices
+  page port (default 28770), the one Tailscale Serve may expose to the owner's other devices
     GET  /  /app.js       the page
     GET  /api/view        the library, what is open now, recent actions with memory before and after
     POST /api/command     {action: open|sleep|close|dedupe, items: [ids], group: title, asleep: bool}
@@ -252,7 +252,7 @@ def handlers(app):
     return type('Page', (PageHandler,), {'app': app}), type('Ext', (ExtensionHandler,), {'app': app})
 
 
-def serve(port=28766, home=None, ready=None, ext_port=None):
+def serve(port=28770, home=None, ready=None, ext_port=None):
     app = App(library.Library(home))
     app.keep_measuring()
     page_h, ext_h = handlers(app)

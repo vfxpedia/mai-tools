@@ -32,7 +32,7 @@ def main(argv=None):
     c = sub.add_parser('check-rules'); c.add_argument('rules')
     v = sub.add_parser('verify', help='re-read a downloaded export and print what it contains, to compare with the popup message'); v.add_argument('export'); v.add_argument('--expect-tabs', type=int)
     s = sub.add_parser('serve', help='run the tab library on 127.0.0.1 (reach it from a phone through Tailscale Serve)')
-    s.add_argument('--port', type=int, default=28766, help='page port; the extension port is this plus one'); s.add_argument('--home', help='data folder (default ~/.mai/tabs or MAI_TABS_HOME)')
+    s.add_argument('--port', type=int, default=28770, help='page port; the extension port is this plus one'); s.add_argument('--home', help='data folder (default ~/.mai/tabs or MAI_TABS_HOME)')
     a = ap.parse_args(argv)
     if a.cmd == 'serve':
         from . import server

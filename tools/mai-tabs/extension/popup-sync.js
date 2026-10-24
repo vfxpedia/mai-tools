@@ -8,7 +8,7 @@
     var ago = Math.round((Date.now() - st.at) / 1000);
     el.textContent = st.ok
       ? '탭 보관함: ' + ago + ' 초 전에 보냄 · 탭 ' + st.counts.tabs + ' · 보관 ' + st.counts.stored + ' · 보관 안 함 ' + st.counts.not_stored
-      : '탭 보관함: 보내지 못함 (' + st.error + ') · 서버 http://127.0.0.1:28766 확인';
+      : '탭 보관함: 보내지 못함 (' + st.error + ') · 서버 http://127.0.0.1:28770 확인';
   }
 
   chrome.storage.local.get('status').then(function (d) { show(d.status); });

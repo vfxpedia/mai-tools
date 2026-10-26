@@ -392,6 +392,35 @@ class Keepalive(unittest.TestCase):
         st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=58), idle)
         self.assertEqual([i.split('|')[0] for _, _, i in sends], ['keep'])
 
+    def test_nudge_that_waited_past_five_minutes_is_dropped_and_decided_again(self):
+        st, idle = self.deferred()
+        hidden = {'a': {'text': idle['a'], 'prompt_trailing': 0}}
+        st, sends, logs = self.k(st, T0 + dt.timedelta(minutes=61), hidden)
+        self.assertEqual(sends, [])
+        self.assertTrue(any(l.startswith('DROP keep|') and 'waited 360 s' in l for l in logs), logs)
+        self.assertEqual(st['pending'], [])
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=62), idle)   # typing gone, still resting: a fresh nudge
+        self.assertEqual([i.split('|')[0] for _, _, i in sends], ['keep'])
+
+    # The site pane on 10/26 (names kept generic): a finished turn, then the gray suggestion in the prompt row.
+    SUGGESTION = '\n'.join(['✻ Baked for 4s · done 오전 7:10', 'context  ━━────────┃─  13% 128k/1.0M',
+                            '─────────────────────────────────────── site', '❯ #558 머지됐는지 확인해',
+                            '──────────────────────────────────────────', '  ⏵⏵ auto mode on (shift+tab to cycle)'])
+
+    def test_resting_pane_with_a_suggestion_gets_its_nudge(self):
+        at = dt.datetime(2026, 10, 19, 22, 11, tzinfo=UTC)               # 07:11 KST, a minute after the turn ended
+        scr = {'a': {'text': self.SUGGESTION, 'prompt_trailing': 0}}
+        st, _, _ = self.k({}, at, scr)
+        st, sends, _ = self.k(st, at + dt.timedelta(minutes=55), scr)
+        self.assertEqual([i.split('|')[0] for _, _, i in sends], ['keep'], '10/26: site waited all day behind this')
+
+    def test_a_suggestion_still_holds_back_warnings(self):
+        at = dt.datetime(2026, 10, 19, 22, 11, tzinfo=UTC)
+        scr = {'a': {'text': self.SUGGESTION, 'prompt_trailing': 0}}
+        st, sends, _ = core.tick({}, at, limits(94), [term('a')], scr, {}, local_tz=KST)
+        self.assertEqual(sends, [], 'warn and resume keep the old, careful rule for any visible text')
+        self.assertEqual([p['id'].split('|')[0] for p in st['pending']], ['warn'])
+
     def test_done_line_parsing(self):
         now = dt.datetime(2026, 10, 20, 3, 0, tzinfo=UTC)      # 12:00 KST
         self.assertEqual(core.screen_state('claude', '· done 오전 11:42', now, KST)['done_at'],

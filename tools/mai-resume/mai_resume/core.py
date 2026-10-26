@@ -54,6 +54,7 @@ FIXED_TZ = {'Asia/Seoul': 9, 'Asia/Tokyo': 9, 'UTC': 0, 'Etc/UTC': 0}   # used w
 DONE_KO = re.compile('·\\s*done\\s+(오전|오후)\\s*(\\d{1,2}):(\\d{2})')
 DONE_EN = re.compile(r'·\s*done\s+(\d{1,2}):(\d{2})\s*(am|pm)', re.I)
 CLAUDE_PLACEHOLDER = re.compile(r'^Try "[^"]*"$')
+MENU_ROW = re.compile(r'^\d+\.\s')
 SPINNER = re.compile(r'…\s*\(\d+(?:m \d+)?s|esc to interrupt|Compacting', re.I)
 CODEX_PLACEHOLDERS = ('ask codex to do anything', 'find and fix a bug', 'explain this codebase', 'summarize recent commits',
                       'implement {feature}', 'write tests for', 'improve documentation', 'run /review')
@@ -201,13 +202,15 @@ def _done_at(text, now, local_tz):
 
 def holds(mid, engine, ss):
     """Does this screen state hold back message `mid`? Used by tick and again by the runner right before typing.
-    A keep-alive is held by a working pane too, and on a resting Claude pane the gray suggestion shown after the marker
-    does not hold it (Orca hides real typed text, measured 10/20). Every other message waits on any visible text."""
-    if not mid.startswith('keep|'):
-        return ss['typing']
-    if ss['busy']:
+    Orca hides real typed text in a Claude prompt (measured 10/20: the row stays a bare marker and its trailing space
+    goes from 1 to 0), so text shown after the marker of a resting Claude pane is the gray suggestion and holds no
+    message: keep, warn and resume alike (owner 10/26 20:3x). Hidden typed text still holds every kind. A pane counts
+    as resting when it is not working and shows a finished turn or a limit hit; a numbered choice row (a permission
+    menu) is never a suggestion. A keep-alive is also held by a working pane."""
+    if mid.startswith('keep|') and ss['busy']:
         return True
-    if engine == 'claude' and ss['shown_text'] and ss['done_at']:
+    if (engine == 'claude' and ss['shown_text'] and not ss['busy'] and not ss.get('menu')
+            and (ss['done_at'] or ss['hit'])):
         return False
     return ss['typing']
 
@@ -249,11 +252,12 @@ def screen_state(engine, screen, now, local_tz=None):
     if engine == 'claude' and CLAUDE_PLACEHOLDER.match(typed):     # an empty prompt shows a hint: Try "fix typecheck errors"
         typed = ''
     shown = engine == 'claude' and bool(typed)   # text Orca shows after the Claude marker (typed text is hidden, 10/20)
+    menu = engine == 'claude' and bool(MENU_ROW.match(typed))   # '❯ 1. Yes' is a choice cursor, not a suggestion
     if engine == 'claude' and prompts and not typed and trailing == 0:
         typed = '(hidden typed text)'
     tail = '\n'.join(lines[-14:])
     return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(tail)), 'done_at': _done_at(tail, now, local_tz),
-            'shown_text': shown}
+            'shown_text': shown, 'menu': menu}
 
 
 def _fmt(cfg, kind, engine, window, pct, reset, now_local, note=''):
@@ -381,9 +385,8 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         # A keep-alive is true only for the idle moment it was decided in. If it waited (someone typing) and the pane is
         # now working, or finished a newer turn, it would land in the middle of work and read as an order to stop
         # (10/26: decided 15:46, delivered 16:13 into a working reviewer pane, which replied idle and stopped). Drop it.
-        typing = scr is None or screen_state(eng, scr, now)['typing']
-        if p['id'].startswith('keep|') and scr is not None:
-            ss = screen_state(eng, scr, now, local_tz)
+        ss = screen_state(eng, scr, now, local_tz) if scr is not None else None
+        if p['id'].startswith('keep|') and ss is not None:
             # owner 10/26: keep-alive only for a pane that is resting after a finished turn, never into work in progress,
             # and a nudge that waited longer than keepalive_stale_s is dropped so the next round decides afresh
             why = ('is working' if ss['busy'] else
@@ -395,10 +398,9 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
                 if why.startswith('waited'):   # still resting: let the next round decide again instead of waiting a period
                     st['keepalive'][p['handle']] = _iso(now - dt.timedelta(seconds=cfg['keepalive_s']))
                 continue
-            # Text shown after a resting Claude marker is the gray suggestion, not typing: Orca hides real typed text and
-            # only the trailing space of the row changes (measured 10/20). Only keep-alives use this; warn and resume
-            # still wait on any visible text. 10/26: site waited 17 times all day behind a suggestion.
-            typing = holds(p['id'], eng, ss)
+        # Text shown after a resting Claude marker is the gray suggestion, not typing (see holds). 10/26: site waited
+        # 17 times behind one for its keep-alive, and the owner saw a warning marked held behind one too.
+        typing = ss is None or holds(p['id'], eng, ss)
         if typing:
             if age > cfg['defer_give_up_s']:
                 logs.append('DROP %s (prompt busy with typed text for %d s)' % (p['id'], age))

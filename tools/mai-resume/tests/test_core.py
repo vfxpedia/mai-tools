@@ -414,12 +414,50 @@ class Keepalive(unittest.TestCase):
         st, sends, _ = self.k(st, at + dt.timedelta(minutes=55), scr)
         self.assertEqual([i.split('|')[0] for _, _, i in sends], ['keep'], '10/26: site waited all day behind this')
 
-    def test_a_suggestion_still_holds_back_warnings(self):
+    # owner 10/26 20:3x: a warning shown as held behind that same gray suggestion should have been sent. The rule is one
+    # for every kind now: on a resting Claude pane visible text is the suggestion; hidden typed text holds them all.
+    def test_a_suggestion_does_not_hold_back_warnings(self):
         at = dt.datetime(2026, 10, 19, 22, 11, tzinfo=UTC)
         scr = {'a': {'text': self.SUGGESTION, 'prompt_trailing': 0}}
-        st, sends, _ = core.tick({}, at, limits(94), [term('a')], scr, {}, local_tz=KST)
-        self.assertEqual(sends, [], 'warn and resume keep the old, careful rule for any visible text')
+        st, sends, _ = core.tick({}, at, limits(94, at=at, reset=at + dt.timedelta(hours=2)), [term('a')], scr, {},
+                                 local_tz=KST)
+        self.assertEqual([i.split('|')[0] for _, _, i in sends], ['warn'])
+        self.assertEqual(st['pending'], [])
+
+    def test_a_suggestion_does_not_hold_back_a_resume(self):
+        now = dt.datetime(2026, 10, 20, 9, 0, tzinfo=UTC)            # 18:00 in Seoul
+        hit = "x\n⎿  You've hit your session limit · resets 7:10pm (Asia/Seoul)\n❯ 이어서 진행해\n"
+        st, _, _ = tick({}, now, {}, [term('a')], {'a': {'text': hit, 'prompt_trailing': 1}})
+        st, sends, _ = tick(st, dt.datetime(2026, 10, 20, 10, 13, tzinfo=UTC), {}, [term('a')],
+                            {'a': {'text': hit, 'prompt_trailing': 1}})
+        self.assertEqual([i.split('|')[0] for _, _, i in sends], ['resume'])
+
+    def test_hidden_typed_text_holds_every_kind(self):
+        at = dt.datetime(2026, 10, 19, 22, 11, tzinfo=UTC)
+        bare = self.SUGGESTION.replace('#558 머지됐는지 확인해', '')
+        scr = {'a': {'text': bare, 'prompt_trailing': 0}}
+        for kind in ('keep', 'warn', 'resume'):
+            self.assertTrue(core.holds(kind + '|x', 'claude', core.screen_state('claude', scr['a'], at, KST)), kind)
+        st, sends, _ = core.tick({}, at, limits(94, at=at, reset=at + dt.timedelta(hours=2)), [term('a')], scr, {},
+                                 local_tz=KST)
+        self.assertEqual(sends, [])
         self.assertEqual([p['id'].split('|')[0] for p in st['pending']], ['warn'])
+
+    def test_suggestion_rule_by_kind(self):
+        at = dt.datetime(2026, 10, 19, 22, 11, tzinfo=UTC)
+        cases = {   # screen -> held? for keep, warn, resume
+            'suggestion on a resting pane': (self.SUGGESTION, 0, (False, False, False)),
+            'empty prompt on a resting pane': (self.SUGGESTION.replace('#558 머지됐는지 확인해', ''), 1,
+                                               (False, False, False)),
+            'hidden typed text': (self.SUGGESTION.replace('#558 머지됐는지 확인해', ''), 0, (True, True, True)),
+            'a permission menu': (self.SUGGESTION.replace('#558 머지됐는지 확인해', '1. Yes'), 1,
+                                  (True, True, True)),
+            'text with no finished turn': ('x\n❯ 한글 입력 중\n', None, (True, True, True)),
+        }
+        for name, (text, trailing, want) in cases.items():
+            ss = core.screen_state('claude', {'text': text, 'prompt_trailing': trailing}, at, KST)
+            got = tuple(core.holds(k + '|x', 'claude', ss) for k in ('keep', 'warn', 'resume'))
+            self.assertEqual(got, want, name)
 
     def test_done_line_parsing(self):
         now = dt.datetime(2026, 10, 20, 3, 0, tzinfo=UTC)      # 12:00 KST

@@ -1,0 +1,28 @@
+{
+ "what": "idle Codex pane with its placeholder (only the rows from the last turn end down; the output above was another project)",
+ "captured": "2026-10-27 01:0x KST",
+ "tail": [
+  "  Worked for 3m 57s • 12:49 AM",
+  "› Ask Codex to do anything",
+  "  GPT-6.1-Sol high · Context 26% left · weekly 72% left",
+  "  ? for shortcuts                                                                                                  ⚠ 4 warnings · f2 to view"
+ ],
+ "tailRows": [
+  {
+   "wrapped": false,
+   "trailingSpaces": 111
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  }
+ ]
+}

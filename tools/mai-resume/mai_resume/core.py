@@ -55,6 +55,9 @@ DONE_KO = re.compile('·\\s*done\\s+(오전|오후)\\s*(\\d{1,2}):(\\d{2})')
 DONE_EN = re.compile(r'·\s*done\s+(\d{1,2}):(\d{2})\s*(am|pm)', re.I)
 CLAUDE_PLACEHOLDER = re.compile(r'^Try "[^"]*"$')
 MENU_ROW = re.compile(r'^\d+\.\s')
+# a message sent while the pane works waits above the spinner with "ctrl+enter to send now" (seen 10/27); lead also saw
+# "Press up to edit queued messages" in the prompt row
+QUEUED = re.compile(r'^\s*ctrl\+enter to send now\s*$|Press up to edit queued messages', re.M)
 SPINNER = re.compile(r'…\s*\(\d+(?:m \d+)?s|esc to interrupt|Compacting', re.I)
 CODEX_PLACEHOLDERS = ('ask codex to do anything', 'find and fix a bug', 'explain this codebase', 'summarize recent commits',
                       'implement {feature}', 'write tests for', 'improve documentation', 'run /review')
@@ -202,16 +205,10 @@ def _done_at(text, now, local_tz):
 
 def holds(mid, engine, ss):
     """Does this screen state hold back message `mid`? Used by tick and again by the runner right before typing.
-    Orca hides real typed text in a Claude prompt (measured 10/20: the row stays a bare marker and its trailing space
-    goes from 1 to 0), so text shown after the marker of a resting Claude pane is the gray suggestion and holds no
-    message: keep, warn and resume alike (owner 10/26 20:3x). Hidden typed text still holds every kind. A pane counts
-    as resting when it is not working and shows a finished turn or a limit hit; a numbered choice row (a permission
-    menu) is never a suggestion. A keep-alive is also held by a working pane."""
+    Only real typing holds (see screen_state: hidden typed text or a choice menu, never text Orca shows after the
+    Claude marker), for keep, warn and resume alike (owner 10/26 20:3x). A keep-alive is also held by a working pane."""
     if mid.startswith('keep|') and ss['busy']:
         return True
-    if (engine == 'claude' and ss['shown_text'] and not ss['busy'] and not ss.get('menu')
-            and (ss['done_at'] or ss['hit'])):
-        return False
     return ss['typing']
 
 
@@ -231,8 +228,13 @@ def screen_state(engine, screen, now, local_tz=None):
     """{'hit': (what, reset) or None, 'typing': bool, 'busy': bool} read from the visible screen of a pane.
     `screen` is the screen text, or a dict {'text': ..., 'prompt_trailing': n} where n is the trailing-space count of the
     last prompt row. Orca's screen read does not show text typed but not yet submitted into a Claude prompt (measured
-    10/20: the row stays a bare marker), but that row's trailing space goes from 1 to 0 while text is there, so a bare
-    marker with 0 trailing spaces counts as typing."""
+    10/20, and again 10/27 on Claude Code 2.1.310 with Orca 1.4.241: the row stays a bare marker), but that row's
+    trailing space goes from 1 to 0 while text is there, so a bare marker with 0 trailing spaces counts as typing.
+    Text Orca does show after the Claude marker is never typing: a gray suggestion, the empty-prompt hint, or the queue
+    hint. Two bare-marker-0 cases are not typing either (real screens in tests/screens): the Try hint row of a new pane
+    (10/27 a fresh pane read as typing forever, send rc 4) and the prompt under a queued message, which Orca shows as
+    the same bare marker with 0 whether or not text is typed (sending there queues one more message, as the owner's own
+    Enter would). A numbered choice row ('❯ 1. Yes', a permission menu) is held as typing."""
     trailing = None
     if isinstance(screen, dict):
         trailing = screen.get('prompt_trailing')
@@ -249,15 +251,22 @@ def screen_state(engine, screen, now, local_tz=None):
     typed = prompts[-1] if prompts else ''
     if engine == 'codex' and typed.lower().startswith(CODEX_PLACEHOLDERS):
         typed = ''
-    if engine == 'claude' and CLAUDE_PLACEHOLDER.match(typed):     # an empty prompt shows a hint: Try "fix typecheck errors"
-        typed = ''
-    shown = engine == 'claude' and bool(typed)   # text Orca shows after the Claude marker (typed text is hidden, 10/20)
-    menu = engine == 'claude' and bool(MENU_ROW.match(typed))   # '❯ 1. Yes' is a choice cursor, not a suggestion
-    if engine == 'claude' and prompts and not typed and trailing == 0:
-        typed = '(hidden typed text)'
     tail = '\n'.join(lines[-14:])
+    menu = shown = queued = False
+    if engine == 'claude':
+        hint = bool(CLAUDE_PLACEHOLDER.match(typed))  # an empty prompt shows a hint: Try "fix typecheck errors"
+        queued = bool(QUEUED.search(tail))
+        # The input row sits in a box: the row right under it is a ──── rule (every real capture in tests/screens).
+        # A marker row outside that box is a choice cursor ('❯ 1. Yes', '❯ No, exit' in the folder trust dialog).
+        rows = [ln.strip() for ln in lines]
+        last = max((i for i, r in enumerate(rows) if r.startswith(mark)), default=None)
+        boxed = last is not None and last + 1 < len(rows) and rows[last + 1].startswith('─')
+        menu = bool(typed) and not hint and (bool(MENU_ROW.match(typed)) or not boxed)
+        shown = bool(typed) and not hint and not menu  # text Orca shows in the input row: suggestion or queue hint
+        hidden = bool(prompts) and not typed and trailing == 0 and not queued
+        typed = '(choice menu)' if menu else '(hidden typed text)' if hidden else ''
     return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(tail)), 'done_at': _done_at(tail, now, local_tz),
-            'shown_text': shown, 'menu': menu}
+            'shown_text': shown, 'menu': menu, 'queued': queued}
 
 
 def _fmt(cfg, kind, engine, window, pct, reset, now_local, note=''):

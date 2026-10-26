@@ -1,0 +1,58 @@
+{
+ "what": "same pane, text typed into the prompt but not sent",
+ "captured": "2026-10-27 01:0x KST",
+ "tail": [
+  " ▐▛███▛█   Claude Code v2.1.310",
+  "▝▜██████▀  Haiku 5.5 · Claude Max",
+  "context  ──────────┃─    -            … no reply yet                                                                                                                    [-]",
+  "5 hours  ━━━━━━━━╍╍╍╍  63% [~126%]    ✕ short, out in 1h8m",
+  "7 days   ━━━━━━╍╍╍╍╍╍  51% [>200%]    ✕ short, out in 1d1h",
+  "turn     -                 [$0.00]    … no turn yet",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "❯",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "  ⏵⏵ auto mode on (shift+tab to cycle)"
+ ],
+ "tailRows": [
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  }
+ ]
+}

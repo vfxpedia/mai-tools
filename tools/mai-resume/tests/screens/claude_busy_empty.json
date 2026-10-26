@@ -1,0 +1,78 @@
+{
+ "what": "same pane working on a turn, empty prompt",
+ "captured": "2026-10-27 01:0x KST",
+ "tail": [
+  " ▐▛███▛█   Claude Code v2.1.310",
+  "▝▜██████▀  Haiku 5.5 · Claude Max",
+  "❯ probe typed text (ignore that). Run the shell command: sleep 45 ; then reply with the single word ok.",
+  "● Sleeping 45 seconds",
+  "  ⎿  $ sleep 45",
+  "✶ Architecting… (7s · ↓ 81 tokens · thinking)",
+  "context  ━─────────┃─   8% 76.0k/1.0M ● compact at 85%                                                                                                                  [-]",
+  "5 hours  ━━━━━━━━╍╍╍╍  63% [~126%]    ✕ short, out in 1h8m",
+  "7 days   ━━━━━━╍╍╍╍╍╍  51% [>200%]    ✕ short, out in 1d1h",
+  "turn     $0.01             [$0.01]    ● 1 req · new 42.5k $0.01 · reads 33.5k $0.00 · out 81 $0.00",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "❯",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents"
+ ],
+ "tailRows": [
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 69
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 1
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  }
+ ]
+}

@@ -426,7 +426,7 @@ class Keepalive(unittest.TestCase):
 
     def test_a_suggestion_does_not_hold_back_a_resume(self):
         now = dt.datetime(2026, 10, 20, 9, 0, tzinfo=UTC)            # 18:00 in Seoul
-        hit = "x\n⎿  You've hit your session limit · resets 7:10pm (Asia/Seoul)\n❯ 이어서 진행해\n"
+        hit = "x\n⎿  You've hit your session limit · resets 7:10pm (Asia/Seoul)\n❯ 이어서 진행해\n────────────\n"
         st, _, _ = tick({}, now, {}, [term('a')], {'a': {'text': hit, 'prompt_trailing': 1}})
         st, sends, _ = tick(st, dt.datetime(2026, 10, 20, 10, 13, tzinfo=UTC), {}, [term('a')],
                             {'a': {'text': hit, 'prompt_trailing': 1}})

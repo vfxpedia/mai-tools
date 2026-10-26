@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- mai-resume: `fallback/limit_guard.py`, the first prototype kept as a Claude-only standby that sends nothing while mai-resume holds its lock port 127.0.0.1:28766 and takes over when the port is free. The check binds the port instead of connecting, because mai-resume listens with a backlog of one and never accepts, so connect probes time out while it is alive (measured 10/26). Example config, tests.
+
 - mai-resume: opens the codex gauge (`mai-codex-gauge watch --session <id>`) in a split next to each allow-listed codex pane that has none, once per pane incarnation; the session id comes from the gauge's own `~/.mai/sessions` files, a tab that already shows the gauge (title Mods or its rows in the preview) gets none, and a gauge pane the owner closes is not opened again.
 
 - mai-resume: right before typing, the guard also compares the prompt row with this round's first read; if it moved, someone is typing and the message waits a round (same rule as `send`).

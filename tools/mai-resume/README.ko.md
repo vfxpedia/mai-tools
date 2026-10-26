@@ -42,6 +42,14 @@ mai-resume status                    # 맥박 확인, 낡았으면 종료값 1
 
 설정 · 파일 · 시험 · 한계는 [README.md](README.md) 의 표와 같다.
 
+## 뒷받침 지킴이 (`fallback/limit_guard.py`, 10/26)
+
+이 지킴이의 첫 시제품을 Claude 세션용 대기 지킴이로 남긴 것이다. 같은 세 가지 (한도 전 멈춤 · 풀린 뒤 재개 · 캐시 유지) 를 보내지만 **mai-resume 가 돌지 않을 때만** 보낸다. 판마다 mai-resume 의 잠금 포트 `127.0.0.1:28766` 을 bind 해 보고, 이미 쓰는 중이면 아무것도 보내지 않고 경고 기록도 남기지 않는다 (로그에 `STANDBY` 한 줄). 비었으면 `ACTIVE` 를 남기고 맡는다. 한 창은 한 도구만: 같은 Claude 세션을 여기에는 대기로만 적는다.
+
+붙어 보는 (connect) 방식이 아니라 bind 로 본다. mai-resume 는 대기열 하나로 listen 하고 연결을 받지 않아서, 붙어 보기를 거듭하면 대기열이 차고 그 뒤로는 살아 있어도 시간 초과가 난다 (10/26 실측, `tests/test_fallback.py` 가 재현).
+
+설치 · 실행은 [README.md](README.md) 의 같은 절. 설정 예시 `fallback/config.example.json` (주간 98 %, `primary_lock_port` 0 이면 검사 안 함). Orca 실행 파일은 `ORCA_CLI_COMMAND`, 없으면 Windows 는 `%LOCALAPPDATA%\Programs\orca` 의 `orca.exe`, 그 밖은 `orca-ide` (Linux 의 맨 `orca` 는 GNOME 화면 낭독기).
+
 ## 보낼 창 목록 (10/20)
 
 `~/.mai/resume/targets.txt` 에 창 이름표를 한 줄에 하나씩 적는다 (`2580fc05` 처럼 앞부분만 적어도 되고 `#` 뒤는 메모). 판마다 다시 읽으므로 고친 뒤 재시작이 필요 없다. 파일이 있으면 적힌 창만 신호를 받고, 비어 있으면 아무 창도 받지 않는다. 파일이 없으면 모든 창을 보고 로그에 그렇게 적는다. 팀장이 더는 쓰지 않는 옛 세션이 재개 · 캐시 유지 신호를 받고 끝난 일을 다시 진행한 일 뒤에 생겼다. 재개 문구는 「멈춘 일만 이어 가고 끝났으면 대기」, 캐시 유지 문구는 「대기 한 단어 · 일을 시작하지 말 것」 이다.

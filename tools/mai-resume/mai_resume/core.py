@@ -40,7 +40,8 @@ DEFAULTS = {
         'resume': '[mai-resume {now}] The {engine} {window} limit has reset. Re-read your HANDOFF and the last '
                   'instruction and continue only work the limit stopped. If it was finished, start nothing and reply '
                   'with the single word idle.',
-        'keepalive': '[mai-resume {now}] Cache keep-alive. Reply with the single word idle. Do not start any work.',
+        'keepalive': '[mai-resume {now}] Cache keep-alive. If you are in the middle of work, carry on with it unchanged. '
+                     'If not, reply with the single word idle and start nothing new.',
     },
 }
 
@@ -361,6 +362,16 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         age = (now - _parse_iso(p['since'])).total_seconds()
         eng = next(s['engine'] for s in sessions if s['handle'] == p['handle'])
         scr = screens.get(p['handle'])
+        # A keep-alive is true only for the idle moment it was decided in. If it waited (someone typing) and the pane is
+        # now working, or finished a newer turn, it would land in the middle of work and read as an order to stop
+        # (10/26: decided 15:46, delivered 16:13 into a working reviewer pane, which replied idle and stopped). Drop it.
+        if p['id'].startswith('keep|') and scr is not None:
+            ss = screen_state(eng, scr, now, local_tz)
+            if ss['busy'] or (ss['done_at'] and ss['done_at'] > _parse_iso(p['since'])):
+                logs.append('DROP %s (keep-alive stale: pane %s since it was decided %d s ago)'
+                            % (p['id'], 'is working' if ss['busy'] else 'finished a newer turn', age))
+                st['sent'][p['id']] = _iso(now)
+                continue
         if scr is None or screen_state(eng, scr, now)['typing']:
             if age > cfg['defer_give_up_s']:
                 logs.append('DROP %s (prompt busy with typed text for %d s)' % (p['id'], age))

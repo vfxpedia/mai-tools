@@ -140,7 +140,9 @@ class WarnMore(unittest.TestCase):
         m = core.DEFAULTS['messages']
         self.assertNotIn('next task', m['resume'])
         self.assertIn('start nothing', m['resume'])
-        self.assertIn('Do not start any work', m['keepalive'])
+        self.assertIn('carry on with it unchanged', m['keepalive'])   # 10/26: never an order to stop work in progress
+        self.assertIn('start nothing new', m['keepalive'])
+        self.assertNotIn('Do not start any work', m['keepalive'])
 
     def test_only_and_exclude_filters(self):
         terms = [term('a'), term('b'), term('c')]
@@ -345,6 +347,50 @@ class Keepalive(unittest.TestCase):
         st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=55), typing)
         self.assertEqual(sends, [])
         self.assertEqual([p['id'].split('|')[0] for p in st['pending']], ['keep'])
+
+    # A working Claude pane's tail as Orca read it on 10/26 (super2 in the middle of a tool run), names removed.
+    WORKING_TAIL = '\n'.join([
+        '     2>/dev/null > "$S"; python - "$S" <<…',
+        '· Processing… (6m 43s · ↓ 14.0k tokens)',
+        'context  ━━━━━━────┃─  54% 521k/1.0M  ● compact in ~13 turns       [-]',
+        '5 hours  ━━━━━━━━────  68% [~70%]     ● enough (24m)',
+        'turn     $1.75             [$409.8]   ● 14 req · reads 7.2M',
+        '────────────────────────────────────────────────── pane ─',
+        '❯ ',
+        '──────────────────────────────────────────────────────────',
+        '  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent',
+    ]) + '\n'
+
+    def test_real_working_tail_reads_busy(self):
+        st = core.screen_state('claude', self.WORKING_TAIL, T0, KST)
+        self.assertEqual((st['busy'], st['typing'], st['done_at']), (True, False, None))
+
+    def deferred(self):
+        """10/26 shape: idle at +55 min, but text sits in the prompt, so the nudge waits in pending."""
+        idle = {'a': done_screen((T0 - dt.timedelta(minutes=1)).astimezone(KST))}
+        st, _, _ = self.k({}, T0, idle)
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=55), {'a': {'text': idle['a'], 'prompt_trailing': 0}})
+        self.assertEqual((sends, [p['id'].split('|')[0] for p in st['pending']]), ([], ['keep']))
+        return st, idle
+
+    def test_waiting_nudge_is_dropped_when_the_pane_is_now_working(self):
+        st, _ = self.deferred()
+        st, sends, logs = self.k(st, T0 + dt.timedelta(minutes=82), {'a': self.WORKING_TAIL})
+        self.assertEqual(sends, [], '10/26 15:46 -> 16:13: a nudge decided while idle must not land in work')
+        self.assertEqual(st['pending'], [])
+        self.assertTrue(any(l.startswith('DROP keep|') and 'is working' in l for l in logs), logs)
+
+    def test_waiting_nudge_is_dropped_after_a_newer_turn(self):
+        st, _ = self.deferred()
+        newer = {'a': done_screen((T0 + dt.timedelta(minutes=70)).astimezone(KST))}
+        st, sends, logs = self.k(st, T0 + dt.timedelta(minutes=72), newer)
+        self.assertEqual([i for _, _, i in sends if i.startswith('keep')], [])
+        self.assertTrue(any('finished a newer turn' in l for l in logs), logs)
+
+    def test_waiting_nudge_still_goes_when_the_pane_is_still_idle_on_the_same_turn(self):
+        st, idle = self.deferred()
+        st, sends, _ = self.k(st, T0 + dt.timedelta(minutes=58), idle)
+        self.assertEqual([i.split('|')[0] for _, _, i in sends], ['keep'])
 
     def test_done_line_parsing(self):
         now = dt.datetime(2026, 10, 20, 3, 0, tzinfo=UTC)      # 12:00 KST

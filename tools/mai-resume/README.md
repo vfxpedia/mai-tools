@@ -85,6 +85,29 @@ Everything lives in `~/.mai/resume/`: `config.json` (optional), `state.json`, `r
 `python -I tests/test_core.py` (decisions with known inputs) and `python -I tests/test_runner.py` (retry, one instance,
 restart alert, status, re-check before sending, with a fake Orca). Both run in `common/run_all_tests.py`.
 
+## Fallback guard (`fallback/limit_guard.py`)
+
+The first prototype of this guard, kept as a standby for Claude sessions. It sends the same three kinds of message
+(stop before the limit, resume after the reset, keep-alive) but **only while mai-resume is not running**: every round it
+tries to bind mai-resume's lock port `127.0.0.1:28766` and, if that port is already in use, it sends nothing and records
+no warning (one `STANDBY` line in its log). When the port is free it logs `ACTIVE` and takes over. One pane, one tool:
+list the same Claude sessions here only as the standby.
+
+It checks by binding, not by connecting: mai-resume listens with a backlog of one and never accepts, so connect probes
+fill the queue and then time out while mai-resume is alive (measured 10/26; `tests/test_fallback.py` reproduces it).
+
+```
+mkdir -p ~/.mai/limit-guard && cp tools/mai-resume/fallback/config.example.json ~/.mai/limit-guard/config.json   # then fill sessions
+python tools/mai-resume/fallback/limit_guard.py --once --dry     # one round, sends nothing
+python tools/mai-resume/fallback/limit_guard.py                  # loop every poll_s
+```
+
+Files: `~/.mai/limit-guard/config.json`, `state.json`, `guard.log`, keys as in `config.example.json`
+(`primary_lock_port` 0 turns the check off). The Orca CLI is `ORCA_CLI_COMMAND`, else `orca.exe` under
+`%LOCALAPPDATA%\Programs\orca` on Windows and `orca-ide` elsewhere (the bare `orca` on Linux is the GNOME screen reader).
+It reads Claude limits only and has no typing check of its own, which is why it stays silent while mai-resume runs.
+Tests: `python -I tests/test_fallback.py`.
+
 ## Known limits
 
 - The typing check reads one screen row; it was measured on Claude Code 2.1.303 in Orca 1.4.230. A different terminal

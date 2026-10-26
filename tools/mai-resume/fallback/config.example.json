@@ -1,0 +1,12 @@
+{
+  "warn_pct_five_hour": 93,
+  "warn_pct_seven_day": 98,
+  "resume_grace_s": 180,
+  "poll_s": 60,
+  "keepalive_s": 3300,
+  "primary_lock_port": 28766,
+  "sessions": {
+    "lead": "term_<orca terminal handle>",
+    "planner": "term_<orca terminal handle>"
+  }
+}

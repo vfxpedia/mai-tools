@@ -27,6 +27,7 @@ DEFAULTS = {
     'resume_grace_s': 180,
     'poll_s': 60,
     'defer_give_up_s': 1800,       # a message that could not be delivered for this long is dropped (and logged)
+    'keepalive_stale_s': 300,      # a keep-alive not delivered within this is dropped; the next round decides afresh (owner 10/26)
     'keepalive_s': 3300,           # nudge an idle Claude session this often so its prompt cache (1 h) survives; 0 = off
     'engines': {'claude': {'account': 'default'}, 'codex': {'account_prefix': 'codex:'}},
     'messages': {
@@ -40,7 +41,8 @@ DEFAULTS = {
         'resume': '[mai-resume {now}] The {engine} {window} limit has reset. Re-read your HANDOFF and the last '
                   'instruction and continue only work the limit stopped. If it was finished, start nothing and reply '
                   'with the single word idle.',
-        'keepalive': '[mai-resume {now}] Cache keep-alive. Reply with the single word idle. Do not start any work.',
+        'keepalive': '[mai-resume {now}] Cache keep-alive. If you are in the middle of work, carry on with it unchanged. '
+                     'If not, reply with the single word idle and start nothing new.',
     },
 }
 
@@ -233,10 +235,12 @@ def screen_state(engine, screen, now, local_tz=None):
         typed = ''
     if engine == 'claude' and CLAUDE_PLACEHOLDER.match(typed):     # an empty prompt shows a hint: Try "fix typecheck errors"
         typed = ''
+    shown = engine == 'claude' and bool(typed)   # text Orca shows after the Claude marker (typed text is hidden, 10/20)
     if engine == 'claude' and prompts and not typed and trailing == 0:
         typed = '(hidden typed text)'
     tail = '\n'.join(lines[-14:])
-    return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(tail)), 'done_at': _done_at(tail, now, local_tz)}
+    return {'hit': hit, 'typing': bool(typed), 'busy': bool(SPINNER.search(tail)), 'done_at': _done_at(tail, now, local_tz),
+            'shown_text': shown}
 
 
 def _fmt(cfg, kind, engine, window, pct, reset, now_local, note=''):
@@ -361,7 +365,29 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
         age = (now - _parse_iso(p['since'])).total_seconds()
         eng = next(s['engine'] for s in sessions if s['handle'] == p['handle'])
         scr = screens.get(p['handle'])
-        if scr is None or screen_state(eng, scr, now)['typing']:
+        # A keep-alive is true only for the idle moment it was decided in. If it waited (someone typing) and the pane is
+        # now working, or finished a newer turn, it would land in the middle of work and read as an order to stop
+        # (10/26: decided 15:46, delivered 16:13 into a working reviewer pane, which replied idle and stopped). Drop it.
+        typing = scr is None or screen_state(eng, scr, now)['typing']
+        if p['id'].startswith('keep|') and scr is not None:
+            ss = screen_state(eng, scr, now, local_tz)
+            # owner 10/26: keep-alive only for a pane that is resting after a finished turn, never into work in progress,
+            # and a nudge that waited longer than keepalive_stale_s is dropped so the next round decides afresh
+            why = ('is working' if ss['busy'] else
+                   'finished a newer turn' if ss['done_at'] and ss['done_at'] > _parse_iso(p['since']) else
+                   'waited %d s' % age if age > cfg['keepalive_stale_s'] else None)
+            if why:
+                logs.append('DROP %s (keep-alive stale: pane %s since it was decided)' % (p['id'], why))
+                st['sent'][p['id']] = _iso(now)
+                if why.startswith('waited'):   # still resting: let the next round decide again instead of waiting a period
+                    st['keepalive'][p['handle']] = _iso(now - dt.timedelta(seconds=cfg['keepalive_s']))
+                continue
+            # Text shown after a resting Claude marker is the gray suggestion, not typing: Orca hides real typed text and
+            # only the trailing space of the row changes (measured 10/20). Only keep-alives use this; warn and resume
+            # still wait on any visible text. 10/26: site waited 17 times all day behind a suggestion.
+            if eng == 'claude' and ss['shown_text'] and ss['done_at'] and not ss['busy']:
+                typing = False
+        if typing:
             if age > cfg['defer_give_up_s']:
                 logs.append('DROP %s (prompt busy with typed text for %d s)' % (p['id'], age))
                 st['sent'][p['id']] = _iso(now)   # given up for good: without this step 1 queued it again (10/20 12:27, 13:07)

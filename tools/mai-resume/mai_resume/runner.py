@@ -173,23 +173,27 @@ def round_once(orca, state, cfg, limits_path, now, log, dry=False):
         except (RuntimeError, OSError, subprocess.SubprocessError) as e:
             log('READ failed %s %s' % (s['handle'], e))        # unread pane: nothing is typed into it this round
     limits = load_json(limits_path, {})
+    # a message put back keeps the time it was first queued, so its age (keepalive_stale_s, defer_give_up_s) keeps counting
+    # (10/26: re-queued with "now" every round, a keep-alive never aged and waited 15 rounds behind a suggestion)
+    first = {p['id']: p['since'] for p in (state.get('pending') or [])}
     new, sends, lines = core.tick(state, now, limits, terminals, screens, cfg)
     for ln in lines:
         log(ln)
     engines = {s['handle']: s['engine'] for s in sessions}
     for handle, text, mid in sends:
+        since = first.get(mid, core._iso(now))
         try:                                                     # look again right before typing: someone may have started
             fresh = orca.screen(handle)
             eng = engines.get(handle, 'claude')
             # typing now: the prompt row changed since this round's first read (lead 10/20, same rule as `send`)
-            late = core.screen_state(eng, fresh, now)['typing'] or (
+            late = core.holds(mid, eng, core.screen_state(eng, fresh, now)) or (
                 handle in screens and core.prompt_key(eng, screens[handle]) != core.prompt_key(eng, fresh))
         except (RuntimeError, OSError, subprocess.SubprocessError):
             late = True
         if late:
             log('DEFER %s (prompt holds text right before sending)' % mid)
             new['sent'].pop(mid, None)
-            new['pending'].append({'handle': handle, 'text': text, 'id': mid, 'since': core._iso(now)})
+            new['pending'].append({'handle': handle, 'text': text, 'id': mid, 'since': since})
             continue
         if dry:
             log('DRY send %s %s: %s' % (handle, mid, text[:100]))
@@ -202,7 +206,7 @@ def round_once(orca, state, cfg, limits_path, now, log, dry=False):
         log('SEND %s %s accepted=%s' % (handle, mid, ok))
         if not ok:                                               # undo, so the next round tries again
             new['sent'].pop(mid, None)
-            new['pending'].append({'handle': handle, 'text': text, 'id': mid, 'since': core._iso(now)})
+            new['pending'].append({'handle': handle, 'text': text, 'id': mid, 'since': since})
     new['sessions'] = len(sessions)
     new['companions'] = dict(state.get('companions') or {})   # tick keeps only its own keys
     attach_companions(orca, new, cfg, terminals, sessions, log, dry)

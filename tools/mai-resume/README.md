@@ -30,7 +30,10 @@ Every minute (`poll_s`) it:
    leaves after a turn and no progress mark. A working session keeps its own cache, so its clock just restarts; any
    warning or resume message also counts as a nudge. No nudge while a limit window is held (warned, before the resume)
    or the pane shows the limit line: requests are refused then, so a nudge keeps no cache and only spends the limit.
-   A pane seen for the first time only starts its clock.
+   A pane seen for the first time only starts its clock. A nudge that had to wait (text in the prompt) is dropped when
+   the pane is working by the time it could go, or has finished a newer turn: it was true only for the idle moment it
+   was decided in (10/26: one waited 27 minutes and landed in a working session, which read it as a stop). The text
+   says to carry on with work in progress and reply idle only when there is none.
 
 ## Delivery rules
 

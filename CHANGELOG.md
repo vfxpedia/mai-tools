@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- mai-resume: a keep-alive that waited in pending (text in the prompt) is dropped when the pane is working by the time it could go, or has finished a newer turn since it was decided. On 10/26 one decided at 15:46 went in at 16:13 into a working session, which answered idle and stopped. The default keep-alive text now says to carry on with work in progress and reply idle only when there is none.
+
 - mai-resume: `fallback/limit_guard.py`, the first prototype kept as a Claude-only standby that sends nothing while mai-resume holds its lock port 127.0.0.1:28766 and takes over when the port is free. The check binds the port instead of connecting, because mai-resume listens with a backlog of one and never accepts, so connect probes time out while it is alive (measured 10/26). Example config, tests.
 
 - mai-resume: opens the codex gauge (`mai-codex-gauge watch --session <id>`) in a split next to each allow-listed codex pane that has none, once per pane incarnation; the session id comes from the gauge's own `~/.mai/sessions` files, a tab that already shows the gauge (title Mods or its rows in the preview) gets none, and a gauge pane the owner closes is not opened again.

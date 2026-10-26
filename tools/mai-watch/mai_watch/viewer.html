@@ -142,9 +142,16 @@
   .page-fold > summary { display: none; }
   .limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 8px 22px; margin-bottom: 10px; }
   .limit-name { font-weight: 600; }
+  .att-caret { display: none; }
   @media (max-width: 1200px) {
     .overview { grid-template-columns: minmax(0, 1fr); }
     .gpus, .attention { grid-column: auto; }
+    /* one column: Now · soon and its warnings first, then the GPUs; the warnings fold under the line (owner 10/26) */
+    .attention { order: -1; }
+    .attention-toggle { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+    .attention-toggle:focus-visible { outline: 2px solid var(--bar); outline-offset: 2px; }
+    .att-caret { display: inline; }
+    .attention.collapsed .attention-rows { display: none; }
     .attention-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 900px) {
@@ -214,7 +221,7 @@
       <label>Emphasis <select id="view-focus"><option value="balanced">Balanced</option><option value="cpu">CPU</option><option value="gpu">GPU</option><option value="ai">AI limits</option></select></label>
       <label><input type="checkbox" id="expand-tables"> Expand supporting tables on mobile</label>
       <button type="button" id="diagnostic-download">Download safe diagnostics</button><span id="diagnostic-result" class="quiet" role="status"></span>
-      <p class="quiet">Settings stay in this browser. Warnings, GPUs and limit summaries always remain visible. Graphs show only retained measurements, not invented history.</p>
+      <p class="quiet">Settings stay in this browser. The warning count, GPUs and limit summaries always remain visible; on a narrow screen the warning rows open with a tap on the count line. Graphs show only retained measurements, not invented history.</p>
     </details><div id="live"></div></section>
   <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
   <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>

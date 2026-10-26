@@ -246,6 +246,16 @@ class LiveViewTests(unittest.TestCase):
         self.assertGreaterEqual(len(relevant), 5)
         self.assertTrue(all(not n['closed'] for n in relevant), relevant)
 
+    def test_attention_rows_start_folded_under_a_toggle_line(self):
+        # owner 10/26: on the phone the Now · soon line comes first and its warning rows open only on a tap
+        nodes = self.render([])
+        box = [n for n in nodes if n['cls'].startswith('attention ') or n['cls'] == 'attention']
+        self.assertEqual(['attention collapsed'], [n['cls'] for n in box])
+        toggle = [n for n in nodes if 'attention-toggle' in n['cls']]
+        self.assertEqual(1, len(toggle))
+        self.assertTrue(any(n['cls'] == 'att-caret quiet' and 'show' in n['text'] for n in nodes))
+        self.assertTrue(any(n['cls'] == 'attention-rows' for n in nodes))  # rows still in the page for the wide layout
+
     def test_failed_query_stays_unknown_but_filtered_empty_is_not_proof_of_no_training(self):
         self.assertTrue(any('Process list unknown' in n['text'] for n in self.render(None)))
         nodes = self.render([{'process': 'desktop.exe', 'vram_mib': None}])

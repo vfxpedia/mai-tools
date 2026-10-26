@@ -108,6 +108,24 @@
     var bar = el('div', undefined, 'attention-summary');
     bar.appendChild(el('strong', 'Now ' + bad + ' · soon ' + warn));
     if (!list.length) { bar.appendChild(el('span', ' · all clear', 'quiet')); box.appendChild(bar); return box; }
+    // On the one-column (phone) layout the rows fold under this line: closed until tapped, tap again to close (owner 10/26).
+    // The wide layout ignores the fold (CSS); the choice lives in state.open so the 1 s redraw keeps it.
+    var open = !!state.open['attention-rows'];
+    box.className = 'attention' + (open ? ' expanded' : ' collapsed');
+    bar.className = 'attention-summary attention-toggle';
+    bar.setAttribute('role', 'button');
+    bar.setAttribute('tabindex', '0');
+    bar.setAttribute('aria-expanded', open ? 'true' : 'false');
+    bar.appendChild(el('span', open ? ' ▾ hide' : ' ▸ show ' + list.length, 'att-caret quiet'));
+    function toggle() {
+      state.open['attention-rows'] = !state.open['attention-rows'];
+      var now = state.open['attention-rows'];
+      box.className = 'attention' + (now ? ' expanded' : ' collapsed');
+      bar.setAttribute('aria-expanded', now ? 'true' : 'false');
+      bar.lastChild.textContent = now ? ' ▾ hide' : ' ▸ show ' + list.length;
+    }
+    bar.addEventListener('click', toggle);
+    bar.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
     var rows = el('div', undefined, 'attention-rows');
     list.forEach(function (f) {
       var row = el('div', undefined, 'att-row lvl-' + f.level);

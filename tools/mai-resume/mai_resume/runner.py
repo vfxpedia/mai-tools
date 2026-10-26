@@ -84,14 +84,7 @@ class Orca:
 
     def screen(self, handle):
         """{'text': screen text, 'prompt_trailing': trailing spaces of the last prompt row} (see core.screen_state)."""
-        t = self._run(['terminal', 'read', '--terminal', handle, '--screen']).get('terminal') or {}
-        lines, rows = t.get('tail') or [], t.get('tailRows') or []
-        trailing = None
-        for i in range(len(lines) - 1, -1, -1):
-            if lines[i].strip().startswith(('\u276f', '\u203a')):
-                trailing = (rows[i] or {}).get('trailingSpaces') if i < len(rows) and isinstance(rows[i], dict) else None
-                break
-        return {'text': '\n'.join(lines), 'prompt_trailing': trailing}
+        return screen_of(self._run(['terminal', 'read', '--terminal', handle, '--screen']).get('terminal') or {})
 
     def split(self, handle, command):
         # 'horizontal' puts the new pane UNDER the chat (checked on screen 10/20). The gauge goes below, never beside
@@ -103,6 +96,18 @@ class Orca:
         r = self._run(['terminal', 'send', '--terminal', handle, '--text', core.one_line(text), '--enter'])
         s = r.get('send') or {}
         return bool(s.get('accepted'))
+
+
+def screen_of(t):
+    """The `terminal` object of `orca terminal read --screen --json` as core.screen_state reads it. Kept apart from Orca
+    so the tests feed it real captured screens (tests/screens)."""
+    lines, rows = t.get('tail') or [], t.get('tailRows') or []
+    trailing = None
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].strip().startswith(('❯', '›')):
+            trailing = (rows[i] or {}).get('trailingSpaces') if i < len(rows) and isinstance(rows[i], dict) else None
+            break
+    return {'text': '\n'.join(lines), 'prompt_trailing': trailing}
 
 
 def notify(cfg, text, log):

@@ -266,7 +266,7 @@ class KeepAliveDelivery(unittest.TestCase):
     """10/26 after the restart: the core let a keep-alive through for a resting pane with a gray suggestion, but the
     runner's last look still read the suggestion as typing and put it back with a fresh time, every round."""
     # T0 = 09:00 KST; the turn ended 07:59, before the keep-alive clock; the prompt row shows a suggestion (trailing 0, as Orca reads it)
-    SUGGEST = {'a': {'text': '✻ Baked for 4s · done 오전 7:59\n❯ #558 머지됐는지 확인해\n', 'prompt_trailing': 0}}
+    SUGGEST = {'a': {'text': '✻ Baked for 4s · done 오전 7:59\n❯ #558 머지됐는지 확인해\n────────────\n', 'prompt_trailing': 0}}
 
     def setUp(self):
         self.d = tempfile.mkdtemp()

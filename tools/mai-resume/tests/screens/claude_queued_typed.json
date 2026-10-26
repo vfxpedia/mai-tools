@@ -1,0 +1,88 @@
+{
+ "what": "working, one queued message, and text typed into the prompt",
+ "captured": "2026-10-27 01:0x KST",
+ "tail": [
+  "❯ Run this in the foreground with the Bash tool, never in the background: python -c \"import time; time.sleep(90)\" . Then reply ok.",
+  "  Sleeping 90 seconds in foreground via Python · 33s",
+  "  ⎿  $ python -c \"import time; time.sleep(90)\" (33s)",
+  "     (ctrl+b to run in background)",
+  "❯ second queued probe, reply ok2",
+  "  ctrl+enter to send now",
+  "· Working… (37s · ↓ 362 tokens)",
+  "context  ━─────────┃─   8% 77.3k/1.0M ● compact at 85%                                                                                                                  [-]",
+  "5 hours  ━━━━━━━━╍╍╍╍  63% [~124%]    ✕ short, out in 1h10m",
+  "7 days   ━━━━━━╍╍╍╍╍╍  51% [>200%]    ✕ short, out in 1d1h",
+  "turn     -                 [$0.01]    … no turn yet",
+  "now      Bash python -c \"import time; time.sleep(90)\" · progress sleep 45",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "❯",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "  ⏵⏵ auto mode on (shift+tab to cycle)"
+ ],
+ "tailRows": [
+  {
+   "wrapped": false,
+   "trailingSpaces": 42
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 140
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  }
+ ]
+}

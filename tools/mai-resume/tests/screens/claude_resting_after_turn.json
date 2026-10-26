@@ -1,0 +1,88 @@
+{
+ "what": "resting after finished turns, empty prompt",
+ "captured": "2026-10-27 01:0x KST",
+ "tail": [
+  "● The harness blocked a foreground sleep, so I'll run it as a background command, which the block message suggests for waiting.",
+  "  Ran 1 shell command",
+  "● The 45-second sleep is running in the background. I'll reply ok when it finishes.",
+  "✻ Cooked for 14s · done 오전 1:02 · 1 shell still running",
+  "❯ queued probe message, reply ok",
+  "● ok",
+  "✻ Brewed for 2s · done 오전 1:02 · 1 shell still running",
+  "context  ━─────────┃─   8% 77.1k/1.0M ● compact at 85%                                                                                                                  [-]",
+  "5 hours  ━━━━━━━━╍╍╍╍  63% [~126%]    ✕ short, out in 1h8m",
+  "7 days   ━━━━━━╍╍╍╍╍╍  51% [>200%]    ✕ short, out in 1d1h",
+  "turn     $0.00             [$0.01]    ● 1 req · reads 77.0k $0.00 · out 119 $0.00 · new 70 $0.00",
+  "now      progress sleep 45",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "❯",
+  "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+  "  ⏵⏵ auto mode on · 1 shell · ← 2 agents"
+ ],
+ "tailRows": [
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 1
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 140
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 1
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  },
+  {
+   "wrapped": false,
+   "trailingSpaces": 0
+  }
+ ]
+}

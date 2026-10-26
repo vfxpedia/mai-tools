@@ -281,10 +281,16 @@ class KeepAliveDelivery(unittest.TestCase):
         self.assertNotIn('DEFER', rt(os.path.join(self.d, 'resume.log')))
 
     def test_a_put_back_message_keeps_its_first_time_and_ages_out(self):
-        class Hidden(FakeOrca):              # someone really typing: bare marker, trailing 0, on every read
+        # The round's first read looks empty, the runner's second look finds hidden typed text: the runner puts the
+        # message back, every round. Its queue time must stay, so the core drops it after keepalive_stale_s.
+        class LookTwice(FakeOrca):
+            reads = 0
+
             def screen(self, handle):
-                return {'text': '✻ Baked for 4s · done 오전 7:59\n❯\n', 'prompt_trailing': 0}
-        orca = Hidden(TERMS, {})
+                self.reads += 1
+                trailing = 1 if self.reads % 2 else 0
+                return {'text': '✻ Baked for 4s · done 오전 7:59\n❯\n', 'prompt_trailing': trailing}
+        orca = LookTwice(TERMS, {})
         st = runner.round_once(orca, {'keepalive': {'a': core._iso(T0 - dt.timedelta(minutes=56))}},
                                core.merged({}), self.lim, T0, self.log)
         first = [p['since'] for p in st['pending']]

@@ -262,6 +262,40 @@ class Splitter(FakeOrca):
         return True
 
 
+class KeepAliveDelivery(unittest.TestCase):
+    """10/26 after the restart: the core let a keep-alive through for a resting pane with a gray suggestion, but the
+    runner's last look still read the suggestion as typing and put it back with a fresh time, every round."""
+    # T0 = 09:00 KST; the turn ended 07:59, before the keep-alive clock; the prompt row shows a suggestion (trailing 0, as Orca reads it)
+    SUGGEST = {'a': {'text': '✻ Baked for 4s · done 오전 7:59\n❯ #558 머지됐는지 확인해\n', 'prompt_trailing': 0}}
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.lim = limits_file(self.d, 10)
+        self.log = runner.Log(os.path.join(self.d, 'resume.log'))
+
+    def test_resting_pane_with_a_suggestion_gets_the_keepalive_in_one_round(self):
+        orca = FakeOrca(TERMS, self.SUGGEST)
+        state = {'keepalive': {'a': core._iso(T0 - dt.timedelta(minutes=56))}}
+        runner.round_once(orca, state, core.merged({}), self.lim, T0, self.log)
+        self.assertEqual([h for h, _ in orca.sent], ['a'])
+        self.assertNotIn('DEFER', rt(os.path.join(self.d, 'resume.log')))
+
+    def test_a_put_back_message_keeps_its_first_time_and_ages_out(self):
+        class Hidden(FakeOrca):              # someone really typing: bare marker, trailing 0, on every read
+            def screen(self, handle):
+                return {'text': '✻ Baked for 4s · done 오전 7:59\n❯\n', 'prompt_trailing': 0}
+        orca = Hidden(TERMS, {})
+        st = runner.round_once(orca, {'keepalive': {'a': core._iso(T0 - dt.timedelta(minutes=56))}},
+                               core.merged({}), self.lim, T0, self.log)
+        first = [p['since'] for p in st['pending']]
+        st = runner.round_once(orca, st, core.merged({}), self.lim, T0 + dt.timedelta(minutes=1), self.log)
+        self.assertEqual(first, [p['since'] for p in st['pending']], 'the queue time must not move')
+        st = runner.round_once(orca, st, core.merged({}), self.lim, T0 + dt.timedelta(minutes=6), self.log)
+        self.assertEqual(st['pending'], [])
+        self.assertIn('keep-alive stale: pane waited', rt(os.path.join(self.d, 'resume.log')))
+        self.assertEqual(orca.sent, [])
+
+
 def cx(handle, tab, inc='i1', title=None):
     return {'handle': handle, 'agentIdentity': 'codex', 'connected': True, 'writable': True, 'tabId': tab,
             'incarnationId': inc, 'title': title or handle}

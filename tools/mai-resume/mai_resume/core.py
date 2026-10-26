@@ -199,6 +199,19 @@ def _done_at(text, now, local_tz):
     return t
 
 
+def holds(mid, engine, ss):
+    """Does this screen state hold back message `mid`? Used by tick and again by the runner right before typing.
+    A keep-alive is held by a working pane too, and on a resting Claude pane the gray suggestion shown after the marker
+    does not hold it (Orca hides real typed text, measured 10/20). Every other message waits on any visible text."""
+    if not mid.startswith('keep|'):
+        return ss['typing']
+    if ss['busy']:
+        return True
+    if engine == 'claude' and ss['shown_text'] and ss['done_at']:
+        return False
+    return ss['typing']
+
+
 def prompt_key(engine, screen):
     """(last prompt row text, its trailing spaces): two reads of a pane whose keys differ mean someone is typing now."""
     trailing = None
@@ -385,8 +398,7 @@ def tick(state, now, limits, terminals, screens, cfg, local_tz=None):
             # Text shown after a resting Claude marker is the gray suggestion, not typing: Orca hides real typed text and
             # only the trailing space of the row changes (measured 10/20). Only keep-alives use this; warn and resume
             # still wait on any visible text. 10/26: site waited 17 times all day behind a suggestion.
-            if eng == 'claude' and ss['shown_text'] and ss['done_at'] and not ss['busy']:
-                typing = False
+            typing = holds(p['id'], eng, ss)
         if typing:
             if age > cfg['defer_give_up_s']:
                 logs.append('DROP %s (prompt busy with typed text for %d s)' % (p['id'], age))

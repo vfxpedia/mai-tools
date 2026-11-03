@@ -112,7 +112,7 @@
 
   tabs.forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-tab')); }); });
   // the tab exists only when the server has a board; a 404 keeps the page exactly as it was
-  root.MaiWatchConnection.read('gpu_jobs.json', 'json').then(function () {
+  root.MaiWatchConnection.read('gpu_jobs.json?probe=1', 'json').then(function () {
     $('tab-gpu').hidden = false; $('tabs').hidden = false;
     var want = /gpu/.test(root.location.hash) ? 'gpu' : null;
     if (!want) { try { want = root.localStorage.getItem('mai-watch-tab'); } catch (_) { want = null; } }

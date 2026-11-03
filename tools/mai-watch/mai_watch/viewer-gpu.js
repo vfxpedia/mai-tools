@@ -54,7 +54,7 @@
       d.entries.forEach(function (e) {
         var tr = el('tr');
         tr.appendChild(el('td', String(e.n), 'quiet'));
-        var st = el('td'); st.appendChild(el('span', e.state, 'pill ' + (STATE_CLASS[e.state] || ''))); tr.appendChild(st);
+        var st = el('td'); st.appendChild(el('span', e.state, 'pill ' + (STATE_CLASS[String(e.state).split(' ')[0]] || ''))); tr.appendChild(st);
         [e.gpu, e.priority, e.start, e.end, e.launcher].forEach(function (v) { tr.appendChild(el('td', v)); });
         tr.appendChild(el('td', e.title, 'job-title'));
         t.appendChild(tr);

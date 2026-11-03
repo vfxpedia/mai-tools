@@ -202,6 +202,59 @@
     header, main { padding-left: 16px; padding-right: 16px; }
     .device { grid-template-columns: 1fr; }
   }
+
+  /* tabs (owner 11/03): Resources and, when the server has a board, GPU 작업 */
+  .tabs { display: flex; gap: 4px; padding: 0 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .tabs button { min-height: 40px; padding: 6px 14px; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; font: inherit; font-weight: 600; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--bar); }
+  .tabs button:focus-visible { outline: 2px solid var(--bar); outline-offset: -2px; }
+  #gpu-section { display: none; }
+  body[data-tab="gpu"] #gpu-section { display: block; }
+  body[data-tab="gpu"] #live-section, body[data-tab="gpu"] .page-fold, body[data-tab="gpu"] #alerts { display: none !important; }
+  .job-gpus { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 12px; margin-bottom: 18px; }
+  .job-gpu { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .job-gpu h3 { margin: 0 0 2px; font-size: 15px; }
+  .job-now { font-weight: 700; overflow-wrap: anywhere; }
+  .job-line { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .job-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .job-bar .meter { width: 100%; height: 10px; }
+  .job-table td.job-title { min-width: 14rem; }
+  .job-table .pill { padding: 0 8px; }
+  .job-table tr.job-title-row { display: none; }
+  .job-note { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  .job-warn { padding: 8px 12px; border-radius: 6px; border-left: 5px solid var(--bad); background: var(--bad-bg); font-weight: 600; overflow-wrap: anywhere; margin-bottom: 6px; }
+  .off { color: var(--muted); background: var(--bg); }
+  /* AI sessions (owner 11/03 bug): "doing" was the last column, squeezed to a few characters by the nowrap columns, so every row grew
+     very tall. It now has its own full-width line under each session. */
+  table.session-table tr.session-row td { border-bottom: 0; padding-bottom: 0; }
+  table.session-table tr.session-doing td { white-space: normal; overflow-wrap: anywhere; padding-top: 1px; padding-bottom: 6px; }
+  .session-doing-label { color: var(--muted); font-weight: 600; margin-right: 10px; }
+  /* narrow screens at 100 % (owner 11/03): keep the two-up layout the owner sees at 75 % zoom, CPU next to RAM and Claude next to Codex,
+     with smaller type and gaps instead of one long column */
+  @media (max-width: 560px) {
+    body { font-size: 13px; line-height: 1.4; }
+    .tabs { padding: 0 10px; }
+    h2 { font-size: 14px; }
+    .host-band { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+    .host-card, .io { padding: 7px 8px; }
+    .host-title { font-size: 13px; }
+    .tile-big { font-size: 18px; }
+    .spark.host-graph { height: 28px; }
+    .cores { height: 64px; flex-basis: 64px; }
+    .host-card table.compact { font-size: 11px; table-layout: fixed; }
+    .host-card table.compact td, .host-card table.compact th { padding-right: 4px; overflow: hidden; text-overflow: ellipsis; }
+    .host-card table.compact th:first-child, .host-card table.compact td:first-child { width: 52%; }
+    .host-card .quiet { font-size: 11px; }
+    .usage-highlights { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .usage-highlight { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 6px 8px; }
+    .gpu-row { gap: 5px; padding: 8px; }
+    .num-big { font-size: 22px; }
+    .job-gpu { padding: 9px 10px; }
+    .job-table .job-title { display: none; }
+    .job-table tr:not(.job-title-row) td { border-bottom: 0; padding-bottom: 0; }
+    .job-table tr.job-title-row { display: table-row; }
+    .job-table tr.job-title-row td { white-space: normal; overflow-wrap: anywhere; padding-top: 1px; padding-bottom: 6px; }
+  }
 </style>
 </head>
 <body>
@@ -212,6 +265,7 @@
   <span id="generated" class="mono"></span>
   <div class="header-actions"><button id="refresh" type="button" title="Reload this page, not the collector" aria-label="Reload page">↻ Reload</button><button id="theme" type="button" aria-label="Change color theme">Theme: System</button></div>
 </header>
+<nav id="tabs" class="tabs" hidden><button type="button" data-tab="live" aria-selected="true">Resources</button><button type="button" id="tab-gpu" data-tab="gpu" aria-selected="false" hidden>GPU 작업</button></nav>
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
@@ -223,6 +277,7 @@
       <button type="button" id="diagnostic-download">Download safe diagnostics</button><span id="diagnostic-result" class="quiet" role="status"></span>
       <p class="quiet">Settings stay in this browser. The warning count, GPUs and limit summaries always remain visible; on a narrow screen the warning rows open with a tap on the count line. Graphs show only retained measurements, not invented history.</p>
     </details><div id="live"></div></section>
+  <section id="gpu-section"><div class="section-head"><h2>GPU 작업</h2><span id="gpu-status" class="pill warn">읽는 중</span><span id="gpu-freshness" class="quiet"></span></div><div id="gpu-board"></div></section>
   <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
   <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>
   <details id="eventsfold" class="page-fold"><summary>Recent events</summary><section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section></details>
@@ -230,6 +285,7 @@
 <script src="viewer-health.js"></script>
 <script src="viewer-connection.js"></script>
 <script src="viewer-live.js"></script>
+<script src="viewer-gpu.js"></script>
 <script>
 (function () {
   'use strict';

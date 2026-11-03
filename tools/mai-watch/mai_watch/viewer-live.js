@@ -383,9 +383,22 @@
         });
         cards.appendChild(card);
       });
-      var rows = items.map(function (item) { return [item.name, item.engine, item.context, item.turns, item.cost, item.tokens, item.active, item.doing]; });
-      var desktop = table(head, rows, 'compact session-table');
-      desktop.className += ' session-table-wrap';
+      // "doing" goes on its own full-width line under each session (owner 11/03): as the last column it was squeezed to a few
+      // characters, so even a short text made every row very tall and the table looked full of empty space
+      var t = el('table', undefined, 'compact session-table'), tr = el('tr');
+      head.slice(0, -1).forEach(function (h) { tr.appendChild(el('th', h)); });
+      t.appendChild(tr);
+      items.forEach(function (item) {
+        var row = el('tr', undefined, 'session-row');
+        [item.name, item.engine, item.context, item.turns, item.cost, item.tokens, item.active].forEach(function (c) { row.appendChild(el('td', c)); });
+        t.appendChild(row);
+        var line = el('tr', undefined, 'session-doing'), td = el('td');
+        td.colSpan = head.length - 1;
+        td.appendChild(el('span', 'doing', 'session-doing-label'));
+        td.appendChild(el('span', item.doing || 'unknown'));
+        line.appendChild(td); t.appendChild(line);
+      });
+      var desktop = el('div', undefined, 'scroll session-table-wrap'); desktop.appendChild(t);
       var group = el('div', undefined, 'session-list');
       group.appendChild(desktop); group.appendChild(cards);
       return group;

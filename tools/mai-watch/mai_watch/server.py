@@ -6,16 +6,16 @@ import os
 import urllib.parse
 
 ALLOWED = ('snapshot.json', 'collector_heartbeat.json', 'events.jsonl')
-PACKAGE_FILES = ('viewer-health.js', 'viewer-live.js', 'viewer-connection.js', 'manifest.webmanifest', 'viewer-icon.svg')
+PACKAGE_FILES = ('viewer-health.js', 'viewer-live.js', 'viewer-connection.js', 'viewer-gpu.js', 'manifest.webmanifest', 'viewer-icon.svg')
 TAIL_BYTES = 128 * 1024      # events.jsonl is served as its last lines only, so a long log cannot make every poll heavy
 VIEWER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'viewer.html')
 TYPES = {'viewer-health.js': 'application/javascript; charset=utf-8', 'viewer-live.js': 'application/javascript; charset=utf-8',
-         'viewer-connection.js': 'application/javascript; charset=utf-8',
+         'viewer-connection.js': 'application/javascript; charset=utf-8', 'viewer-gpu.js': 'application/javascript; charset=utf-8',
          'manifest.webmanifest': 'application/manifest+json; charset=utf-8', 'viewer-icon.svg': 'image/svg+xml',
          'snapshot.json': 'application/json', 'collector_heartbeat.json': 'application/json', 'events.jsonl': 'text/plain; charset=utf-8'}
 
 
-def make_handler(out_dir, live=None):
+def make_handler(out_dir, live=None, gpu_jobs=None):
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
             pass
@@ -38,6 +38,11 @@ def make_handler(out_dir, live=None):
                 if live is None:
                     return self._send(404, b'no live sampler', 'text/plain')
                 return self._send(200, json.dumps(live.diagnostics(), allow_nan=False).encode('utf-8'), 'application/json')
+            if name == 'gpu_jobs.json':
+                if gpu_jobs is None:
+                    return self._send(404, b'no GPU jobs board: start live with --gpu-jobs PATH', 'text/plain')
+                return self._send(200, json.dumps(gpu_jobs.document(), ensure_ascii=False, allow_nan=False, default=str).encode('utf-8'),
+                                  'application/json; charset=utf-8')
             if name == 'status.json':
                 if live is None:
                     return self._send(404, b'no live sampler: start with mai-watch', 'text/plain')
@@ -76,5 +81,5 @@ class ViewerServer(http.server.ThreadingHTTPServer):
     request_queue_size = 32
 
 
-def make_server(out_dir, port=28765, live=None):
-    return ViewerServer(('127.0.0.1', port), make_handler(out_dir, live))
+def make_server(out_dir, port=28765, live=None, gpu_jobs=None):
+    return ViewerServer(('127.0.0.1', port), make_handler(out_dir, live, gpu_jobs))

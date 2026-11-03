@@ -66,11 +66,13 @@ def document(mod, d, slow):
     gpus = sorted(d['smi']['gpus'])
     boxes = [box_lines(mod.gpu_box(d, i, BOX_WIDTH, mod.Paint(False))) for i in gpus]
     entries, notes = [], []
+    # every field read with .get, as the board itself does: it adds row kinds (a folded C-layer row has no queue id, 11/04), and one
+    # missing field must not blank the whole tab
     for n, e in enumerate(d['entries'], 1):
-        entries.append({'n': n, 'state': e['state'], 'gpu': 'GPU%s' % e['gpu'], 'priority': 'P%s' % e['priority'],
+        entries.append({'n': n, 'state': e.get('state', '-'), 'gpu': 'GPU%s' % e.get('gpu', '-'), 'priority': 'P%s' % e.get('priority', '-'),
                         'start': mod.clock(e.get('start'), now), 'end': mod.clock(e.get('end'), now),
-                        'launcher': mod.launcher(e), 'title': e['title']})
-        tag = '자동' if e['auto'] else '대기열 %s' % e['id']
+                        'launcher': mod.launcher(e), 'title': e.get('title', '')})
+        tag = '자동' if e.get('auto') else '대기열 %s' % e.get('id', '-')
         notes.append({'n': n, 'text': ' · '.join(x for x in (tag, e.get('owner'), e.get('condition'), e.get('source')) if x)})
     guards = [j for j in d['jobs'] if j['kind'] == 'guard']
     parked = [j for j in d['jobs'] if j['kind'] != 'guard' and not any(mod.on_gpu(j, i) for i in gpus)]
@@ -86,6 +88,7 @@ class GpuJobs:
         self.clock, self.loader = clock, loader
         self.lock = threading.Lock()
         self.mod, self.slow, self.slow_at, self.doc, self.doc_at = None, None, 0.0, None, 0.0
+        self.mtime = None
 
     def _run(self, fn, *args, **kw):
         run = subprocess.run
@@ -106,8 +109,10 @@ class GpuJobs:
             if self.doc is not None and now - self.doc_at < FAST_S:
                 return self.doc
             try:
-                if self.mod is None:
-                    self.mod = self.loader(self.path)
+                # the board is still being changed (11/04): a new file is loaded again, so the tab never shows an old version's values
+                mtime = os.path.getmtime(self.path) if os.path.exists(self.path) else None
+                if self.mod is None or mtime != self.mtime:
+                    self.mod, self.mtime, self.slow = self.loader(self.path), mtime, None
                 if self.slow is None or now - self.slow_at >= SLOW_S:
                     self.slow, self.slow_at = self._run(self.mod.slow_data), now
                 d = self._run(self.mod.board_data, slow=self.slow)

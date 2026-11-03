@@ -20,7 +20,8 @@ def fake_board(calls):
     def board_data(slow=None):
         calls.append('board')
         return {'now': 100.0, 'smi': {'gpus': {0: {}}}, 'warnings': ['경고 하나'],
-                'entries': [{'state': '실행', 'gpu': 0, 'priority': 1, 'start': 90, 'title': '평가', 'auto': True, 'owner': 'w'}],
+                'entries': [{'state': '실행', 'gpu': 0, 'priority': 1, 'start': 90, 'title': '평가', 'auto': True, 'owner': 'w'},
+                            {'state': '실행', 'gpu': 1, 'priority': 4, 'title': 'C층 남은 칸', 'auto': False}],
                 'jobs': [{'kind': 'guard', 'script': 'g.py', 'pid': 7}]}
     m.board_data = board_data
     m.gpu_box = lambda d, i, w, p: ['┌─ GPU0 · RTX ──┐', '│ EX-41 학습 · S2a   │',
@@ -39,6 +40,7 @@ class GpuJobsTest(unittest.TestCase):
         self.assertEqual(d['entries'][0]['start'], 'T90')
         self.assertEqual(d['entries'][0]['launcher'], '자동')
         self.assertEqual(d['notes'][0]['text'], '자동 · w')
+        self.assertEqual(d['notes'][1]['text'], '대기열 -')     # a folded row without a queue id (11/04)
         self.assertEqual(d['guards'], ['g.py 7'])
         self.assertEqual(d['warnings'], ['경고 하나'])
 

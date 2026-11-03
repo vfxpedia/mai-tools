@@ -65,6 +65,7 @@ def main(argv=None):
     st.add_argument('--url', default='http://127.0.0.1:28765/status.json')
     st.add_argument('--json', action='store_true', help='print the whole status document')
     lv.add_argument('--config', default=None, help='optional: also run the workload collector of this configuration')
+    lv.add_argument('--gpu-jobs', default=None, help='optional: a GPU job board module (gpu_jobs.py) shown read-only in a "GPU 작업" tab')
     v = sub.add_parser('validate'); v.add_argument('files', nargs='+')
     i = sub.add_parser('init'); i.add_argument('dir')
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -267,7 +268,11 @@ def run_live(a):
         print(str(e), file=sys.stderr)
         return 2
     try:
-        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler)
+        board = None
+        if a.gpu_jobs:
+            from mai_watch import gpujobs
+            board = gpujobs.GpuJobs(a.gpu_jobs)
+        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler, gpu_jobs=board)
     except OSError as e:
         print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port.' % (a.port, e.strerror or e), file=sys.stderr)
         return 2

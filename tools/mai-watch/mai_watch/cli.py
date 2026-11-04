@@ -271,7 +271,8 @@ def run_live(a):
         board = None
         if a.gpu_jobs:
             from mai_watch import gpujobs
-            board = gpujobs.GpuJobs(a.gpu_jobs)
+            board = gpujobs.GpuJobs(a.gpu_jobs, background=True)
+            threading.Thread(target=board.document, name='gpu-jobs-warm', daemon=True).start()   # first visitor gets a copy at once
         srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler, gpu_jobs=board)
     except OSError as e:
         print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port.' % (a.port, e.strerror or e), file=sys.stderr)

@@ -41,6 +41,8 @@ def make_handler(out_dir, live=None, gpu_jobs=None):
             if name == 'gpu_jobs.json':
                 if gpu_jobs is None:
                     return self._send(404, b'no GPU jobs board: start live with --gpu-jobs PATH', 'text/plain')
+                if 'probe=1' in self.path:      # the page asks only whether the tab exists, so the button shows before the first reading
+                    return self._send(200, b'{"schema": "mai-watch-gpu-jobs-v1", "probe": true}', 'application/json; charset=utf-8')
                 return self._send(200, json.dumps(gpu_jobs.document(), ensure_ascii=False, allow_nan=False, default=str).encode('utf-8'),
                                   'application/json; charset=utf-8')
             if name == 'status.json':

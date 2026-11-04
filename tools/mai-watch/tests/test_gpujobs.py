@@ -4,6 +4,8 @@ import unittest
 
 from mai_watch import gpujobs
 
+BOARD = "import os, time\nclass Paint:\n    def __init__(self, color):\n        pass\ndef clock(ts, now):\n    return '-' if not ts else 'T'\ndef launcher(e):\n    return 'auto'\ndef on_gpu(j, i):\n    return False\ndef slow_data():\n    return {'read_at': time.time()}\ndef board_data(slow=None):\n    if os.path.exists(os.path.join(os.path.dirname(__file__), 'SLOW')):\n        time.sleep(3)\n    return {'now': time.time(), 'smi': {'gpus': {0: {}}}, 'warnings': [], 'jobs': [],\n            'entries': [{'state': 'run', 'gpu': 0, 'priority': 1, 'title': 'job', 'auto': True}]}\ndef gpu_box(d, i, w, p):\n    return ['+- GPU0 -+', '| busy |', '+--+']\n"
+
 
 def fake_board(calls):
     m = types.SimpleNamespace()
@@ -66,6 +68,29 @@ class GpuJobsTest(unittest.TestCase):
         now[0] += 2.0
         g.document()
         self.assertEqual(len(tries), 2)
+
+    def test_background_reads_in_a_child_and_replies_at_once(self):
+        import os, tempfile, time
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'board.py')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(BOARD)
+            g = gpujobs.GpuJobs(path, background=True)
+            try:
+                first = g.document()                     # waits for the child's first reading
+                self.assertEqual(first['entries'][0]['title'], 'job')
+                self.assertNotEqual(g.proc.pid, os.getpid())
+                open(os.path.join(tmp, 'SLOW'), 'w').close()   # from now on every reading in the child takes 3 s
+                time.sleep(1.2)
+                t = time.time()
+                g.document()
+                self.assertLess(time.time() - t, 0.5)    # the reply does not wait for the slow reading
+            finally:
+                g.asked_at = 0.0
+                time.sleep(0.1)
+                if g.proc is not None:
+                    g.proc.kill()
+                    g.proc.wait(5)
 
 
 if __name__ == '__main__':

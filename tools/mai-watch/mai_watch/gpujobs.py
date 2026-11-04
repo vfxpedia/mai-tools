@@ -13,7 +13,9 @@ so the calls run with that flag added when the caller did not set one (mai-os os
 A file that is missing or fails to load is reported in the tab and retried on the next request, never a crash of mai-watch.
 """
 import importlib.util
+import json
 import os
+import sys
 import re
 import subprocess
 import threading
@@ -22,6 +24,9 @@ import time
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 FAST_S = 1.0
 SLOW_S = 10.0
+IDLE_S = 30.0          # the worker stops when nobody asked for this long
+FIRST_WAIT_S = 4.0     # the first reply after a start waits this long for the child's first reading
+SCHEMA = 'mai-watch-gpu-jobs-v1'
 NEEDED = ('slow_data', 'board_data', 'gpu_box', 'clock', 'launcher', 'on_gpu', 'Paint')
 BOX_WIDTH = 160          # wide enough that the board's own fit() never cuts a line with …
 BAR = re.compile(r'^\[([█░]+)\]\s*(.*)$')
@@ -83,12 +88,13 @@ def document(mod, d, slow):
 
 
 class GpuJobs:
-    def __init__(self, path, clock=time.time, loader=load):
+    def __init__(self, path, clock=time.time, loader=load, background=False):
         self.path = os.path.abspath(os.path.expanduser(path))
-        self.clock, self.loader = clock, loader
+        self.clock, self.loader, self.background = clock, loader, background
         self.lock = threading.Lock()
         self.mod, self.slow, self.slow_at, self.doc, self.doc_at = None, None, 0.0, None, 0.0
         self.mtime = None
+        self.asked_at, self.worker, self.proc, self.ready = 0.0, None, None, threading.Event()
 
     def _run(self, fn, *args, **kw):
         run = subprocess.run
@@ -104,6 +110,46 @@ class GpuJobs:
             subprocess.run = run
 
     def document(self):
+        """With background=True (mai-watch live) the board is read in a child process and a reply never waits for a reading.
+
+        Read inside mai-watch, the board's process list took 4 s and its evaluation files up to 10 s whenever the sampler's own process
+        scan was running (measured 11/04; alone each takes 0.01 to 0.1 s), so one reply took 4 to 19 s. The child has its own interpreter
+        and psutil; a worker thread here asks it for a fresh copy once a second while someone asked in the last IDLE_S seconds."""
+        if not self.background:
+            return self.refresh()
+        self.asked_at = self.clock()
+        if self.worker is None or not self.worker.is_alive():
+            self.worker = threading.Thread(target=self._keep_fresh, name='gpu-jobs', daemon=True)
+            self.worker.start()
+        if self.doc is None:
+            self.ready.wait(FIRST_WAIT_S)
+        return self.doc if self.doc is not None else {'schema': SCHEMA, 'error': 'GPU 관리판을 아직 읽는 중', 'path': self.path}
+
+    def _child(self):
+        if self.proc is None or self.proc.poll() is not None:
+            self.proc = subprocess.Popen([sys.executable, '-m', 'mai_watch.gpujobs', self.path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                         creationflags=NO_WINDOW, text=True, encoding='utf-8', bufsize=1)
+        return self.proc
+
+    def _keep_fresh(self):
+        while self.clock() - self.asked_at < IDLE_S:
+            try:
+                proc = self._child()
+                proc.stdin.write('\n'); proc.stdin.flush()
+                line = proc.stdout.readline()        # blocking pipe read, so the rest of mai-watch keeps running meanwhile
+                if not line:
+                    raise OSError('the GPU board reader stopped')
+                self.doc = json.loads(line)
+            except (OSError, ValueError) as e:
+                self.doc = {'schema': SCHEMA, 'error': '%s: %s' % (type(e).__name__, e), 'path': self.path}
+                if self.proc is not None and self.proc.poll() is None:
+                    self.proc.kill()
+                self.proc = None
+            self.ready.set()
+            time.sleep(FAST_S)
+
+    def refresh(self):
         with self.lock:
             now = self.clock()
             if self.doc is not None and now - self.doc_at < FAST_S:
@@ -122,3 +168,15 @@ class GpuJobs:
                 self.doc = {'schema': 'mai-watch-gpu-jobs-v1', 'error': '%s: %s' % (type(e).__name__, e), 'path': self.path}
             self.doc_at = now
             return self.doc
+
+
+def child(path):
+    """`python -m mai_watch.gpujobs PATH`: one line on stdin asks for a reading, one JSON line on stdout answers. Ends with stdin."""
+    board = GpuJobs(path)
+    for _ in sys.stdin:
+        sys.stdout.write(json.dumps(board.refresh(), ensure_ascii=False, allow_nan=False, default=str) + '\n')
+        sys.stdout.flush()
+
+
+if __name__ == '__main__':
+    child(sys.argv[1])

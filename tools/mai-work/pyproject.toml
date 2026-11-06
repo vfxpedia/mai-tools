@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mai-work"
+version = "0.1.0"
+description = "A work list with states, order, schedule and decision times, checked instead of remembered."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+mai-work = "mai_work.__main__:main"
+
+[tool.setuptools]
+packages = ["mai_work"]

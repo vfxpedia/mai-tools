@@ -91,24 +91,27 @@ def convert_rows(header, rows, source_name, source_sha, now):
     return work, events
 
 
-def back_to_legacy(work_rows):
+def back_to_legacy(work_rows, extra=()):
     reverse = {v: k for k, v in schema.LEGACY_STATUS.items()}
     out = []
     for w in work_rows:
         r = {old: w[col] for old, col in schema.LEGACY_TO_WORK.items()}
         r['status'] = reverse.get(w['status'], w['status'])
+        for col in extra:
+            # a cancelled row without a time was marked `unknown` by the converter; the original cell was empty
+            r[col] = '' if col == 'decided_at' and w[col] == 'unknown' and w['status'] == 'cancelled' else w[col]
         out.append(r)
     return out
 
 
-def round_trip(legacy_rows, work_rows):
+def round_trip(legacy_rows, work_rows, extra=()):
     """Differences between the original rows and the rows rebuilt from WORK.tsv: [] means no cell was lost or changed."""
-    rebuilt = back_to_legacy(work_rows)
+    rebuilt = back_to_legacy(work_rows, extra)
     diffs = []
     if len(rebuilt) != len(legacy_rows):
         diffs.append(('*', 'rows', len(legacy_rows), len(rebuilt)))
     for a, b in zip(legacy_rows, rebuilt):
-        for c in schema.LEGACY_COLUMNS:
+        for c in schema.LEGACY_COLUMNS + tuple(extra):
             if a.get(c) != b.get(c):
                 diffs.append((a.get('id'), c, a.get(c), b.get(c)))
     return diffs
@@ -156,8 +159,9 @@ def convert(source, out_dir, now=None):
     write_tsv(work_path, schema.WORK_COLUMNS, work)
     write_tsv(os.path.join(out_dir, 'WORK-events.tsv'), schema.EVENT_COLUMNS, events)
     _, _, written = read_tsv(work_path)                 # prove it from the file on disk, not from memory
-    diffs = round_trip(rows, written)
-    same_text = tsv_text(schema.LEGACY_COLUMNS, back_to_legacy(written)) == text
+    extra = legacy_extras(header)
+    diffs = round_trip(rows, written, extra)
+    same_text = tsv_text(schema.LEGACY_COLUMNS + extra, back_to_legacy(written, extra)) == text
     with open(os.path.join(out_dir, 'CONVERT-REPORT.md'), 'w', encoding='utf-8', newline='\n') as f:
         f.write(report(source, sha, written, events, diffs, same_text))
     return {'rows': len(written), 'diffs': diffs, 'same_text': same_text, 'sha256': sha}

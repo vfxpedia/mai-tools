@@ -93,7 +93,7 @@ def owner_topic(wait_for):
 def load(path):
     """Rows in the new columns and the events, from either format. Raises ConvertError on a list it cannot read safely."""
     text, header, rows = conv.read_tsv(path)
-    if header == schema.LEGACY_COLUMNS:
+    if conv.legacy_extras(header) is not None:          # the old eight columns, maybe with some WORK.tsv columns already added
         work, _ = conv.convert_rows(header, rows, os.path.basename(path), '', '')
         return 'legacy', work, []
     if header != schema.WORK_COLUMNS:

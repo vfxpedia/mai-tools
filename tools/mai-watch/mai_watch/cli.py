@@ -66,6 +66,7 @@ def main(argv=None):
     st.add_argument('--json', action='store_true', help='print the whole status document')
     lv.add_argument('--config', default=None, help='optional: also run the workload collector of this configuration')
     lv.add_argument('--gpu-jobs', default=None, help='optional: a GPU job board module (gpu_jobs.py) shown read-only in a "GPU 작업" tab')
+    lv.add_argument('--worklist', default=None, help='optional: a work list (WORK.tsv or WORKLIST.tsv) checked by mai-work and shown in a "작업" tab')
     v = sub.add_parser('validate'); v.add_argument('files', nargs='+')
     i = sub.add_parser('init'); i.add_argument('dir')
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -273,7 +274,11 @@ def run_live(a):
             from mai_watch import gpujobs
             board = gpujobs.GpuJobs(a.gpu_jobs, background=True)
             threading.Thread(target=board.document, name='gpu-jobs-warm', daemon=True).start()   # first visitor gets a copy at once
-        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler, gpu_jobs=board)
+        work = None
+        if a.worklist:
+            from mai_watch import worklist
+            work = worklist.Worklist(a.worklist)
+        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler, gpu_jobs=board, worklist=work)
     except OSError as e:
         print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port.' % (a.port, e.strerror or e), file=sys.stderr)
         return 2

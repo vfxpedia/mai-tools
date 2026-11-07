@@ -9,8 +9,7 @@
   function el(tag, text, cls) { var e = doc.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
   var STATE_CLASS = { '실행': 'ok', '대기': 'warn', '실패': 'bad', '보류': 'off', '끝': 'off' };
-  var tabs = doc.querySelectorAll('.tabs [data-tab]');
-  var current = 'live', loop = null, received = null;
+  var loop = null, received = null;
 
   function clockText(epoch) { var d = new Date(epoch * 1000); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2); }
 
@@ -87,14 +86,6 @@
     $('gpu-freshness').textContent = '측정 ' + clockText(d.now) + (d.slow_read_at ? ' · 대기열 · 파일 ' + clockText(d.slow_read_at) : '');
   }
 
-  function show(name) {
-    current = name === 'gpu' && !$('tab-gpu').hidden ? 'gpu' : 'live';
-    tabs.forEach(function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-tab') === current)); });
-    doc.body.setAttribute('data-tab', current);
-    try { root.localStorage.setItem('mai-watch-tab', current); } catch (_) {}
-    if (current === 'gpu') { if (loop) loop.start(); } else if (loop) loop.stop();
-  }
-
   loop = root.MaiWatchConnection.createLoop({
     task: function (signal) { return root.MaiWatchConnection.read('gpu_jobs.json', 'json', signal); },
     interval: function () { return 1000; },
@@ -110,12 +101,8 @@
   });
   root.MaiWatchConnection.bind(loop);
 
-  tabs.forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-tab')); }); });
-  // the tab exists only when the server has a board; a 404 keeps the page exactly as it was
+  // the tab exists only when the server has a board; a 404 keeps the page exactly as it was (switching is viewer-tabs.js)
   root.MaiWatchConnection.read('gpu_jobs.json?probe=1', 'json').then(function () {
-    $('tab-gpu').hidden = false; $('tabs').hidden = false;
-    var want = /gpu/.test(root.location.hash) ? 'gpu' : null;
-    if (!want) { try { want = root.localStorage.getItem('mai-watch-tab'); } catch (_) { want = null; } }
-    show(want || 'live');
-  }, function () { show('live'); });
+    root.MaiWatchTabs.add('gpu', { start: function () { loop.start(); }, stop: function () { loop.stop(); } });
+  }, function () {});
 })(typeof window !== 'undefined' ? window : globalThis);

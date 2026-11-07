@@ -211,6 +211,34 @@
   #gpu-section { display: none; }
   body[data-tab="gpu"] #gpu-section { display: block; }
   body[data-tab="gpu"] #live-section, body[data-tab="gpu"] .page-fold, body[data-tab="gpu"] #alerts { display: none !important; }
+  /* 작업 tab (owner 11/06 · W42): the work list checked by mai-work; most urgent first, each item a two-line card */
+  #work-section { display: none; }
+  body[data-tab="work"] #work-section { display: block; }
+  body[data-tab="work"] #live-section, body[data-tab="work"] .page-fold, body[data-tab="work"] #alerts { display: none !important; }
+  .work-band { display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: baseline; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  .work-band.bad { border-left: 6px solid var(--bad); }
+  .work-band.warn { border-left: 6px solid var(--warn); }
+  .work-count { display: grid; }
+  .work-count.bad .num-big { color: var(--bad); }
+  .work-count.warn .num-big { color: var(--warn); }
+  .work-block h3 .quiet { font-weight: 400; }
+  .work-stage { margin: 14px 0 4px; font-size: 14px; }
+  .work-item, .work-finding { padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+  .work-finding.fail { border-left: 4px solid var(--bad); padding-left: 10px; }
+  .work-finding.warn { border-left: 4px solid var(--warn); padding-left: 10px; }
+  .work-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .work-meta .pill { padding: 0 8px; }
+  .work-title { overflow-wrap: anywhere; margin-top: 2px; }
+  .work-sub { overflow-wrap: anywhere; font-size: 0.92em; }
+  .work-pri.p0 { color: var(--bad); font-weight: 700; }
+  .work-pri.p1 { font-weight: 700; }
+  .work-due { font-variant-numeric: tabular-nums; }
+  .bad-text { color: var(--bad); font-weight: 700; }
+  .warn-text { color: var(--warn); font-weight: 600; }
+  .work-event { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 3px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  .work-fold { margin: 12px 0; }
+  .work-fold summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+  .work-foot { overflow-wrap: anywhere; }
   .job-gpus { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 12px; margin-bottom: 18px; }
   .job-gpu { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; min-width: 0; display: grid; gap: 6px; align-content: start; }
   .job-gpu h3 { margin: 0 0 2px; font-size: 15px; }
@@ -265,7 +293,7 @@
   <span id="generated" class="mono"></span>
   <div class="header-actions"><button id="refresh" type="button" title="Reload this page, not the collector" aria-label="Reload page">↻ Reload</button><button id="theme" type="button" aria-label="Change color theme">Theme: System</button></div>
 </header>
-<nav id="tabs" class="tabs" hidden><button type="button" data-tab="live" aria-selected="true">Resources</button><button type="button" id="tab-gpu" data-tab="gpu" aria-selected="false" hidden>GPU 작업</button></nav>
+<nav id="tabs" class="tabs" hidden><button type="button" data-tab="live" aria-selected="true">Resources</button><button type="button" id="tab-gpu" data-tab="gpu" aria-selected="false" hidden>GPU 작업</button><button type="button" id="tab-work" data-tab="work" aria-selected="false" hidden>작업</button></nav>
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
@@ -278,6 +306,7 @@
       <p class="quiet">Settings stay in this browser. The warning count, GPUs and limit summaries always remain visible; on a narrow screen the warning rows open with a tap on the count line. Graphs show only retained measurements, not invented history.</p>
     </details><div id="live"></div></section>
   <section id="gpu-section"><div class="section-head"><h2>GPU 작업</h2><span id="gpu-status" class="pill warn">읽는 중</span><span id="gpu-freshness" class="quiet"></span></div><div id="gpu-board"></div></section>
+  <section id="work-section"><div class="section-head"><h2>작업</h2><span id="work-status" class="pill warn">읽는 중</span><span id="work-freshness" class="quiet"></span></div><div id="work-board"></div></section>
   <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
   <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>
   <details id="eventsfold" class="page-fold"><summary>Recent events</summary><section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section></details>
@@ -285,7 +314,9 @@
 <script src="viewer-health.js"></script>
 <script src="viewer-connection.js"></script>
 <script src="viewer-live.js"></script>
+<script src="viewer-tabs.js"></script>
 <script src="viewer-gpu.js"></script>
+<script src="viewer-work.js"></script>
 <script>
 (function () {
   'use strict';

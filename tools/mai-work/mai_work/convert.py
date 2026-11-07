@@ -48,9 +48,24 @@ def write_tsv(path, columns, rows):
     os.replace(tmp, path)
 
 
+def legacy_extras(header):
+    """Columns after the eight old ones, when each is a WORK.tsv column name (a list moving over one column at a time, 11/07:
+    lead added `decision` and `decided_at`). None when the header is not the old list at all."""
+    n = len(schema.LEGACY_COLUMNS)
+    if tuple(header[:n]) != schema.LEGACY_COLUMNS:
+        return None
+    extra = tuple(header[n:])
+    taken = set(schema.LEGACY_TO_WORK.values())
+    if len(set(extra)) != len(extra) or any(c not in schema.WORK_COLUMNS or c in taken for c in extra):
+        return None
+    return extra
+
+
 def convert_rows(header, rows, source_name, source_sha, now):
-    if header != schema.LEGACY_COLUMNS:
-        raise ConvertError('columns are %s, expected %s' % (list(header), list(schema.LEGACY_COLUMNS)))
+    extra = legacy_extras(header)
+    if extra is None:
+        raise ConvertError('columns are %s, expected %s (optionally followed by WORK.tsv column names)'
+                           % (list(header), list(schema.LEGACY_COLUMNS)))
     seen, work, events = set(), [], []
     for n, r in enumerate(rows, 2):            # line 1 is the header
         if None in r or any(v is None for v in r.values()):
@@ -64,7 +79,9 @@ def convert_rows(header, rows, source_name, source_sha, now):
         for old, col in schema.LEGACY_TO_WORK.items():
             new[col] = r[old]
         new['status'] = schema.LEGACY_STATUS[r['status']]
-        if new['status'] == 'cancelled':
+        for col in extra:
+            new[col] = r[col]
+        if new['status'] == 'cancelled' and not new['decided_at']:
             new['decided_at'] = 'unknown'
         work.append(new)
         events.append({'ts': now, 'decided_at': new['decided_at'], 'decided_by': '', 'id': r['id'], 'event': 'add',

@@ -93,6 +93,16 @@ class CheckTest(unittest.TestCase):
             self.assertEqual(d['format'], 'legacy')
             self.assertEqual(sorted((f['rule'], f['id']) for f in d['findings']), [('C1', 'A1'), ('C10', 'A2'), ('C5', 'A2')])
             self.assertEqual(d['counts']['FAIL'], 3)
+            # 11/07: the old list with WORK.tsv columns added at the end is still read; a real decision time clears C10
+            with open(p, 'w', encoding='utf-8', newline='') as f:
+                f.write('\t'.join(schema.LEGACY_COLUMNS) + '\tdecision\tdecided_at\n'
+                        'A2\ts\tP2\t-\tamy\t-\tdropped\tgone\tdecisions.tsv line 9\t2026-01-09T17:19:44+09:00\n'
+                        'A3\ts\tP2\t-\tamy\t-\tdropped\tgone\t\t\n')
+            d = chk.document(p, now=NOW)
+            self.assertEqual(sorted((f['rule'], f['id']) for f in d['findings']), [('C10', 'A3'), ('C5', 'A3')])
+            with open(p, 'w', encoding='utf-8') as f:
+                f.write('\t'.join(schema.LEGACY_COLUMNS) + '\tnot_a_column\nA\ts\tP1\t-\tx\t-\topen\tw\tz\n')
+            self.assertIn('error', chk.document(p, now=NOW))      # an unknown extra column is refused, not guessed
             with open(p, 'w', encoding='utf-8') as f:
                 f.write('id\tsomething\nA\tb\n')
             self.assertIn('error', chk.document(p, now=NOW))

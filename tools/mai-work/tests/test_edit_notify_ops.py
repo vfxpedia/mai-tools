@@ -41,6 +41,8 @@ class EditTest(Base):
         self.assertEqual((r['status'], r['evidence']), ('done', self.proof))
         self.assertTrue(r['start_actual'] and r['end_actual'])
         self.assertEqual([e['event'] for e in edit.log(self.path, 'A')], ['add', 'start', 'done'])
+        self.assertTrue(chk.iso_with_zone(r['decided_at']))                # done records a zoned decision time (C11)
+        self.assertEqual(chk.check([r], [], NOW), [])
         with self.assertRaises(edit.EditError):
             self.do('start', 'A')                                   # done is final
 

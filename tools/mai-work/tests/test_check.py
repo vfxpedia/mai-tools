@@ -1,4 +1,4 @@
-"""Each rule C1 to C10 fires on an input made to break it, and a clean list gives no finding (known answers)."""
+"""Each rule C1 to C11 fires on an input made to break it, and a clean list gives no finding (known answers)."""
 import datetime
 import os
 import tempfile
@@ -11,6 +11,14 @@ from mai_work import schema
 NOW = datetime.datetime(2026, 1, 10, 12, 0).timestamp()
 PAST = 'at:2026-01-10T10:00'
 FUTURE = 'at:2026-01-11T10:00'
+ZONED = '2026-01-09T19:35:00+09:00'
+PROOF = os.path.join(tempfile.mkdtemp(), 'proof.md')
+open(PROOF, 'w').close()
+
+
+def done(**kw):
+    """A finished item as C11 wants it: evidence that opens and a zoned decision time."""
+    return row(**dict({'status': 'done', 'evidence': PROOF, 'decided_at': ZONED}, **kw))
 
 
 def row(**kw):
@@ -26,7 +34,7 @@ def rules(rows, events=(), it=None):
 
 class CheckTest(unittest.TestCase):
     def test_clean_list_has_no_finding(self):
-        rows = [row(id='A', status='done', evidence='-'), row(id='B', after='A'), row(id='C', status='doing', start_actual='2026-01-10T11:00:00')]
+        rows = [done(id='A'), row(id='B', after='A'), row(id='C', status='doing', start_actual='2026-01-10T11:00:00')]
         self.assertEqual(rules(rows), [])
 
     def test_c1_overdue_without_evidence(self):
@@ -60,7 +68,7 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(rules([row(id='D')], ev), [('C5', 'D')])
 
     def test_c6_owner_asked_again_about_a_locked_topic(self):
-        rows = [row(id='A', status='done', locked='disk-cleanup', decided_at='2026-01-03T02:10:00+09:00', decision='L149'),
+        rows = [row(id='A', status='done', evidence=PROOF, locked='disk-cleanup', decided_at='2026-01-03T02:10:00+09:00', decision='L149'),
                 row(id='B', wait_for='팀장:disk-cleanup')]
         found = chk.check(rows, [], NOW)
         self.assertEqual([(f['rule'], f['id']) for f in found], [('C6', 'B')])
@@ -76,12 +84,18 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(rules([row(id='A', status='hold', wait_for='팀장 결정')], ev), [('C9', 'A')])
 
     def test_c10_decision_time(self):
-        rows = [row(id='A', status='done', locked='t', decided_at='19:3x', decision='L1')]       # a guess is not a time
+        rows = [row(id='A', status='open', locked='t', decided_at='19:3x', decision='L1')]       # a guess is not a time
         self.assertEqual(rules(rows), [('C10', 'A')])
         rows[0]['decided_at'] = '2026-01-09T19:35:00+09:00'
         self.assertEqual(rules(rows), [])
         ev = [{'ts': '2026-01-09T10:00:00+09:00', 'decided_at': '2026-01-09T18:00:00+09:00', 'id': 'A', 'event': 'decide'}]
         self.assertEqual(rules(rows, ev), [('C10', 'A')])                                         # decided after it was written
+
+    def test_c11_done_needs_evidence_and_a_zoned_time(self):
+        self.assertEqual(rules([done(id='A')]), [])
+        self.assertEqual(rules([done(id='A', evidence=PROOF + '.never-made')]), [('C11', 'A')])   # analyst W39 counterexample
+        self.assertEqual(rules([done(id='A', decided_at='2026-01-09T19:35:00')]), [('C11', 'A')])  # no zone
+        self.assertEqual(rules([done(id='A', decided_at='')]), [('C11', 'A')])
 
     def test_document_reads_the_old_list_and_never_raises(self):
         with tempfile.TemporaryDirectory() as tmp:

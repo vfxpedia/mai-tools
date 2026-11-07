@@ -13,6 +13,8 @@ Rules (design `os/worklist-tool-design.md` 4 절):
   C5 FAIL  hold without wait_for, replaced without a valid   C10 FAIL a decision (locked, cancelled, replaced, postponed
            replaced_by, cancelled without decision, end_plan          end_plan) without a real decided_at, or decided after
            postponed without why and decision                         it was written down
+  C11 FAIL done without evidence that opens, or without decided_at as ISO with a time zone offset (lead G25 · analyst W39
+           counterexample 11/07: a done row pointing at a file that was never made passed every other rule)
 """
 import datetime
 import os
@@ -45,6 +47,16 @@ def parse_ts(value):
         return datetime.datetime.fromisoformat(value).timestamp()
     except ValueError:
         return None
+
+
+def iso_with_zone(value):
+    """True for a full ISO time with a zone offset, e.g. 2026-11-06T17:19:44+09:00 (no zone, a date alone or 17:1x -> False)."""
+    if not value or 'T' not in value:
+        return False
+    try:
+        return datetime.datetime.fromisoformat(value).utcoffset() is not None
+    except ValueError:
+        return False
 
 
 def evidence_present(spec):
@@ -163,6 +175,10 @@ def check(rows, events, now=None, it=None):
         decided = parse_ts(r.get('decided_at'))
         if (r.get('locked') or st in ('cancelled', 'replaced')) and decided is None:
             add('C10', 'FAIL', r, '결정인데 결정 시각이 없음 (%s)' % (r.get('decided_at') or '빈칸'))
+        if st == 'done' and not (ev and iso_with_zone(r.get('decided_at'))):
+            add('C11', 'FAIL', r, '끝인데 %s' % ' · '.join(x for x in (
+                '' if ev else '증거 파일이 안 열림 (%s)' % (r.get('evidence') or '빈칸'),
+                '' if iso_with_zone(r.get('decided_at')) else '결정 시각이 시간대 있는 ISO 가 아님 (%s)' % (r.get('decided_at') or '빈칸')) if x))
     # C4: priority inversion per owner
     for owner in {r.get('owner') for r in rows}:
         mine = [r for r in rows if r.get('owner') == owner]

@@ -7,7 +7,7 @@ from . import convert as conv
 EDIT_COMMANDS = {
     'add': ('title', 'owner', 'priority', 'end_plan', 'start_plan', 'stage', 'after', 'evidence', 'source', 'why'),
     'start': (),
-    'done': ('evidence', 'why'),
+    'done': ('evidence', 'why', 'decided_at', 'decided_by'),
     'hold': ('wait_for', 'why'),
     'resume': ('why',),
     'cancel': ('why', 'decision', 'decided_at', 'decided_by'),

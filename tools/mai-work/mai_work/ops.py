@@ -15,6 +15,9 @@ def ops_lines(path, now, it=None):
         return [('FAIL', 'W worklist', 'worklist unreadable: %s' % d['error'])]
     out = []
     for f in d['findings']:
+        if f['rule'] == 'C11':      # the wording the project check and its tests already use (lead G25, 11/07)
+            out.append(('FAIL', 'W %s' % f['id'], 'done without evidence or ISO decided_at'))
+            continue
         out.append(('FAIL' if f['level'] == 'FAIL' else 'WARN', 'W %s' % f['id'], '%s %s %s %s · %s'
                     % (f['rule'], f['priority'], f['owner'], f['msg'], _title(d, f['id'])[:60])))
     flagged = {f['id'] for f in d['findings']}

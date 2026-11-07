@@ -162,8 +162,9 @@ def apply(path, cmd, item, by, now=None, **kw):
                 if r['status'] == 'open':
                     move(r, 'doing', 'start')
                     r['start_actual'] = ts
-                move(r, 'done', 'done', why=kw.get('why') or '')
-                r['end_actual'] = ts
+                when = real_time(kw['decided_at'], now) if kw.get('decided_at') else ts   # done is a decision too (C11)
+                move(r, 'done', 'done', why=kw.get('why') or '', decided_at=when, decided_by=kw.get('decided_by') or by)
+                r.update({'end_actual': ts, 'decided_at': when, 'decided_by': kw.get('decided_by') or by})
             elif cmd == 'hold':
                 r['wait_for'] = need('wait_for')
                 move(r, 'hold', 'hold', why=kw.get('why') or '')

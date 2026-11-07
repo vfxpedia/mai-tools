@@ -6,16 +6,19 @@ import os
 import urllib.parse
 
 ALLOWED = ('snapshot.json', 'collector_heartbeat.json', 'events.jsonl')
-PACKAGE_FILES = ('viewer-health.js', 'viewer-live.js', 'viewer-connection.js', 'viewer-gpu.js', 'manifest.webmanifest', 'viewer-icon.svg')
+PACKAGE_FILES = ('viewer-health.js', 'viewer-live.js', 'viewer-connection.js', 'viewer-tabs.js', 'viewer-gpu.js', 'viewer-work.js',
+                 'manifest.webmanifest', 'viewer-icon.svg')
+JS = 'application/javascript; charset=utf-8'
 TAIL_BYTES = 128 * 1024      # events.jsonl is served as its last lines only, so a long log cannot make every poll heavy
 VIEWER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'viewer.html')
 TYPES = {'viewer-health.js': 'application/javascript; charset=utf-8', 'viewer-live.js': 'application/javascript; charset=utf-8',
          'viewer-connection.js': 'application/javascript; charset=utf-8', 'viewer-gpu.js': 'application/javascript; charset=utf-8',
+         'viewer-tabs.js': JS, 'viewer-work.js': JS,
          'manifest.webmanifest': 'application/manifest+json; charset=utf-8', 'viewer-icon.svg': 'image/svg+xml',
          'snapshot.json': 'application/json', 'collector_heartbeat.json': 'application/json', 'events.jsonl': 'text/plain; charset=utf-8'}
 
 
-def make_handler(out_dir, live=None, gpu_jobs=None):
+def make_handler(out_dir, live=None, gpu_jobs=None, worklist=None):
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
             pass
@@ -44,6 +47,13 @@ def make_handler(out_dir, live=None, gpu_jobs=None):
                 if 'probe=1' in self.path:      # the page asks only whether the tab exists, so the button shows before the first reading
                     return self._send(200, b'{"schema": "mai-watch-gpu-jobs-v1", "probe": true}', 'application/json; charset=utf-8')
                 return self._send(200, json.dumps(gpu_jobs.document(), ensure_ascii=False, allow_nan=False, default=str).encode('utf-8'),
+                                  'application/json; charset=utf-8')
+            if name == 'work.json':
+                if worklist is None:
+                    return self._send(404, b'no work list: start live with --worklist PATH', 'text/plain')
+                if 'probe=1' in self.path:
+                    return self._send(200, b'{"schema": "mai-work-check-v1", "probe": true}', 'application/json; charset=utf-8')
+                return self._send(200, json.dumps(worklist.document(), ensure_ascii=False, allow_nan=False, default=str).encode('utf-8'),
                                   'application/json; charset=utf-8')
             if name == 'status.json':
                 if live is None:
@@ -83,5 +93,5 @@ class ViewerServer(http.server.ThreadingHTTPServer):
     request_queue_size = 32
 
 
-def make_server(out_dir, port=28765, live=None, gpu_jobs=None):
-    return ViewerServer(('127.0.0.1', port), make_handler(out_dir, live, gpu_jobs))
+def make_server(out_dir, port=28765, live=None, gpu_jobs=None, worklist=None):
+    return ViewerServer(('127.0.0.1', port), make_handler(out_dir, live, gpu_jobs, worklist))

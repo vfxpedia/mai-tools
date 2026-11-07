@@ -10,7 +10,7 @@
   function el(tag, text, cls) { var e = doc.createElement(tag); if (text !== undefined && text !== null) e.textContent = text; if (cls) e.className = cls; return e; }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
   var RULE = { C1: '마감 지남', C2: '시작 늦음', C3: '순서 어김', C4: '우선순위 역전', C5: '기록 결함', C6: '확정 재안건',
-               C7: '끝 처리 안 함', C8: '멈춘 일', C9: '팀장 결정 대기', C10: '결정 시각 없음' };
+               C7: '끝 처리 안 함', C8: '멈춘 일', C9: '팀장 결정 대기', C10: '결정 시각 없음', C11: '끝 근거 없음' };
   var STATUS = { open: ['열림', 'warn'], doing: ['진행', 'ok'], done: ['끝', 'off'], hold: ['보류', 'off'], cancelled: ['취소', 'off'], replaced: ['대체', 'off'] };
   var PRI = { P0: 0, P1: 1, P2: 2, P3: 3 };
   var loop = null, received = null;

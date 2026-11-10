@@ -125,3 +125,15 @@ class CheckTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def test_local_path_reads_windows_evidence_on_linux():
+    # 11/10 ai-lx01: 55 of 57 C11 FAILs were Windows paths the Linux mounts could open once mapped
+    from mai_work.check import local_path as lp
+    assert lp('C:/Users/AI-WS01/s2_lab/a.json', 'posix', {}) == '/mnt/win-d/mai/data/foothold/s2_lab/a.json'
+    assert lp('D:\\mai-tmp\\lead\\x.md', 'posix', {}) == '/mnt/win-d/mai/tmp/lead/x.md'
+    assert lp('D:/mai-tmpX/a', 'posix', {}) == '/mnt/win-d/mai-tmpX/a'          # no partial-name match
+    assert lp('C:/x/y', 'posix', {}) == '/mnt/win-c/x/y'
+    assert lp('C:/x/y', 'nt', {}) == 'C:/x/y'                                     # Windows unchanged
+    assert lp('/home/jay/a.md', 'posix', {}) == '/home/jay/a.md'
+    assert lp('C:/x/y', 'posix', {'MAI_WORK_PATH_MAP': 'C:=/mnt/c'}) == '/mnt/c/x/y'

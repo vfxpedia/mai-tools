@@ -59,11 +59,36 @@ def iso_with_zone(value):
         return False
 
 
+# Windows evidence paths read on Linux ai-lx01 (11/10): the Windows disks are mounted at /mnt/win-c (ro) and /mnt/win-d (rw),
+# and the 11/09 D: cleanup moved these roots behind junctions that Linux may not follow, so their real folders come first.
+# Longest prefix wins. Override with MAI_WORK_PATH_MAP="WIN=LINUX;WIN=LINUX". Windows itself never rewrites.
+PATH_MAP = (('C:/Users/AI-WS01/s2_lab', '/mnt/win-d/mai/data/foothold/s2_lab'),
+            ('D:/mai-wt-archive', '/mnt/win-d/mai/wt-archive'), ('D:/mai-wt', '/mnt/win-d/mai/wt'),
+            ('D:/mai-tmp', '/mnt/win-d/mai/tmp'), ('D:/mai-cache', '/mnt/win-d/mai/cache'),
+            ('D:/mai-video', '/mnt/win-d/mai/data/foothold/video'),
+            ('C:', '/mnt/win-c'), ('D:', '/mnt/win-d'))
+
+
+def local_path(path, os_name=None, env=None):
+    """A Windows evidence path as this machine can open it (identity on Windows or for paths that are not Windows paths)."""
+    os_name = os.name if os_name is None else os_name
+    env = os.environ if env is None else env
+    if os_name == 'nt' or len(path) < 2 or path[1] != ':':
+        return path
+    p = path.replace('\\', '/')
+    pairs = [tuple(x.split('=', 1)) for x in (env.get('MAI_WORK_PATH_MAP') or '').split(';') if '=' in x] or PATH_MAP
+    for win, lin in sorted(pairs, key=lambda kv: -len(kv[0])):
+        if p.lower() == win.lower() or p.lower().startswith(win.lower().rstrip('/') + '/'):
+            return lin.rstrip('/') + p[len(win.rstrip('/')):]
+    return path
+
+
 def evidence_present(spec):
     """Same meaning as the operations check: `path` exists, or `path::text` exists and contains text. '-' never counts."""
     if not spec or spec == '-':
         return False
     path, _, needle = spec.partition('::')
+    path = local_path(path)
     if not os.path.exists(path):
         return False
     if not needle:

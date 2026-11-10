@@ -11,6 +11,7 @@ const retiredOwnFiles = ['prices.json']; // Exact obsolete asset only; never fol
 const files = ['package.json', 'plugin.json', 'hooks.json', 'types.d.ts',
   'README.md', '.agents/plugins/marketplace.json', 'src/usage.mjs', 'src/store.mjs',
   'src/band.mjs', 'src/cli.mjs', 'src/hook.mjs', 'src/hook-diagnostics.mjs', 'src/install.mjs', 'src/provider.mjs', 'src/context-policy.mjs',
+  'src/orca-auto.mjs', 'autostart/mai-codex-gauge-sync.service',
   '.codex-plugin/plugin.json', 'src/setup.mjs', 'src/checkpoint.mjs', 'src/telemetry.mjs', 'src/native-rpc.mjs', 'src/native-trust.mjs', 'src/hook-command.mjs', 'bin/mai-codex-mods.mjs',
   'skills/mai-codex-continuity/SKILL.md'];
 const version=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;

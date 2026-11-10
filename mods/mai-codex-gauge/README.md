@@ -22,9 +22,25 @@ Run `node src/setup.mjs sync --home ABSOLUTE_CODEX_HOME --exe ABSOLUTE_CODEX_EXE
 
 The collector checks the owned rollouts about every five seconds, reads account limits at most once per minute, and shares that display snapshot only with the listed sessions. An idle snapshot does not write to limit history or create a turn. Account limits can appear before a session sends its first prompt. Token counts remain per session and absent windows remain unavailable. This does not restart an agent, fix native hook trust, or perform checkpoint/compact actions. Omit `--loop` for a single diagnostic sync.
 
+### Automatically attach in Linux Orca
+
+Install the plugin and review its exact hooks. This opt-in service is for a desktop Orca terminal session using the default Codex home. Confirm the paths to Node 22+, Codex, and `orca-ide` in the unit before installing it. Use one collector for this home; do not leave an earlier manual `sync --loop` running for the same sessions.
+
+```sh
+install -Dm644 ~/.codex/mai-codex-gauge/autostart/mai-codex-gauge-sync.service ~/.config/systemd/user/mai-codex-gauge-sync.service
+systemctl --user daemon-reload
+systemctl --user enable --now mai-codex-gauge-sync.service
+systemctl --user is-enabled mai-codex-gauge-sync.service
+journalctl --user -u mai-codex-gauge-sync.service -n 20 --no-pager
+```
+
+After a trusted `SessionStart` runs in a new or resumed Codex CLI tab, the collector checks the tab, pane and terminal identities and can open a companion underneath. In versions that run the hook on the first turn, just opening a tab is not enough. It leaves tabs with an existing split untouched, including manually sized gauges. If a split has an ambiguous result it does not submit a second split for that binding. A terminal that inherits a foreign `CODEX_THREAD_ID` is refused by the hook; start a new shell or clear that inherited variable before launching a new Codex CLI.
+
+The Orca CLI chooses the initial pane height. Its public split command has no height option; the service does not guarantee a 124 px pane or relaunch a blank companion in a restored split. Enabling the unit runs the collector on the next user login; that does not by itself start Orca or resume a Codex session. To disable automatic attachment and sync, run `systemctl --user disable --now mai-codex-gauge-sync.service`. Existing panes are not closed by this command.
+
 ## Tests
 
-`node --test tests/*.test.mjs` (Node 22 or newer). 117 tests: 112 pass; 5 are skipped in a normal run because they drive a real Codex CLI or a real package install.
+`node --test tests/*.test.mjs` (Node 22 or newer). To include isolated native lifecycle tests, set `MAI_CODEX_TEST_EXE` to the absolute path of the native Codex executable.
 
 ## Not finished or not measured
 

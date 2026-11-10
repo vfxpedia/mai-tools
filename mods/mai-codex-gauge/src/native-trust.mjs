@@ -9,6 +9,8 @@ import {hookCommand} from './hook-command.mjs';
 const expected=['sessionStart','userPromptSubmit','preToolUse','postToolUse','stop','interrupt','preCompact','postCompact'];
 const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
 const norm=p=>path.resolve(p).replaceAll('\\','/');
+// The native engine may bind both the command and its local source digest.
+const nativeHash=/^(?:(?:sha256:)?[a-f\d]{64}|sha256:[a-f\d]{64}\/sha256:[a-f\d]{64})$/;
 function selectGauge(response,home){
  if(!Array.isArray(response?.data)||response.data.some(x=>!Array.isArray(x.hooks)||!Array.isArray(x.errors)||x.errors.length))throw Error('native hook inventory unavailable');
  const cfg=readJson(safePath(home,'mai-codex-gauge.json'));
@@ -23,7 +25,7 @@ function selectGauge(response,home){
  });
  if(hooks.length!==8||expected.some(e=>hooks.filter(h=>h.eventName===e).length!==1)||new Set(hooks.map(h=>h.key)).size!==8)throw Error('exact eight product hooks required');
  for(const h of hooks){
-  if(h.enabled!==true||h.isManaged||norm(h.sourcePath)!==source||typeof h.key!=='string'||!h.key||!/^(?:sha256:)?[a-f\d]{64}$/.test(h.currentHash)||!['untrusted','modified','trusted'].includes(h.trustStatus))throw Error('product hook review refused');
+  if(h.enabled!==true||h.isManaged||norm(h.sourcePath)!==source||typeof h.key!=='string'||!h.key||typeof h.currentHash!=='string'||!nativeHash.test(h.currentHash)||!['untrusted','modified','trusted'].includes(h.trustStatus))throw Error('product hook review refused');
  }
  return hooks;
 }

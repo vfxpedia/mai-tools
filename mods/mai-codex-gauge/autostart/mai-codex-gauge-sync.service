@@ -1,0 +1,12 @@
+[Unit]
+Description=MAI Codex gauge for Orca CLI tabs
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node %h/.codex/mai-codex-gauge/src/setup.mjs orca-service --home %h/.codex --orca /usr/bin/orca-ide --exe %h/.local/bin/codex
+Restart=on-failure
+RestartSec=15s
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

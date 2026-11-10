@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {pathToFileURL} from 'node:url';
+import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {fileURLToPath} from 'node:url';
 import {safePath,validateId,readJson,saveSession,atomicUpdate,isEntry} from './store.mjs';
 import {bandRows,renderRows,freshLimits,pace,recentRate} from './band.mjs';
 import {normalizeProviderUsage,readProviderUsage,discoverProviderRpc} from './provider.mjs';
@@ -91,19 +91,27 @@ export async function syncGauge({base,home,codexHome=home,account,sessions,readQ
 export async function main(args=process.argv.slice(2)){
  const command=args.shift()??'show', opts={};for(let i=0;i<args.length;i++){const a=args[i];if(!a.startsWith('--'))throw Error('invalid argument');opts[a.slice(2)]=args[i+1]?.startsWith('--')||!args[i+1]?true:args[++i];}
  const base=opts.base??path.join(os.homedir(),'.mai'),sessionId=opts.session??process.env.CODEX_THREAD_ID;
- if(command==='sync'){
+ if(command==='sync'||command==='orca-service'){
   const home=path.resolve(opts.home??process.env.CODEX_HOME??path.join(os.homedir(),'.codex'));
   const account=readJson(safePath(home,'mai-codex-gauge.json'))?.account;
-  if(typeof opts.sessions!=='string'||opts.exe!==undefined&&(typeof opts.exe!=='string'||!path.isAbsolute(opts.exe))||opts.loop!==undefined&&opts.loop!==true||!/^codex:[\w-]+$/.test(account??''))throw Error('sync requires exact sessions and an installed Codex account');
-  const sessions=opts.sessions.split(','),cache=new Map();
+  const auto=command==='orca-service';
+  if((auto?opts.sessions!==undefined||typeof opts.orca!=='string':typeof opts.sessions!=='string')||opts.exe!==undefined&&(typeof opts.exe!=='string'||!path.isAbsolute(opts.exe))||opts.loop!==undefined&&opts.loop!==true||!/^codex:[\w-]+$/.test(account??''))throw Error('sync requires a verified scope and an installed Codex account');
+  const fixed=auto?null:opts.sessions.split(','),cache=new Map();
+  const orca=auto?await import('./orca-auto.mjs'):null,run=orca?.orcaRunner(opts.orca);
+  const loop=auto?opts.once!==true:opts.loop===true,entry=fileURLToPath(import.meta.url);
   const rpc=opts.exe?{executable:opts.exe,args:['app-server','--stdio'],environment:{...process.env,CODEX_HOME:home,CODEX_THREAD_ID:''},timeoutMs:5000}:discoverProviderRpc(home);
   let nextQuota=0,previous='';
   do{
-   const query=Boolean(rpc)&&Date.now()>=nextQuota;if(query)nextQuota=Date.now()+60000;
-   const result=await syncGauge({base,home,account,sessions,cache,readQuota:query?async()=>(await readProviderUsage({...rpc,sessionId:sessions[0],includeLimits:true})).rateLimits:null});
-   if(query||JSON.stringify(result.failed)!==previous||!opts.loop)console.log(JSON.stringify({...result,quotaQueried:query}));
-   previous=JSON.stringify(result.failed);
-   if(!opts.loop){if(result.failed.length||query&&!result.quotaReceived)process.exitCode=1;return;}
+   let topology=null;
+   if(auto)try{topology=await orca.reconcileOrca({base,home,account,entry,run});}catch{/* Orca might not be running yet at login. */}
+   const sessions=fixed??[...new Set(topology?.sessions??[])].slice(0,16);
+   if(auto)for(const id of cache.keys())if(!sessions.includes(id))cache.delete(id);
+   const query=sessions.length>0&&Boolean(rpc)&&Date.now()>=nextQuota;if(query)nextQuota=Date.now()+60000;
+   const result=sessions.length?await syncGauge({base,home,account,sessions,cache,readQuota:query?async()=>(await readProviderUsage({...rpc,sessionId:sessions[0],includeLimits:true})).rateLimits:null}):{observed:0,quotaReceived:false,quotaUpdated:0,failed:[]};
+   const state=JSON.stringify([result.failed,sessions.length,auto&&topology===null]);
+   if(query||state!==previous||topology?.attached.length||!loop)console.log(JSON.stringify({...result,quotaQueried:query,...(auto?{orcaReachable:topology!==null,attached:topology?.attached??[]}:{} )}));
+   previous=state;
+   if(!loop){if(result.failed.length||query&&!result.quotaReceived||auto&&topology===null)process.exitCode=1;return;}
    await new Promise(resolve=>setTimeout(resolve,5000));
   }while(true);
  }
@@ -114,6 +122,6 @@ export async function main(args=process.argv.slice(2)){
  if(command==='metrics')return console.log(JSON.stringify(metrics({base,sessionId}),null,2));
  if(command==='status'){validateId(sessionId);saveSession(base,sessionId,{at:Date.now(),cwd:process.cwd(),...(opts.name?{name:opts.name,titled:true}:{}),...(opts.doing?{doing:opts.doing}:{}),...(opts.issues?{issues:opts.issues.split(',')}:{}),...(opts.next?{next:opts.next}:{}),...(opts.waiting!==undefined?{waiting:opts.waiting}:{}),handle:process.env.ORCA_TERMINAL_HANDLE??null});return console.log('Session status saved.');}
  if(command==='scan'||command==='observe'||command==='diagnose'){if(opts.rebuild!==undefined&&(command!=='scan'||!['true',true].includes(opts.rebuild)))throw Error('--rebuild true requires scan');const {observe}=await import('./hook.mjs');const result=await observe({base,sessionId,transcript:opts.transcript,codexHome:opts.home??process.env.CODEX_HOME,account:opts.account,full:command==='scan',rebuild:!!opts.rebuild});return console.log(JSON.stringify(result));}
- throw Error('commands: show, watch, live, sync, status, scan, observe, diagnose, api');
+ throw Error('commands: show, watch, live, sync, orca-service, status, scan, observe, diagnose, api');
 }
 if(isEntry(import.meta.url))main().catch(()=>{console.error('Gauge command failed. Run diagnose or inspect the private source state.');process.exitCode=1;});

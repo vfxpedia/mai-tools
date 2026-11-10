@@ -125,7 +125,7 @@ context는 마지막 요청의 입력과 모델 창을 비교한 관측값이다
 
 ## Linux Orca 자동 부착
 
-설치 뒤 사용자 단위 서비스를 켜면 (`autostart/mai-codex-gauge-sync.service`, 켜는 명령은 영문 README) 새 Codex 탭이나 이어 붙인 탭에서 신뢰된 `SessionStart` 가 돌 때 그 창 아래에 계기판이 붙는다. Codex 0.167 은 첫 질문을 받을 때 세션을 시작하므로 탭을 열기만 해서는 붙지 않는다. 계기판 창에는 `mai-codex-gauge <세션 ID>` 이름표가 붙고, Orca 를 다시 켜 그 창이 빈 셸로 복원되면 서비스가 그 창에만 한 번 watch 를 다시 넣는다.
+설치 뒤 사용자 단위 서비스를 켜면 (`autostart/mai-codex-gauge-sync.service`, 켜는 명령은 영문 README) 새 Codex 탭이나 이어 붙인 탭에서 신뢰된 `SessionStart` 가 돌 때 그 창 아래에 계기판이 붙는다. Codex 0.167 은 첫 질문을 받을 때 세션을 시작하므로 탭을 열기만 해서는 새로 붙지 않는다. 이미 분할된 탭이 복원되면 첫 질문 전에도 `mai-codex-gauge <세션 ID>` 이름표와 해당 Codex 홈의 세션 기록을 확인해 watch 를 되살릴 수 있다. 아래 창의 마지막 표시 줄이 빈 셸 프롬프트일 때만 해당 셸에 한 번 넣는다. 이전 명령 출력이 그 위에 남아 있어도 된다.
 
 높이: Orca 공개 CLI 에는 분할 높이 인자가 없어 새 계기판은 반반으로 열린다. 구분선을 한 번 끌어 아래 창을 150 px 로 맞추면 (context 부터 now 까지 다섯 줄) Orca 가 탭 배치로 기억한다.
 

@@ -123,6 +123,12 @@ native `UserPromptSubmit`가 시작 전 API 표본을, 같은 `turn_id`의 `Stop
 
 context는 마지막 요청의 입력과 모델 창을 비교한 관측값이다. 85%는 정리 권고일 뿐 자동 compact 임계값이 아니다. 공유 `contextPercent`는 compact 분모가 확인되지 않아 null이다. 한도는 마지막 실제 요청의 표본이며 5시간/7일을 창 길이로 구분한다. 실제 quota 조회가 성공했지만 없는 창은 `not provided`, 아직 조회 근거가 없으면 `no data yet`이다. 쉬는 세션이 시간만 바꿔 새 표본을 만들지 않는다.
 
+## Linux Orca 자동 부착
+
+설치 뒤 사용자 단위 서비스를 켜면 (`autostart/mai-codex-gauge-sync.service`, 켜는 명령은 영문 README) 새 Codex 탭이나 이어 붙인 탭에서 신뢰된 `SessionStart` 가 돌 때 그 창 아래에 계기판이 붙는다. Codex 0.167 은 첫 질문을 받을 때 세션을 시작하므로 탭을 열기만 해서는 붙지 않는다. 계기판 창에는 `mai-codex-gauge <세션 ID>` 이름표가 붙고, Orca 를 다시 켜 그 창이 빈 셸로 복원되면 서비스가 그 창에만 한 번 watch 를 다시 넣는다.
+
+높이: Orca 공개 CLI 에는 분할 높이 인자가 없어 새 계기판은 반반으로 열린다. 구분선을 한 번 끌어 아래 창을 150 px 로 맞추면 (context 부터 now 까지 다섯 줄) Orca 가 탭 배치로 기억한다.
+
 ## 맥락 보존과 한계
 
 훅은 원본 JSONL을 수정하거나 요약으로 대체하지 않는다. 50%에서 원문 경로·cursor·업무·이슈·next를 자기 units에 저장한다. 75%에서 현재 작업 단위 종료 후 정본 Issue에 목표·결과·결정·실측·남은 일·대기를 게시하고 다시 읽어 확인하도록 모델에 지시한다. 85%에서 이어가기 기록을 준비한다. 지시 생성은 실제 Issue 게시와 다르므로 체크포인트의 `issueStatus`는 확인 근거가 없으면 `requested`다. `compactStatus:not-triggered`를 기록하며 실행하지 않은 compact를 성공으로 표시하지 않는다.

@@ -67,6 +67,9 @@ def main(argv=None):
     lv.add_argument('--config', default=None, help='optional: also run the workload collector of this configuration')
     lv.add_argument('--gpu-jobs', default=None, help='optional: a GPU job board module (gpu_jobs.py) shown read-only in a "GPU 작업" tab')
     lv.add_argument('--worklist', default=None, help='optional: a work list (WORK.tsv or WORKLIST.tsv) checked by mai-work and shown in a "작업" tab')
+    lv.add_argument('--inbox', action='store_true', help='optional: Orca orchestration messages between sessions, read-only, in a "받은편지함" tab')
+    ib = sub.add_parser('inbox', help='print Orca orchestration messages (who wrote to whom, what), newest last; --follow keeps it fresh')
+    ib.add_argument('--follow', action='store_true'); ib.add_argument('--every', type=float, default=10.0); ib.add_argument('--limit', type=int, default=30)
     v = sub.add_parser('validate'); v.add_argument('files', nargs='+')
     i = sub.add_parser('init'); i.add_argument('dir')
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -102,6 +105,8 @@ def main(argv=None):
         return run_demo(a)
     if a.cmd == 'status':
         return run_status(a)
+    if a.cmd == 'inbox':
+        return run_inbox(a)
     try:
         cfg = collector.load_config(a.config)
     except FileNotFoundError:
@@ -237,6 +242,22 @@ def run_demo(a):
     return run_live(a)
 
 
+def run_inbox(a):
+    import shutil
+    import time
+    from mai_watch import inbox
+    box = inbox.Inbox()
+    while True:
+        inbox.FAST_S = 0
+        doc = box.document()
+        if a.follow:
+            print('\033[H\033[2J', end='')
+        print(inbox.text_view(doc, width=max(40, shutil.get_terminal_size((100, 30)).columns - 4), limit=a.limit), flush=True)
+        if not a.follow:
+            return 1 if doc.get('error') else 0
+        time.sleep(max(2.0, a.every))
+
+
 def run_live(a):
     """One process: live sampler, optional workload collector, local server. Ctrl+C stops all of them."""
     import threading
@@ -278,7 +299,11 @@ def run_live(a):
         if a.worklist:
             from mai_watch import worklist
             work = worklist.Worklist(a.worklist)
-        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler, gpu_jobs=board, worklist=work)
+        box = None
+        if a.inbox:
+            from mai_watch import inbox
+            box = inbox.Inbox()
+        srv = server.make_server(cfg.out_dir if cfg else None, a.port, live=sampler, gpu_jobs=board, worklist=work, inbox=box)
     except OSError as e:
         print('cannot listen on 127.0.0.1:%d (%s). Pick another port with --port.' % (a.port, e.strerror or e), file=sys.stderr)
         return 2

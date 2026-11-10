@@ -237,6 +237,23 @@
   .warn-text { color: var(--warn); font-weight: 600; }
   .work-event { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 3px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
   .work-fold { margin: 12px 0; }
+  /* 받은편지함 tab (owner 11/10): orchestration messages between sessions, newest first; who → whom is the first thing read */
+  #inbox-section { display: none; }
+  body[data-tab="inbox"] #inbox-section { display: block; }
+  body[data-tab="inbox"] #live-section, body[data-tab="inbox"] .page-fold, body[data-tab="inbox"] #alerts { display: none !important; }
+  .inbox-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 12px; }
+  .inbox-tools select, .inbox-tools input { font: inherit; min-height: 36px; padding: 4px 8px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .inbox-day { margin: 16px 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .inbox-msg { padding: 10px 0 10px 12px; border-bottom: 1px solid var(--line); border-left: 4px solid var(--line); min-width: 0; }
+  .inbox-msg.question { border-left-color: var(--warn); }
+  .inbox-msg.blocked { border-left-color: var(--bad); }
+  .inbox-route { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+  .inbox-route .who { font-weight: 700; font-size: 15px; }
+  .inbox-route .arrow { color: var(--muted); }
+  .inbox-route .pill { padding: 0 8px; }
+  .inbox-subject { margin-top: 3px; overflow-wrap: anywhere; font-weight: 600; }
+  .inbox-body { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.93em; }
+  .inbox-msg details summary { cursor: pointer; min-height: 28px; color: var(--muted); }
   .work-fold summary { cursor: pointer; font-weight: 600; min-height: 32px; }
   .work-foot { overflow-wrap: anywhere; }
   .job-gpus { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -293,7 +310,7 @@
   <span id="generated" class="mono"></span>
   <div class="header-actions"><button id="refresh" type="button" title="Reload this page, not the collector" aria-label="Reload page">↻ Reload</button><button id="theme" type="button" aria-label="Change color theme">Theme: System</button></div>
 </header>
-<nav id="tabs" class="tabs" hidden><button type="button" data-tab="live" aria-selected="true">Resources</button><button type="button" id="tab-gpu" data-tab="gpu" aria-selected="false" hidden>GPU 작업</button><button type="button" id="tab-work" data-tab="work" aria-selected="false" hidden>작업</button></nav>
+<nav id="tabs" class="tabs" hidden><button type="button" data-tab="live" aria-selected="true">Resources</button><button type="button" id="tab-gpu" data-tab="gpu" aria-selected="false" hidden>GPU 작업</button><button type="button" id="tab-work" data-tab="work" aria-selected="false" hidden>작업</button><button type="button" id="tab-inbox" data-tab="inbox" aria-selected="false" hidden>받은편지함</button></nav>
 <main>
   <div id="error" class="bad" role="alert"></div>
   <div id="alerts" class="warn" role="status"></div>
@@ -307,6 +324,7 @@
     </details><div id="live"></div></section>
   <section id="gpu-section"><div class="section-head"><h2>GPU 작업</h2><span id="gpu-status" class="pill warn">읽는 중</span><span id="gpu-freshness" class="quiet"></span></div><div id="gpu-board"></div></section>
   <section id="work-section"><div class="section-head"><h2>작업</h2><span id="work-status" class="pill warn">읽는 중</span><span id="work-freshness" class="quiet"></span></div><div id="work-board"></div></section>
+  <section id="inbox-section"><div class="section-head"><h2>받은편지함</h2><span id="inbox-status" class="pill warn">읽는 중</span><span id="inbox-freshness" class="quiet"></span></div><div id="inbox-board"></div></section>
   <details id="devicesfold" class="page-fold"><summary>Devices and idle record</summary><section id="devices-section"><h2>Devices (idle record)</h2><div id="devices"></div></section></details>
   <details id="workloadsfold" class="page-fold"><summary>Workloads</summary><section id="workloads-section"><h2>Workloads</h2><div class="scroll"><table id="workloads"></table></div></section></details>
   <details id="eventsfold" class="page-fold"><summary>Recent events</summary><section id="events-section"><h2>Recent events</h2><div class="scroll"><table id="events"></table></div></section></details>
@@ -317,6 +335,7 @@
 <script src="viewer-tabs.js"></script>
 <script src="viewer-gpu.js"></script>
 <script src="viewer-work.js"></script>
+<script src="viewer-inbox.js"></script>
 <script>
 (function () {
   'use strict';

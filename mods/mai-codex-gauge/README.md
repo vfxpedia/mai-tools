@@ -16,6 +16,12 @@ node src/setup.mjs rollback --manifest ABSOLUTE_BACKUP_MANIFEST
 
 `install` writes a recovery manifest first and changes only the Codex home of the current terminal (`CODEX_HOME`, else `~/.codex`). The owner trusts exactly the eight hooks it installs; nothing trusts them on the owner's behalf. On Linux, `bin/bootstrap-linux.sh` installs from a package file after the owner approves.
 
+### Companion panes for existing sessions
+
+Run `node src/setup.mjs sync --home ABSOLUTE_CODEX_HOME --exe ABSOLUTE_CODEX_EXE --sessions ID1,ID2 --loop` once per account, alongside the individual `watch --session ID` panes. Supply only exact, existing session IDs you have verified belong to that Codex home and login. If the home has a managed provider socket, `--exe` may be omitted.
+
+The collector checks the owned rollouts about every five seconds, reads account limits at most once per minute, and shares that display snapshot only with the listed sessions. An idle snapshot does not write to limit history or create a turn. Account limits can appear before a session sends its first prompt. Token counts remain per session and absent windows remain unavailable. This does not restart an agent, fix native hook trust, or perform checkpoint/compact actions. Omit `--loop` for a single diagnostic sync.
+
 ## Tests
 
 `node --test tests/*.test.mjs` (Node 22 or newer). 117 tests: 112 pass; 5 are skipped in a normal run because they drive a real Codex CLI or a real package install.

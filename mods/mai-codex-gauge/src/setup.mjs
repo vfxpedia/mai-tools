@@ -48,7 +48,7 @@ function parse(args){
 export async function main(args=process.argv.slice(2)){
  const command=args.shift()??'--help';
  if(['--help','help'].includes(command)){console.log('mai-codex-mods: plan | install | doctor | trust | checkpoint | rollback\ninstall --account codex:ALIAS [--home CODEX_HOME] [--mode auto|native|hooks]\ndoctor [--home CODEX_HOME] [--session ID] [--native true]\ntrust [--home CODEX_HOME] [--approve true]: exact eight hashes; explicit user approval only\ncheckpoint --session ID --comment EXACT_ISSUE_COMMENT_URL\nrollback --manifest EXACT_BACKUP_MANIFEST\nshow | metrics | watch | live | status | scan | api: existing gauge commands\nNode >=22; native hook trust review in /hooks or approved native trust RPC is required.');return;}
- if(['show','metrics','watch','live','status','scan','observe','diagnose','api'].includes(command)){const cli=await import('./cli.mjs');return cli.main([command,...args]);}
+ if(['show','metrics','watch','live','sync','orca-service','status','scan','observe','diagnose','api'].includes(command)){const cli=await import('./cli.mjs');return cli.main([command,...args]);}
  const options=parse(args),home=path.resolve(options.home??process.env.CODEX_HOME??path.join(os.homedir(),'.codex')),base=path.resolve(options.base??path.join(os.homedir(),'.mai')),sessionId=options.session??process.env.CODEX_THREAD_ID;
  if(options.exe&&(!['trust','doctor'].includes(command)||!path.isAbsolute(options.exe)))throw Error('--exe requires an absolute native executable for trust or doctor');
  const rpcOptions=options.exe?{executable:options.exe,args:['app-server','--stdio'],environment:{...process.env,CODEX_HOME:home,CODEX_THREAD_ID:''},timeoutMs:5000}:null;

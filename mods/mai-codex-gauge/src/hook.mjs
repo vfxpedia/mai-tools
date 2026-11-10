@@ -4,6 +4,7 @@ import {validateId,safePath,atomicUpdate,readJson,saveSession,saveTurns,saveLimi
 import {otherSessionsText,updateContextPolicy} from './context-policy.mjs';
 import {refreshProvider} from './provider.mjs';
 import {recordHookFailure} from './hook-diagnostics.mjs';
+import {registerOrca} from './orca-auto.mjs';
 const events=new Set(['SessionStart','UserPromptSubmit','PreToolUse','PostToolUse','Stop','Interrupt','PreCompact','PostCompact']);
 export function validateTranscript(file,home,id){
  validateId(id);if(typeof file!=='string'||typeof home!=='string'||file.split(/[\\/]/).includes('..'))throw Error('invalid transcript reference');
@@ -96,6 +97,8 @@ export async function handleHook(input,environment={}){
  const at=Date.now(),session=saveSession(base,id,{at,cwd:input.cwd??'',handle:environment.handle??process.env.ORCA_TERMINAL_HANDLE??null});
  const policyOutput=updateContextPolicy(base,id,input,session,at);
  if(input.hook_event_name==='SessionStart'){
+ if(process.platform==='linux')await registerOrca({base,home,account:cfg.account,sessionId:id,transcript:rollout,
+  paneKey:environment.paneKey??process.env.ORCA_PANE_KEY,handle:environment.handle??process.env.ORCA_TERMINAL_HANDLE});
  const units=readJson(safePath(base,'units',`${id}.json`));const text=`[MAI Codex continuity]\nWork: ${session.doing||'not set'}\nIssues: ${session.issues.join(', ')||'not set'}\nNext: ${session.next||'not set'}\nWaiting: ${session.waiting||'none'}\nFull original: ${units.codex.source}\nRead position: ${units.codex.cursor?.offset??0}\nShared unit index: ${safePath(base,'units',`${id}.json`)}\nThe index is not a substitute for the original. Reopen evidence before deciding. Do not declare unfinished work complete.`;
  const reference=path.join(home,'mai-codex-gauge','skills','mai-codex-continuity','SKILL.md');
  return {hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:text+'\nOperating command reference (read when a checkpoint is pending): '+reference+'\n'+(policyOutput.systemMessage??'')+'\n'+otherSessionsText(base,id,at)}};

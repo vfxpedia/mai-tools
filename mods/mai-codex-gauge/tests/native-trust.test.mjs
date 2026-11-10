@@ -11,6 +11,8 @@ test('approved native trust updates only the eight exact product handlers and pr
  const events=['sessionStart','userPromptSubmit','preToolUse','postToolUse','stop','interrupt','preCompact','postCompact'];
  const command=`node "${path.join(home,'mai-codex-gauge','src','hook.mjs').replaceAll('\\','/')}"`;
  const hooks=events.map((eventName,i)=>({key:`gauge:${i}`,currentHash:`sha256:${String(i).repeat(64)}`,eventName,command,handlerType:'command',sourcePath:path.join(home,'hooks.json'),enabled:true,isManaged:false,trustStatus:'untrusted'}));
+ const compound=`sha256:${'1'.repeat(64)}/sha256:${'2'.repeat(64)}`;
+ hooks[0].currentHash=compound;
  hooks.push({...hooks[0],key:'orca:other',command:'node orca-hook.js',trustStatus:'untrusted'});
  let reads=0,writes=0;
  const rpc=async(method,params)=>{
@@ -18,8 +20,12 @@ test('approved native trust updates only the eight exact product handlers and pr
   assert.equal(method,'config/batchWrite');writes++;
   assert.equal(params.reloadUserConfig,true);assert.equal(params.edits[0].keyPath,'hooks.state');
   assert.equal(params.edits[0].mergeStrategy,'upsert');assert.deepEqual(Object.keys(params.edits[0].value),events.map((_,i)=>`gauge:${i}`));
+  assert.equal(params.edits[0].value['gauge:0'].trusted_hash,compound);
   fs.appendFileSync(path.join(home,'config.toml'),'# verified trust fixture\n');return {status:'ok',version:'new'};
  };
+ hooks[0].currentHash=compound+'/sha256:'+'3'.repeat(64);
+ await assert.rejects(trustGaugeHooks({home,cwd:root,rpc,approved:true}),/review refused/);
+ assert.equal(writes,0);hooks[0].currentHash=compound;
  const plan=await trustGaugeHooks({home,cwd:root,rpc,approved:false});assert.equal(plan.review.length,8);assert.equal(writes,0);
  const result=await trustGaugeHooks({home,cwd:root,rpc,approved:true});assert.equal(result.verified,true);assert.equal(writes,1);assert.equal(result.handlers,8);
  const manifest=JSON.parse(fs.readFileSync(result.manifest,'utf8'));assert.equal(manifest.files.length,1);assert.equal(manifest.files[0].path,path.join(home,'config.toml'));

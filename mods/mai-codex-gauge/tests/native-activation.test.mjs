@@ -50,7 +50,7 @@ test('trusted SessionStart and UserPromptSubmit fire through the real engine wit
  const version=JSON.parse(fs.readFileSync(path.join(home,'mai-codex-gauge','package.json'),'utf8')).version;
  const hooksFile=path.join(home,'plugins','cache','mai-codex-local','mai-codex-gauge',version,'hooks.json'),hooks=JSON.parse(fs.readFileSync(hooksFile,'utf8'));
  hooks.hooks.UserPromptSubmit[0].hooks.push({type:'command',command:hookCommand(stopFile),timeout:5});fs.writeFileSync(hooksFile,JSON.stringify(hooks));
- const options={executable,args:['app-server','--stdio'],timeoutMs:5000,environment:{...process.env,CODEX_HOME:home,USERPROFILE:root,HOME:root,CODEX_THREAD_ID:'',ORCA_TERMINAL_HANDLE:''}};
+ const options={executable,args:['app-server','--stdio'],timeoutMs:5000,environment:{...process.env,CODEX_HOME:home,USERPROFILE:root,HOME:root,CODEX_THREAD_ID:'',ORCA_TERMINAL_HANDLE:'term_native-fixture',ORCA_PANE_KEY:'tab-fixture:leaf-fixture'}};
  await trustGaugeHooks({home,cwd:root,approved:true,rpc:(method,params)=>nativeRpc(options,method,params)});
  const inventory=await nativeRpc(options,'hooks/list',{cwds:[root]}),guard=inventory.data.flatMap(d=>d.hooks).find(h=>h.command.includes('offline-stop.cjs'));
  assert.ok(guard);await nativeRpc(options,'config/batchWrite',{edits:[{keyPath:'hooks.state',value:{[guard.key]:{trusted_hash:guard.currentHash}},mergeStrategy:'upsert'}],reloadUserConfig:true});
@@ -61,4 +61,9 @@ test('trusted SessionStart and UserPromptSubmit fire through the real engine wit
  assert.ok(own.codex.events.some(e=>e.event==='UserPromptSubmit'&&e.turnId===result.turn.id));assert.equal(result.turn.status,'completed');
  assert.match(JSON.stringify(result.notes),/Offline hook test: no model request/);assert.ok(!result.turn.items.some(x=>x.type==='agentMessage'));
  assert.deepEqual(fs.readdirSync(path.join(base,'sessions')),[result.thread.id+'.json']);assert.equal(own.codex.state.requests,0);
+ if(process.platform==='linux'){
+  const registration=JSON.parse(fs.readFileSync(path.join(base,'orca-gauge',result.thread.id+'.json'),'utf8'));
+  assert.equal(registration.handle,'term_native-fixture');assert.equal(registration.paneKey,'tab-fixture:leaf-fixture');
+  assert.equal(registration.sessionId,result.thread.id);
+ }
 });

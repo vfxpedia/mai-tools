@@ -7,7 +7,7 @@ import * as auto from '../src/orca-auto.mjs';
 import {handleHook} from '../src/hook.mjs';
 
 const tabId='tab-a',leafId='leaf-a',handle='term_original',paneKey=`${tabId}:${leafId}`;
-const primary={tabId,leafId,handle,agentIdentity:'codex',connected:true,worktreeId:'worktree-a'};
+const primary={tabId,leafId,handle,agentIdentity:'codex',connected:true,worktreeId:'worktree-a',executionHostId:'local'};
 const visible=(panes,terminals=[primary])=>({terminals,truncated:false,visualLayouts:[{root:{type:'group',tabs:[{tabId,panes}]}}]});
 const term=(handle)=>({type:'terminal',handle});
 function fixture(t){
@@ -81,6 +81,68 @@ const restored={handle:'term_gauge',tabId,leafId:'leaf-gauge',paneTitle:'mai-cod
 const lower={type:'pane-split',direction:'horizontal',first:term(handle),second:term(restored.handle)};
 const prompt='jay@ai-lx01:/work/gauge$ ';
 const blankScreen={handle:restored.handle,status:'running',source:'screen',tail:['',prompt,''],truncated:false,limited:false};
+test('a restored shell can have wrapped history above its final empty prompt',async t=>{
+ const f=fixture(t);await auto.registerOrca(f);
+ const run=async args=>{
+  if(args[1]==='list')return visible(lower,[primary,restored]);
+  if(args[1]==='read')return {terminal:{...blankScreen,
+   tail:[prompt+'node old-watch --session session-a',' continued',prompt,''],
+   tailRows:[{wrapped:false},{wrapped:true},{wrapped:false},{wrapped:false}]}};
+  if(args[1]==='send')return {send:{handle:restored.handle,accepted:true}};
+  throw Error('unexpected command');
+ };
+ assert.deepEqual((await auto.reconcileOrca({...f,run})).restored,['session-a']);
+});
+test('a titled local Codex split recovers without SessionStart and keeps the same at-most-once guard',async t=>{
+ const f=fixture(t),sends=[];
+ const run=async args=>{
+  if(args[1]==='list')return visible(lower,[primary,restored]);
+  if(args[1]==='read')return {terminal:blankScreen};
+  if(args[1]==='send'){sends.push(args);return {send:{handle:restored.handle,accepted:true}};}
+  throw Error('unexpected command');
+ };
+ assert.deepEqual(auto.readOrcaRegistrations(f),[]);
+ const first=await auto.reconcileOrca({...f,run});
+ assert.deepEqual(first.restored,['session-a']);
+ assert.deepEqual(first.sessions,['session-a']);
+ assert.deepEqual(auto.readOrcaRegistrations(f),[]);
+ await auto.registerOrca(f);
+ assert.deepEqual((await auto.reconcileOrca({...f,run})).restored,[]);
+ assert.equal(sends.length,1);
+ assert.deepEqual(sends[0].slice(0,5),['terminal','send','--terminal','term_gauge','--text']);
+ assert.match(sends[0][5],/watch --session session-a --base /);
+});
+test('title-only recovery rejects a missing or foreign rollout and an unrelated upper pane',async t=>{
+ const f=fixture(t),sends=[];
+ const sessions=path.join(f.home,'sessions');
+ fs.writeFileSync(path.join(sessions,'rollout-session-b.jsonl'),'{"type":"session_meta","payload":{"id":"another-owner"}}\n');
+ for(const [upper,pane] of [
+  [primary,{...restored,paneTitle:'mai-codex-gauge session-b'}],
+  [primary,{...restored,paneTitle:'mai-codex-gauge missing'}],
+  [primary,{...restored,paneTitle:'mai-codex-gauge session-a\n'}],
+  [{...primary,agentIdentity:'claude'},restored],
+  [{...primary,executionHostId:'remote'},restored]
+ ]){
+  const run=async args=>{
+   if(args[1]==='list')return visible(lower,[upper,pane]);
+   if(args[1]==='read')return {terminal:blankScreen};
+   sends.push(args);return {};
+  };
+  assert.deepEqual((await auto.reconcileOrca({...f,run})).sessions,[]);
+ }
+ assert.deepEqual(sends,[]);
+});
+test('a valid but conflicting title does not override a current SessionStart binding',async t=>{
+ const f=fixture(t);await auto.registerOrca(f);
+ fs.writeFileSync(path.join(f.home,'sessions','rollout-session-b.jsonl'),'{"type":"session_meta","payload":{"id":"session-b"}}\n');
+ const run=async args=>{
+  assert.equal(args[1],'list');
+  return visible(lower,[primary,{...restored,paneTitle:'mai-codex-gauge session-b'}]);
+ };
+ const result=await auto.reconcileOrca({...f,run});
+ assert.deepEqual(result.sessions,['session-a']);
+ assert.deepEqual(result.restored,[]);
+});
 test('only the exact restored companion receives watch, once per shell even after an ambiguous receipt',async t=>{
  const f=fixture(t),sends=[];await auto.registerOrca(f);
  let incarnation=restored.incarnationId;
@@ -112,6 +174,8 @@ test('untitled, foreign, occupied and unverifiable panes never receive terminal 
   [{...restored,agentIdentity:'codex'},blankScreen],
   [{...restored,tabId:'elsewhere'},blankScreen],
   [restored,{...blankScreen,tail:[prompt+'echo $']}],
+  [restored,{...blankScreen,tail:[prompt,'command still running']}],
+  [restored,{...blankScreen,tail:[prompt],tailRows:[{wrapped:true}]}],
   [restored,{...blankScreen,tail:['context 80%','turn T 100']}],
   [restored,{...blankScreen,source:'screen-unavailable'}],
   [restored,{...blankScreen,draft:'something'}]

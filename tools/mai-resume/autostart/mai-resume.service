@@ -6,7 +6,7 @@
 # Check: systemctl --user status mai-resume ; ~/.venvs/mai-resume/bin/mai-resume status
 [Unit]
 Description=mai-resume: warn AI coding sessions before a plan limit, wake them after the reset
-After=default.target
+# no After=default.target: with WantedBy=default.target it is an ordering cycle; on ai-lx01 11/10 23:24 systemd dropped mai-limit-guard (After=mai-resume) at boot
 
 [Service]
 ExecStart=%h/.venvs/mai-resume/bin/mai-resume run

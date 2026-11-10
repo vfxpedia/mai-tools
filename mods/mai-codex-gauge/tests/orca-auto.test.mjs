@@ -7,7 +7,7 @@ import * as auto from '../src/orca-auto.mjs';
 import {handleHook} from '../src/hook.mjs';
 
 const tabId='tab-a',leafId='leaf-a',handle='term_original',paneKey=`${tabId}:${leafId}`;
-const primary={tabId,leafId,handle,agentIdentity:'codex',connected:true};
+const primary={tabId,leafId,handle,agentIdentity:'codex',connected:true,worktreeId:'worktree-a'};
 const visible=(panes,terminals=[primary])=>({terminals,truncated:false,visualLayouts:[{root:{type:'group',tabs:[{tabId,panes}]}}]});
 const term=(handle)=>({type:'terminal',handle});
 function fixture(t){
@@ -62,4 +62,68 @@ test('a truncated topology is not considered a healthy no-op',async t=>{
   assert.equal(args[1],'list');
   return {...visible(term(handle)),truncated:true};
  }}),/complete Orca topology unavailable/);
+});
+test('new split gets the exact session title on the companion only',async t=>{
+ const f=fixture(t),titles=[];await auto.registerOrca(f);
+ const run=async args=>{
+  if(args[1]==='list')return visible(term(handle));
+  if(args[1]==='split')return {split:{handle:'term_new_gauge',tabId}};
+  if(args[1]==='set-pane-title'){titles.push(args);return {paneTitle:{title:'mai-codex-gauge session-a'}};}
+  throw Error('unexpected call');
+ };
+ const result=await auto.reconcileOrca({...f,run});
+ assert.deepEqual(result.attached,['session-a']);
+ assert.deepEqual(result.titleFailures,[]);
+ assert.deepEqual(titles,[['terminal','set-pane-title','--terminal','term_new_gauge','--title','mai-codex-gauge session-a','--json']]);
+});
+const restored={handle:'term_gauge',tabId,leafId:'leaf-gauge',paneTitle:'mai-codex-gauge session-a',
+ connected:true,writable:true,executionHostId:'local',worktreeId:'worktree-a',worktreePath:'/work/gauge',incarnationId:'incarnation-a'};
+const lower={type:'pane-split',direction:'horizontal',first:term(handle),second:term(restored.handle)};
+const prompt='jay@ai-lx01:/work/gauge$ ';
+const blankScreen={handle:restored.handle,status:'running',source:'screen',tail:['',prompt,''],truncated:false,limited:false};
+test('only the exact restored companion receives watch, once per shell even after an ambiguous receipt',async t=>{
+ const f=fixture(t),sends=[];await auto.registerOrca(f);
+ let incarnation=restored.incarnationId;
+ const run=async args=>{
+  if(args[1]==='list')return visible(lower,[primary,{...restored,incarnationId:incarnation}]);
+  if(args[1]==='read')return {terminal:blankScreen};
+  if(args[1]==='send'){
+   sends.push(args);
+   if(incarnation==='incarnation-a')throw Error('ambiguous transport');
+   return {send:{handle:'term_gauge',accepted:true}};
+  }
+  throw Error('unexpected command');
+ };
+ assert.deepEqual((await auto.reconcileOrca({...f,run})).restored,[]);
+ await auto.reconcileOrca({...f,run});
+ assert.equal(sends.length,1);
+ assert.deepEqual(sends[0].slice(0,5),['terminal','send','--terminal','term_gauge','--text']);
+ assert.match(sends[0][5],/watch --session session-a --base /);
+ assert.deepEqual(sends[0].slice(6),['--enter','--json']);
+ incarnation='incarnation-b';
+ assert.deepEqual((await auto.reconcileOrca({...f,run})).restored,['session-a']);
+ assert.equal(sends.length,2);
+});
+test('untitled, foreign, occupied and unverifiable panes never receive terminal input',async t=>{
+ const f=fixture(t);await auto.registerOrca(f);
+ const cases=[
+  [{...restored,paneTitle:undefined},blankScreen],
+  [{...restored,paneTitle:'mai-codex-gauge session-b'},blankScreen],
+  [{...restored,agentIdentity:'codex'},blankScreen],
+  [{...restored,tabId:'elsewhere'},blankScreen],
+  [restored,{...blankScreen,tail:[prompt+'echo $']}],
+  [restored,{...blankScreen,tail:['context 80%','turn T 100']}],
+  [restored,{...blankScreen,source:'screen-unavailable'}],
+  [restored,{...blankScreen,draft:'something'}]
+ ];
+ for(const [row,screen] of cases){
+  const writes=[];
+  const run=async args=>{
+   if(args[1]==='list')return visible(lower,[primary,row]);
+   if(args[1]==='read')return {terminal:screen};
+   writes.push(args);return {};
+  };
+  await auto.reconcileOrca({...f,run});
+  assert.deepEqual(writes,[]);
+ }
 });

@@ -57,6 +57,13 @@ def _gib(n):
     return round(n / 2 ** 30, 2)
 
 
+def short_process_name(raw):
+    """nvidia-smi on Windows gives the program path, on Linux the whole command line (11/14: Orca's Electron helper filled
+    a GPU row with 1,500 characters). Keep the program file name only: cut at the first ' -' argument, then the basename."""
+    head = re.split(r'\s+-', (raw or '').strip(), maxsplit=1)[0]
+    return os.path.basename(head.replace('\\', '/')).strip()
+
+
 class LiveSampler:
     def __init__(self, nvidia_cmd=('nvidia-smi',), interval_s=1.0, history_s=600, clock=time.time, psutil_module=None, gpu_reader=None,
                  paths=None, mai_home=None, usage_on=True, slow_interval_s=30, path_timeout_s=3.0, rate_clock=time.monotonic, usage_reader=None,
@@ -177,7 +184,7 @@ class LiveSampler:
             by_uuid = {}
             if apps is not None:
                 for app in apps:
-                    name = os.path.basename(app['name'].replace('\\', '/')).strip()
+                    name = short_process_name(app['name'])
                     # WDDM can return desktop apps with unreadable memory, not a measured compute workload.
                     if (app['pid'] is None or app['pid'] <= 0 or not float(app['pid']).is_integer()
                             or app['memory_mib'] is None or app['memory_mib'] <= 0
@@ -247,6 +254,13 @@ class LiveSampler:
                 if value in ('--run_name', '--run-name', '--experiment_name', '--experiment-name') and i + 1 < len(cmd):
                     run_name = cmd[i + 1]
                     break
+            if not run_name:   # an evaluation names no run; its checkpoint folder is the run it measures
+                for i, value in enumerate(cmd):
+                    ckpt = value.split('=', 1)[1] if value.startswith('--checkpoint=') else (
+                        cmd[i + 1] if value == '--checkpoint' and i + 1 < len(cmd) else None)
+                    if ckpt:
+                        run_name = os.path.basename(os.path.dirname(ckpt.replace('\\', '/')))
+                        break
             if run_name:
                 run_name = re.sub(r'[^A-Za-z0-9_.+-]', '_', os.path.basename(run_name.replace('\\', '/')))[:80]
             return {'run_name': run_name, 'elapsed_s': max(0, int(self.clock() - born))}

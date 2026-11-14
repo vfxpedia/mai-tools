@@ -77,6 +77,20 @@ class SamplerTests(unittest.TestCase):
                          (42, 'python.exe', 'terrain_trial', 100, 2048))
         self.assertEqual(sample['gpus'][1]['processes'], [])
 
+    def test_linux_command_line_names_shrink_to_the_program_and_evals_take_the_checkpoint_run(self):
+        self.assertEqual(live.short_process_name('/opt/Orca/orca-ide --type=utility --x=/a/b --trace-process-track-uuid=3'), 'orca-ide')
+        self.assertEqual(live.short_process_name('/home/jay/miniforge3/envs/isaac311/bin/python'), 'python')
+        self.assertEqual(live.short_process_name('C:\\Program Files\\App\\trainer.exe'), 'trainer.exe')
+        s = sampler()
+        s._apps_reader = lambda: 'GPU-aaaaaaaa-0000-0000-0000-000000000001, 42, /x/bin/python -m foothold_s2.eval.eval_map_modes --task T, 4821\n'
+        class Proc:
+            def __init__(self, pid): self.pid = pid
+            def create_time(self): return 1799999900
+            def cmdline(self): return ['python', '-m', 'm', '--checkpoint', '/d/s2_lab/x/main/EX-42-B-E1-v28c_20261114/model_750.pt']
+        s._ps().Process = Proc
+        p0 = s.sample_once()['gpus'][0]['processes'][0]
+        self.assertEqual((p0['process'], p0['run_name']), ('python', 'EX-42-B-E1-v28c_20261114'))
+
     def test_compute_list_discards_unreadable_rows_before_metadata_and_caps_each_gpu(self):
         s = sampler()
         first = 'GPU-aaaaaaaa-0000-0000-0000-000000000001'

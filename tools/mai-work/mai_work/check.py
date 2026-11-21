@@ -18,6 +18,7 @@ Rules (design `os/worklist-tool-design.md` 4 절):
 """
 import datetime
 import os
+import re
 import time
 
 from . import convert as conv
@@ -62,8 +63,7 @@ def iso_with_zone(value):
 # Windows evidence paths read on Linux ai-lx01 (11/10): the Windows disks are mounted at /mnt/win-c (ro) and /mnt/win-d (rw),
 # and the 11/09 D: cleanup moved these roots behind junctions that Linux may not follow, so their real folders come first.
 # Longest prefix wins. Override with MAI_WORK_PATH_MAP="WIN=LINUX;WIN=LINUX". Windows itself never rewrites.
-PATH_MAP = (('C:/Users/AI-WS01/s2_lab', '/mnt/win-d/mai/data/foothold/s2_lab'),
-            ('D:/mai-wt-archive', '/mnt/win-d/mai/wt-archive'), ('D:/mai-wt', '/mnt/win-d/mai/wt'),
+PATH_MAP = (('D:/mai-wt-archive', '/mnt/win-d/mai/wt-archive'), ('D:/mai-wt', '/mnt/win-d/mai/wt'),
             ('D:/mai-tmp', '/mnt/win-d/mai/tmp'), ('D:/mai-cache', '/mnt/win-d/mai/cache'),
             ('D:/mai-video', '/mnt/win-d/mai/data/foothold/video'),
             ('C:', '/mnt/win-c'), ('D:', '/mnt/win-d'))
@@ -77,6 +77,11 @@ def local_path(path, os_name=None, env=None):
         return path
     p = path.replace('\\', '/')
     pairs = [tuple(x.split('=', 1)) for x in (env.get('MAI_WORK_PATH_MAP') or '').split(';') if '=' in x] or PATH_MAP
+    # The legacy junction was under a Windows home, not under a particular person's name.
+    # An explicit map remains authoritative, including an intentional C: override.
+    legacy = re.match(r'^C:/Users/[^/]+/s2_lab(?=/|$)', p, re.IGNORECASE) if pairs is PATH_MAP else None
+    if legacy:
+        return '/mnt/win-d/mai/data/foothold/s2_lab' + p[legacy.end():]
     for win, lin in sorted(pairs, key=lambda kv: -len(kv[0])):
         if p.lower() == win.lower() or p.lower().startswith(win.lower().rstrip('/') + '/'):
             return lin.rstrip('/') + p[len(win.rstrip('/')):]

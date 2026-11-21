@@ -79,7 +79,7 @@ class SamplerTests(unittest.TestCase):
 
     def test_linux_command_line_names_shrink_to_the_program_and_evals_take_the_checkpoint_run(self):
         self.assertEqual(live.short_process_name('/opt/Orca/orca-ide --type=utility --x=/a/b --trace-process-track-uuid=3'), 'orca-ide')
-        self.assertEqual(live.short_process_name('/home/jay/miniforge3/envs/isaac311/bin/python'), 'python')
+        self.assertEqual(live.short_process_name('/home/user/miniforge3/envs/isaac311/bin/python'), 'python')
         self.assertEqual(live.short_process_name('C:\\Program Files\\App\\trainer.exe'), 'trainer.exe')
         s = sampler()
         s._apps_reader = lambda: 'GPU-aaaaaaaa-0000-0000-0000-000000000001, 42, /x/bin/python -m foothold_s2.eval.eval_map_modes --task T, 4821\n'

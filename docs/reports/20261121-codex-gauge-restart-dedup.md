@@ -35,6 +35,10 @@ runner 중복은 정확한 화면과 PID를 확인해 닫았다. verifier 중복
 
 150px는 기존 아래 창의 배치를 보존하는 방식이다. 현재 Orca 공개 split CLI에는 높이 인자가 없다. 신규 창을 자동으로 정확히 150px로 만드는 기능이 생겼다고 주장하지 않는다. 전체 Orca 재시작은 진행 중인 다른 작업을 보호하기 위해 이번에 실행하지 않았다. 재시작 경계는 격리 회귀시험과 실제 중복 상태 복구로 검증했다.
 
+## 배포 관문 보강
+
+PR CI에서 기존 main과 똑같은 hygiene 위반 다섯 건이 발견됐다. 두 시험의 개인 경로를 예시 경로로 바꾸고, mai-work의 옛 Windows 홈 매핑을 특정 사용자 이름에 의존하지 않게 고쳤다. 기존 junction 목적지와 명시적 `MAI_WORK_PATH_MAP` 우선순위는 유지했다. 두 사용자 예시, 폴더 접두사 경계, Windows 무변환, 명시적 설정 덮어쓰기를 실제 함수로 시험했다. 이 시험은 unittest discovery에도 포함했다. hygiene 재검사 결과 0건이다.
+
 ## 되돌리기
 
 설치기는 변경 전 바이트와 manifest를 Codex 홈의 `mai-codex-gauge-backups`에 보존한다. 해당 manifest를 `setup.mjs rollback --manifest <절대 경로>`에 주고 계기판 동기 서비스만 재시작하면 된다. 닫은 중복 창의 작업 데이터는 없으며 기존 정본 계기판과 에이전트 대화는 유지했다.

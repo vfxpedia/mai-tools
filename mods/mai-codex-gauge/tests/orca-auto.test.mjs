@@ -76,11 +76,62 @@ test('new split gets the exact session title on the companion only',async t=>{
  assert.deepEqual(result.titleFailures,[]);
  assert.deepEqual(titles,[['terminal','set-pane-title','--terminal','term_new_gauge','--title','mai-codex-gauge session-a','--json']]);
 });
+test('restoration does not split while the existing watch is alive but absent from topology',async t=>{
+ const f=fixture(t),splits=[];await auto.registerOrca(f);
+ await auto.reconcileOrca({...f,readProcesses:()=>[{pid:10,start:'123',sessionId:'session-a',handle:'term_restoring',paneKey:'old:leaf'}],run:async args=>{
+  if(args[1]==='list')return visible(term(handle));
+  if(args[1]==='split'){splits.push(args);return {};}
+  throw Error('unexpected command');
+ }});
+ assert.deepEqual(splits,[]);
+});
 const restored={handle:'term_gauge',tabId,leafId:'leaf-gauge',paneTitle:'mai-codex-gauge session-a',
  connected:true,writable:true,executionHostId:'local',worktreeId:'worktree-a',worktreePath:'/work/gauge',incarnationId:'incarnation-a'};
 const lower={type:'pane-split',direction:'horizontal',first:term(handle),second:term(restored.handle)};
 const prompt='jay@ai-lx01:/work/gauge$ ';
 const blankScreen={handle:restored.handle,status:'running',source:'screen',tail:['',prompt,''],truncated:false,limited:false};
+test('process evidence requires our executable, script, base and exact pane identity',{skip:process.platform!=='linux'},t=>{
+ const f=fixture(t),proc=path.join(f.home,'proc');fs.mkdirSync(proc);
+ const dir=path.join(proc,'10');fs.mkdirSync(dir);fs.symlinkSync(process.execPath,path.join(dir,'exe'));
+ const command=[process.execPath,f.entry,'watch','--session','session-a','--base',f.base];
+ fs.writeFileSync(path.join(dir,'cmdline'),command.join('\0')+'\0');
+ fs.writeFileSync(path.join(dir,'environ'),`ORCA_TERMINAL_HANDLE=term_gauge\0ORCA_PANE_KEY=tab-a:leaf-gauge\0SECRET=never-return\0`);
+ fs.writeFileSync(path.join(dir,'stat'),'10 (node) '+['S',...Array(18).fill('0'),'123'].join(' '));
+ const read=()=>auto.readGaugeProcesses({...f,procRoot:proc});
+ assert.deepEqual(read(),[{pid:10,start:'123',sessionId:'session-a',handle:'term_gauge',paneKey:'tab-a:leaf-gauge'}]);
+ command[1]=path.join(f.home,'foreign.mjs');fs.writeFileSync(path.join(dir,'cmdline'),command.join('\0')+'\0');assert.deepEqual(read(),[]);
+ command[1]=f.entry;command[6]=path.join(f.home,'other-base');fs.writeFileSync(path.join(dir,'cmdline'),command.join('\0')+'\0');assert.deepEqual(read(),[]);
+});
+test('a second live watch is removed only beside the proven titled watch for the same session',async t=>{
+ const f=fixture(t),closed=[];await auto.registerOrca(f);
+ const duplicate={...restored,handle:'term_duplicate',leafId:'leaf-duplicate',paneTitle:null};
+ const graph={type:'pane-split',direction:'horizontal',first:lower,second:term(duplicate.handle)};
+ const processes=[{pid:10,start:'100',sessionId:'session-a',handle:restored.handle,paneKey:`${tabId}:${restored.leafId}`},
+  {pid:20,start:'200',sessionId:'session-a',handle:duplicate.handle,paneKey:`${tabId}:${duplicate.leafId}`}];
+ const run=async args=>{
+  if(args[1]==='list')return visible(graph,[primary,restored,duplicate]);
+  if(args[1]==='show')return {terminal:duplicate};
+  if(args[1]==='close'){closed.push(args[3]);return {close:{handle:args[3],ptyKilled:true}};}
+  throw Error('unexpected write');
+ };
+ const result=await auto.reconcileOrca({...f,run,readProcesses:()=>processes});
+ assert.deepEqual(closed,['term_duplicate']);assert.deepEqual(result.duplicatesClosed,['term_duplicate']);
+ // Neither a lookalike screen nor another session, tab, agent, or changed process proves ownership.
+ for(const change of [{processes:processes.slice(0,1)},{processes:[processes[0],{...processes[1],sessionId:'other'}]},
+   {pane:{agentIdentity:'codex'}},{pane:{tabId:'foreign'}},{pane:{paneTitle:'my shell'}},{pane:{incarnationId:undefined}}]){
+  closed.length=0;
+  await auto.reconcileOrca({...f,readProcesses:()=>change.processes??processes,run:async args=>{
+   if(args[1]==='list')return visible(graph,[primary,restored,{...duplicate,...change.pane}]);
+   if(args[1]==='show')return {terminal:{...duplicate,...change.pane}};
+   if(args[1]==='read')return {terminal:{...blankScreen,tail:['running watch']}};
+   return run(args);
+  }});
+  assert.deepEqual(closed,[]);
+ }
+ closed.length=0;let reads=0;
+ await auto.reconcileOrca({...f,run,readProcesses:()=>++reads===1?processes:processes.slice(0,1)});
+ assert.deepEqual(closed,[]);
+});
 test('a restored shell can have wrapped history above its final empty prompt',async t=>{
  const f=fixture(t);await auto.registerOrca(f);
  const run=async args=>{

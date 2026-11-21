@@ -63,12 +63,70 @@ function emptyShell(screen,pane){
  const cwd=pane.worktreePath,home=os.homedir();
  return Boolean(prompt&&(prompt[1]===cwd||cwd===home&&prompt[1]==='~'||cwd.startsWith(home+'/')&&prompt[1]==='~'+cwd.slice(home.length)));
 }
-export async function reconcileOrca({base,home,account,entry,node=process.execPath,run}){
+// Inspect only our exact watch command. Never return environment contents or prompt text.
+export function readGaugeProcesses({entry,base,procRoot='/proc'}){
+ if(process.platform!=='linux')return [];
+ let dirs;try{dirs=fs.readdirSync(procRoot);}catch{return [];}
+ const found=[],exe=fs.realpathSync(process.execPath);
+ for(const id of dirs){
+  if(!/^\d+$/.test(id))continue;
+  try{
+   const dir=path.join(procRoot,id);
+   if(fs.realpathSync(path.join(dir,'exe'))!==exe)continue;
+   const argv=fs.readFileSync(path.join(dir,'cmdline'),'utf8').split('\0').filter(Boolean);
+   if(argv[1]!==entry||argv[2]!=='watch')continue;
+   const opts={};let valid=true;
+   for(let i=3;i<argv.length;i+=2){
+    const key=argv[i];if(!['--session','--base','--cols'].includes(key)||!argv[i+1]||opts[key]!==undefined){valid=false;break;}
+    opts[key]=argv[i+1];
+   }
+   if(!valid||path.resolve(opts['--base']??path.join(os.homedir(),'.mai'))!==path.resolve(base))continue;
+   const sessionId=validateId(opts['--session']);
+   let handle,paneKey;
+   for(const line of fs.readFileSync(path.join(dir,'environ'),'utf8').split('\0')){
+    if(line.startsWith('ORCA_TERMINAL_HANDLE='))handle=line.slice(21);
+    if(line.startsWith('ORCA_PANE_KEY='))paneKey=line.slice(14);
+   }
+   if(!terminalFormat.test(handle??'')||!keyFormat.test(paneKey??''))continue;
+   const stat=fs.readFileSync(path.join(dir,'stat'),'utf8');
+   const start=stat.slice(stat.lastIndexOf(')')+2).split(' ')[19];
+   if(!/^\d+$/.test(start??''))continue;
+   found.push({pid:Number(id),start,sessionId,handle,paneKey});
+  }catch{/* Exited, inaccessible or unproven processes are not ours to close. */}
+ }
+ return found;
+}
+export async function reconcileOrca({base,home,account,entry,node=process.execPath,run,readProcesses=()=>readGaugeProcesses({entry,base})}){
  if(![entry,node,base].every(p=>typeof p==='string'&&path.isAbsolute(p)))throw Error('invalid Orca gauge launcher');
  const layout=await run(['terminal','list','--include-visual-layouts','--json']);
- const sessions=[],attached=[],restored=[],titleFailures=[];
+ const sessions=[],attached=[],restored=[],titleFailures=[],duplicatesClosed=[],duplicateFailures=[];
  if(layout?.truncated!==false||!Array.isArray(layout.terminals)||!Array.isArray(layout.visualLayouts))throw Error('complete Orca topology unavailable');
  const allTabs=layout.visualLayouts.flatMap(x=>groupTabs(x.root)),bindings=new Map();
+ const processes=readProcesses(),repairedTabs=new Set();
+ const owns=(p,row)=>p.handle===row.handle&&p.paneKey===`${row.tabId}:${row.leafId}`;
+ const localShell=row=>row?.connected===true&&row.writable===true&&!row.orphaned&&row.agentIdentity==null&&row.executionHostId==='local'&&/^[-\w]{1,128}$/.test(row.incarnationId??'');
+ // A screen or title alone is never permission to close a pane. Require two live
+ // copies of this exact watch, same session and tab, and preserve the titled copy.
+ for(const keeper of layout.terminals){
+  if(!localShell(keeper))continue;
+  const canonical=processes.find(p=>owns(p,keeper)&&keeper.paneTitle===titleFor(p.sessionId));
+  if(!canonical||layout.terminals.filter(r=>r.paneTitle===keeper.paneTitle&&r.tabId===keeper.tabId).length!==1)continue;
+  for(const duplicate of layout.terminals){
+   if(duplicate.handle===keeper.handle||duplicate.paneTitle!=null||!localShell(duplicate)||duplicate.tabId!==keeper.tabId||duplicate.worktreeId!==keeper.worktreeId)continue;
+   const evidence=processes.find(p=>owns(p,duplicate)&&p.sessionId===canonical.sessionId);
+   if(!evidence)continue;
+   try{
+    const current=(await run(['terminal','show','--terminal',duplicate.handle,'--json']))?.terminal;
+    if(!localShell(current)||current.paneTitle!=null||current.tabId!==duplicate.tabId||current.leafId!==duplicate.leafId||current.incarnationId!==duplicate.incarnationId)continue;
+    const fresh=readProcesses();
+    if(![canonical,evidence].every(p=>fresh.some(q=>q.pid===p.pid&&q.start===p.start&&q.sessionId===p.sessionId&&q.handle===p.handle&&q.paneKey===p.paneKey)))continue;
+    const receipt=await run(['terminal','close','--terminal',duplicate.handle,'--json']);
+    if(receipt?.close?.handle===duplicate.handle&&receipt.close.ptyKilled===true)duplicatesClosed.push(duplicate.handle);
+    else duplicateFailures.push(duplicate.handle);
+   }catch{duplicateFailures.push(duplicate.handle);}
+   repairedTabs.add(duplicate.tabId);
+  }
+ }
  const watch=(id)=>`${quote(node)} ${quote(entry)} watch --session ${validateId(id)} --base ${quote(base)}`;
  for(const registration of readOrcaRegistrations({base,home,account})){
   const {sessionId,paneKey,handle}=registration;
@@ -79,7 +137,7 @@ export async function reconcileOrca({base,home,account,entry,node=process.execPa
   const tab=allTabs.find(x=>x.tabId===tabId),handles=paneHandles(tab?.panes);
   if(!handles.includes(handle))continue;
   bindings.set(paneKey,registration);sessions.push(sessionId);
-  if(handles.length!==1||registration.attempted===handle)continue;
+  if(handles.length!==1||registration.attempted===handle||repairedTabs.has(tabId)||processes.some(p=>p.sessionId===sessionId))continue;
   const title=titleFor(sessionId),command=watch(sessionId);
   const claim=atomicUpdate(fileFor(base,sessionId),sessionId,old=>{
    if(!samePane(old,registration)||old.attempted===handle)return null;
@@ -102,6 +160,7 @@ export async function reconcileOrca({base,home,account,entry,node=process.execPa
  // The title can recover an existing split, never create one or assert hook registration.
  const registeredSessions=new Set(sessions);
  for(const {tabId,panes} of allTabs){
+  if(repairedTabs.has(tabId))continue;
   if(panes?.type!=='pane-split'||panes.direction!=='horizontal'||panes.first?.type!=='terminal'||panes.second?.type!=='terminal')continue;
   const upper=panes.first.handle,lower=panes.second.handle;
   if(!terminalFormat.test(upper??'')||!terminalFormat.test(lower??'')||upper===lower)continue;
@@ -138,7 +197,7 @@ export async function reconcileOrca({base,home,account,entry,node=process.execPa
    if(receipt?.send?.accepted===true&&receipt.send.handle===lower)restored.push(sessionId);
   }catch{/* Fail closed, or preserve the claim if the input may have arrived. */}
  }
- return {sessions,attached,restored,titleFailures};
+ return {sessions,attached,restored,titleFailures,duplicatesClosed,duplicateFailures};
 }
 
 const exec=promisify(execFile);

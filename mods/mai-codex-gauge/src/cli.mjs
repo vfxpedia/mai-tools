@@ -109,7 +109,7 @@ export async function main(args=process.argv.slice(2)){
    const query=sessions.length>0&&Boolean(rpc)&&Date.now()>=nextQuota;if(query)nextQuota=Date.now()+60000;
    const result=sessions.length?await syncGauge({base,home,account,sessions,cache,readQuota:query?async()=>(await readProviderUsage({...rpc,sessionId:sessions[0],includeLimits:true})).rateLimits:null}):{observed:0,quotaReceived:false,quotaUpdated:0,failed:[]};
    const state=JSON.stringify([result.failed,sessions.length,auto&&topology===null]);
-   if(query||state!==previous||topology?.attached.length||topology?.restored.length||!loop)console.log(JSON.stringify({...result,quotaQueried:query,...(auto?{orcaReachable:topology!==null,attached:topology?.attached??[],restoreAccepted:topology?.restored??[],titleFailures:topology?.titleFailures??[]}:{} )}));
+   if(query||state!==previous||topology?.attached.length||topology?.restored.length||topology?.duplicatesClosed.length||topology?.duplicateFailures.length||!loop)console.log(JSON.stringify({...result,quotaQueried:query,...(auto?{orcaReachable:topology!==null,attached:topology?.attached??[],restoreAccepted:topology?.restored??[],titleFailures:topology?.titleFailures??[],duplicatesClosed:topology?.duplicatesClosed??[],duplicateFailures:topology?.duplicateFailures??[]}:{} )}));
    previous=state;
    if(!loop){if(result.failed.length||query&&!result.quotaReceived||auto&&topology===null)process.exitCode=1;return;}
    await new Promise(resolve=>setTimeout(resolve,5000));

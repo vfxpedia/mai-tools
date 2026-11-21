@@ -118,10 +118,11 @@ test('a second live watch is removed only beside the proven titled watch for the
  assert.deepEqual(closed,['term_duplicate']);assert.deepEqual(result.duplicatesClosed,['term_duplicate']);
  // Neither a lookalike screen nor another session, tab, agent, or changed process proves ownership.
  for(const change of [{processes:processes.slice(0,1)},{processes:[processes[0],{...processes[1],sessionId:'other'}]},
-   {pane:{agentIdentity:'codex'}},{pane:{tabId:'foreign'}},{pane:{paneTitle:'my shell'}}]){
+   {pane:{agentIdentity:'codex'}},{pane:{tabId:'foreign'}},{pane:{paneTitle:'my shell'}},{pane:{incarnationId:undefined}}]){
   closed.length=0;
   await auto.reconcileOrca({...f,readProcesses:()=>change.processes??processes,run:async args=>{
    if(args[1]==='list')return visible(graph,[primary,restored,{...duplicate,...change.pane}]);
+   if(args[1]==='show')return {terminal:{...duplicate,...change.pane}};
    if(args[1]==='read')return {terminal:{...blankScreen,tail:['running watch']}};
    return run(args);
   }});

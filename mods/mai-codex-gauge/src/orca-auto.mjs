@@ -104,7 +104,7 @@ export async function reconcileOrca({base,home,account,entry,node=process.execPa
  const allTabs=layout.visualLayouts.flatMap(x=>groupTabs(x.root)),bindings=new Map();
  const processes=readProcesses(),repairedTabs=new Set();
  const owns=(p,row)=>p.handle===row.handle&&p.paneKey===`${row.tabId}:${row.leafId}`;
- const localShell=row=>row?.connected===true&&row.writable===true&&!row.orphaned&&row.agentIdentity==null&&row.executionHostId==='local';
+ const localShell=row=>row?.connected===true&&row.writable===true&&!row.orphaned&&row.agentIdentity==null&&row.executionHostId==='local'&&/^[-\w]{1,128}$/.test(row.incarnationId??'');
  // A screen or title alone is never permission to close a pane. Require two live
  // copies of this exact watch, same session and tab, and preserve the titled copy.
  for(const keeper of layout.terminals){
